@@ -1,0 +1,23 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "coinflakes-v2-ui: debug client",
+            "type": "chrome",
+            "request": "launch",
+            "userDataDir": false,
+            "runtimeArgs": [
+                "--profile-directory=Web3DebugProfile",
+            ],
+            "url": "http://localhost:3000/",
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ]
+        }
+    ]
+}

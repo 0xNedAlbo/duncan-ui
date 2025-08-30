@@ -1,0 +1,26 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "command": "./tools/startLocalhost.sh",
+            "problemMatcher": [],
+            "label": "tools: start local node",
+            "detail": "Start an a local rpc node",
+        },
+        {
+            "type": "shell",
+            "command": "./tools/fundAccount.sh",
+            "problemMatcher": [],
+            "label": "tools: fund test account",
+            "detail": "Fund the test account with 10K DAI"
+        },
+        {
+            "type": "shell",
+            "command": "npm run dev",
+            "problemMatcher": [],
+            "label": "npm: run dev server",
+            "detail": "Run the dev server at localhost:3000"
+        },
+    ]
+}
