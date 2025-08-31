@@ -4,23 +4,8 @@ import { EvmAddress } from "./evmAddress";
 import { TickMath, encodeSqrtRatioX96 } from "@uniswap/v3-sdk";
 import { parseUnits } from "viem";
 
-export type UniswapV3Pool = {
-    chainId?: number;
-    address?: EvmAddress;
-    token0: Erc20Token;
-    token1: Erc20Token;
-    fee?: 500 | 3000 | 10000;
-};
-
-export type UniswapV3Position = {
-    positionId?: number;
-    owner?: EvmAddress;
-    pool: UniswapV3Pool;
-    liquidity: bigint;
-    tickLower: number;
-    tickUpper: number;
-    tickCurrent: number;
-};
+export const feeTiers = [100, 500, 3000, 10000];
+export type FeeTiersType = 100 | 500 | 3000 | 10000;
 
 export function getTickFromPrice(
     priceStr: string,

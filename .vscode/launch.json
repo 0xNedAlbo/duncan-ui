@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "coinflakes-v2-ui: debug client",
+            "name": "duncan-ui: debug client",
             "type": "chrome",
             "request": "launch",
             "userDataDir": false,

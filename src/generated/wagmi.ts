@@ -622,6 +622,653 @@ export const nonfungiblePositionManagerConfig = {
 } as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Pool
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const poolAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tickLower',
+        internalType: 'int24',
+        type: 'int24',
+        indexed: true,
+      },
+      {
+        name: 'tickUpper',
+        internalType: 'int24',
+        type: 'int24',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint128',
+        type: 'uint128',
+        indexed: false,
+      },
+      {
+        name: 'amount0',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amount1',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Burn',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'recipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'tickLower',
+        internalType: 'int24',
+        type: 'int24',
+        indexed: true,
+      },
+      {
+        name: 'tickUpper',
+        internalType: 'int24',
+        type: 'int24',
+        indexed: true,
+      },
+      {
+        name: 'amount0',
+        internalType: 'uint128',
+        type: 'uint128',
+        indexed: false,
+      },
+      {
+        name: 'amount1',
+        internalType: 'uint128',
+        type: 'uint128',
+        indexed: false,
+      },
+    ],
+    name: 'Collect',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'sender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'recipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount0',
+        internalType: 'uint128',
+        type: 'uint128',
+        indexed: false,
+      },
+      {
+        name: 'amount1',
+        internalType: 'uint128',
+        type: 'uint128',
+        indexed: false,
+      },
+    ],
+    name: 'CollectProtocol',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'sender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'recipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount0',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amount1',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'paid0',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'paid1',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Flash',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'observationCardinalityNextOld',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+      {
+        name: 'observationCardinalityNextNew',
+        internalType: 'uint16',
+        type: 'uint16',
+        indexed: false,
+      },
+    ],
+    name: 'IncreaseObservationCardinalityNext',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'sqrtPriceX96',
+        internalType: 'uint160',
+        type: 'uint160',
+        indexed: false,
+      },
+      { name: 'tick', internalType: 'int24', type: 'int24', indexed: false },
+    ],
+    name: 'Initialize',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'sender',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tickLower',
+        internalType: 'int24',
+        type: 'int24',
+        indexed: true,
+      },
+      {
+        name: 'tickUpper',
+        internalType: 'int24',
+        type: 'int24',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint128',
+        type: 'uint128',
+        indexed: false,
+      },
+      {
+        name: 'amount0',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amount1',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Mint',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'feeProtocol0Old',
+        internalType: 'uint8',
+        type: 'uint8',
+        indexed: false,
+      },
+      {
+        name: 'feeProtocol1Old',
+        internalType: 'uint8',
+        type: 'uint8',
+        indexed: false,
+      },
+      {
+        name: 'feeProtocol0New',
+        internalType: 'uint8',
+        type: 'uint8',
+        indexed: false,
+      },
+      {
+        name: 'feeProtocol1New',
+        internalType: 'uint8',
+        type: 'uint8',
+        indexed: false,
+      },
+    ],
+    name: 'SetFeeProtocol',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'sender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'recipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount0',
+        internalType: 'int256',
+        type: 'int256',
+        indexed: false,
+      },
+      {
+        name: 'amount1',
+        internalType: 'int256',
+        type: 'int256',
+        indexed: false,
+      },
+      {
+        name: 'sqrtPriceX96',
+        internalType: 'uint160',
+        type: 'uint160',
+        indexed: false,
+      },
+      {
+        name: 'liquidity',
+        internalType: 'uint128',
+        type: 'uint128',
+        indexed: false,
+      },
+      { name: 'tick', internalType: 'int24', type: 'int24', indexed: false },
+    ],
+    name: 'Swap',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tickLower', internalType: 'int24', type: 'int24' },
+      { name: 'tickUpper', internalType: 'int24', type: 'int24' },
+      { name: 'amount', internalType: 'uint128', type: 'uint128' },
+    ],
+    name: 'burn',
+    outputs: [
+      { name: 'amount0', internalType: 'uint256', type: 'uint256' },
+      { name: 'amount1', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'recipient', internalType: 'address', type: 'address' },
+      { name: 'tickLower', internalType: 'int24', type: 'int24' },
+      { name: 'tickUpper', internalType: 'int24', type: 'int24' },
+      { name: 'amount0Requested', internalType: 'uint128', type: 'uint128' },
+      { name: 'amount1Requested', internalType: 'uint128', type: 'uint128' },
+    ],
+    name: 'collect',
+    outputs: [
+      { name: 'amount0', internalType: 'uint128', type: 'uint128' },
+      { name: 'amount1', internalType: 'uint128', type: 'uint128' },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'recipient', internalType: 'address', type: 'address' },
+      { name: 'amount0Requested', internalType: 'uint128', type: 'uint128' },
+      { name: 'amount1Requested', internalType: 'uint128', type: 'uint128' },
+    ],
+    name: 'collectProtocol',
+    outputs: [
+      { name: 'amount0', internalType: 'uint128', type: 'uint128' },
+      { name: 'amount1', internalType: 'uint128', type: 'uint128' },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'factory',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'fee',
+    outputs: [{ name: '', internalType: 'uint24', type: 'uint24' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'feeGrowthGlobal0X128',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'feeGrowthGlobal1X128',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'recipient', internalType: 'address', type: 'address' },
+      { name: 'amount0', internalType: 'uint256', type: 'uint256' },
+      { name: 'amount1', internalType: 'uint256', type: 'uint256' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'flash',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      {
+        name: 'observationCardinalityNext',
+        internalType: 'uint16',
+        type: 'uint16',
+      },
+    ],
+    name: 'increaseObservationCardinalityNext',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'sqrtPriceX96', internalType: 'uint160', type: 'uint160' },
+    ],
+    name: 'initialize',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'liquidity',
+    outputs: [{ name: '', internalType: 'uint128', type: 'uint128' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'maxLiquidityPerTick',
+    outputs: [{ name: '', internalType: 'uint128', type: 'uint128' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'recipient', internalType: 'address', type: 'address' },
+      { name: 'tickLower', internalType: 'int24', type: 'int24' },
+      { name: 'tickUpper', internalType: 'int24', type: 'int24' },
+      { name: 'amount', internalType: 'uint128', type: 'uint128' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'mint',
+    outputs: [
+      { name: 'amount0', internalType: 'uint256', type: 'uint256' },
+      { name: 'amount1', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'observations',
+    outputs: [
+      { name: 'blockTimestamp', internalType: 'uint32', type: 'uint32' },
+      { name: 'tickCumulative', internalType: 'int56', type: 'int56' },
+      {
+        name: 'secondsPerLiquidityCumulativeX128',
+        internalType: 'uint160',
+        type: 'uint160',
+      },
+      { name: 'initialized', internalType: 'bool', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'secondsAgos', internalType: 'uint32[]', type: 'uint32[]' },
+    ],
+    name: 'observe',
+    outputs: [
+      { name: 'tickCumulatives', internalType: 'int56[]', type: 'int56[]' },
+      {
+        name: 'secondsPerLiquidityCumulativeX128s',
+        internalType: 'uint160[]',
+        type: 'uint160[]',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'positions',
+    outputs: [
+      { name: 'liquidity', internalType: 'uint128', type: 'uint128' },
+      {
+        name: 'feeGrowthInside0LastX128',
+        internalType: 'uint256',
+        type: 'uint256',
+      },
+      {
+        name: 'feeGrowthInside1LastX128',
+        internalType: 'uint256',
+        type: 'uint256',
+      },
+      { name: 'tokensOwed0', internalType: 'uint128', type: 'uint128' },
+      { name: 'tokensOwed1', internalType: 'uint128', type: 'uint128' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'protocolFees',
+    outputs: [
+      { name: 'token0', internalType: 'uint128', type: 'uint128' },
+      { name: 'token1', internalType: 'uint128', type: 'uint128' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'feeProtocol0', internalType: 'uint8', type: 'uint8' },
+      { name: 'feeProtocol1', internalType: 'uint8', type: 'uint8' },
+    ],
+    name: 'setFeeProtocol',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'slot0',
+    outputs: [
+      { name: 'sqrtPriceX96', internalType: 'uint160', type: 'uint160' },
+      { name: 'tick', internalType: 'int24', type: 'int24' },
+      { name: 'observationIndex', internalType: 'uint16', type: 'uint16' },
+      {
+        name: 'observationCardinality',
+        internalType: 'uint16',
+        type: 'uint16',
+      },
+      {
+        name: 'observationCardinalityNext',
+        internalType: 'uint16',
+        type: 'uint16',
+      },
+      { name: 'feeProtocol', internalType: 'uint8', type: 'uint8' },
+      { name: 'unlocked', internalType: 'bool', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tickLower', internalType: 'int24', type: 'int24' },
+      { name: 'tickUpper', internalType: 'int24', type: 'int24' },
+    ],
+    name: 'snapshotCumulativesInside',
+    outputs: [
+      { name: 'tickCumulativeInside', internalType: 'int56', type: 'int56' },
+      {
+        name: 'secondsPerLiquidityInsideX128',
+        internalType: 'uint160',
+        type: 'uint160',
+      },
+      { name: 'secondsInside', internalType: 'uint32', type: 'uint32' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'recipient', internalType: 'address', type: 'address' },
+      { name: 'zeroForOne', internalType: 'bool', type: 'bool' },
+      { name: 'amountSpecified', internalType: 'int256', type: 'int256' },
+      { name: 'sqrtPriceLimitX96', internalType: 'uint160', type: 'uint160' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'swap',
+    outputs: [
+      { name: 'amount0', internalType: 'int256', type: 'int256' },
+      { name: 'amount1', internalType: 'int256', type: 'int256' },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'int16', type: 'int16' }],
+    name: 'tickBitmap',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'tickSpacing',
+    outputs: [{ name: '', internalType: 'int24', type: 'int24' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'int24', type: 'int24' }],
+    name: 'ticks',
+    outputs: [
+      { name: 'liquidityGross', internalType: 'uint128', type: 'uint128' },
+      { name: 'liquidityNet', internalType: 'int128', type: 'int128' },
+      {
+        name: 'feeGrowthOutside0X128',
+        internalType: 'uint256',
+        type: 'uint256',
+      },
+      {
+        name: 'feeGrowthOutside1X128',
+        internalType: 'uint256',
+        type: 'uint256',
+      },
+      { name: 'tickCumulativeOutside', internalType: 'int56', type: 'int56' },
+      {
+        name: 'secondsPerLiquidityOutsideX128',
+        internalType: 'uint160',
+        type: 'uint160',
+      },
+      { name: 'secondsOutside', internalType: 'uint32', type: 'uint32' },
+      { name: 'initialized', internalType: 'bool', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'token0',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'token1',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // React
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1290,3 +1937,393 @@ export const useWatchNonfungiblePositionManagerTransferEvent =
     address: nonfungiblePositionManagerAddress,
     eventName: 'Transfer',
   })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__
+ */
+export const useReadPool = /*#__PURE__*/ createUseReadContract({ abi: poolAbi })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"factory"`
+ */
+export const useReadPoolFactory = /*#__PURE__*/ createUseReadContract({
+  abi: poolAbi,
+  functionName: 'factory',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"fee"`
+ */
+export const useReadPoolFee = /*#__PURE__*/ createUseReadContract({
+  abi: poolAbi,
+  functionName: 'fee',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"feeGrowthGlobal0X128"`
+ */
+export const useReadPoolFeeGrowthGlobal0X128 =
+  /*#__PURE__*/ createUseReadContract({
+    abi: poolAbi,
+    functionName: 'feeGrowthGlobal0X128',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"feeGrowthGlobal1X128"`
+ */
+export const useReadPoolFeeGrowthGlobal1X128 =
+  /*#__PURE__*/ createUseReadContract({
+    abi: poolAbi,
+    functionName: 'feeGrowthGlobal1X128',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"liquidity"`
+ */
+export const useReadPoolLiquidity = /*#__PURE__*/ createUseReadContract({
+  abi: poolAbi,
+  functionName: 'liquidity',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"maxLiquidityPerTick"`
+ */
+export const useReadPoolMaxLiquidityPerTick =
+  /*#__PURE__*/ createUseReadContract({
+    abi: poolAbi,
+    functionName: 'maxLiquidityPerTick',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"observations"`
+ */
+export const useReadPoolObservations = /*#__PURE__*/ createUseReadContract({
+  abi: poolAbi,
+  functionName: 'observations',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"observe"`
+ */
+export const useReadPoolObserve = /*#__PURE__*/ createUseReadContract({
+  abi: poolAbi,
+  functionName: 'observe',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"positions"`
+ */
+export const useReadPoolPositions = /*#__PURE__*/ createUseReadContract({
+  abi: poolAbi,
+  functionName: 'positions',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"protocolFees"`
+ */
+export const useReadPoolProtocolFees = /*#__PURE__*/ createUseReadContract({
+  abi: poolAbi,
+  functionName: 'protocolFees',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"slot0"`
+ */
+export const useReadPoolSlot0 = /*#__PURE__*/ createUseReadContract({
+  abi: poolAbi,
+  functionName: 'slot0',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"snapshotCumulativesInside"`
+ */
+export const useReadPoolSnapshotCumulativesInside =
+  /*#__PURE__*/ createUseReadContract({
+    abi: poolAbi,
+    functionName: 'snapshotCumulativesInside',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"tickBitmap"`
+ */
+export const useReadPoolTickBitmap = /*#__PURE__*/ createUseReadContract({
+  abi: poolAbi,
+  functionName: 'tickBitmap',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"tickSpacing"`
+ */
+export const useReadPoolTickSpacing = /*#__PURE__*/ createUseReadContract({
+  abi: poolAbi,
+  functionName: 'tickSpacing',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"ticks"`
+ */
+export const useReadPoolTicks = /*#__PURE__*/ createUseReadContract({
+  abi: poolAbi,
+  functionName: 'ticks',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"token0"`
+ */
+export const useReadPoolToken0 = /*#__PURE__*/ createUseReadContract({
+  abi: poolAbi,
+  functionName: 'token0',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"token1"`
+ */
+export const useReadPoolToken1 = /*#__PURE__*/ createUseReadContract({
+  abi: poolAbi,
+  functionName: 'token1',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__
+ */
+export const useWritePool = /*#__PURE__*/ createUseWriteContract({
+  abi: poolAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"burn"`
+ */
+export const useWritePoolBurn = /*#__PURE__*/ createUseWriteContract({
+  abi: poolAbi,
+  functionName: 'burn',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"collect"`
+ */
+export const useWritePoolCollect = /*#__PURE__*/ createUseWriteContract({
+  abi: poolAbi,
+  functionName: 'collect',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"collectProtocol"`
+ */
+export const useWritePoolCollectProtocol = /*#__PURE__*/ createUseWriteContract(
+  { abi: poolAbi, functionName: 'collectProtocol' },
+)
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"flash"`
+ */
+export const useWritePoolFlash = /*#__PURE__*/ createUseWriteContract({
+  abi: poolAbi,
+  functionName: 'flash',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"increaseObservationCardinalityNext"`
+ */
+export const useWritePoolIncreaseObservationCardinalityNext =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: poolAbi,
+    functionName: 'increaseObservationCardinalityNext',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useWritePoolInitialize = /*#__PURE__*/ createUseWriteContract({
+  abi: poolAbi,
+  functionName: 'initialize',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"mint"`
+ */
+export const useWritePoolMint = /*#__PURE__*/ createUseWriteContract({
+  abi: poolAbi,
+  functionName: 'mint',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"setFeeProtocol"`
+ */
+export const useWritePoolSetFeeProtocol = /*#__PURE__*/ createUseWriteContract({
+  abi: poolAbi,
+  functionName: 'setFeeProtocol',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"swap"`
+ */
+export const useWritePoolSwap = /*#__PURE__*/ createUseWriteContract({
+  abi: poolAbi,
+  functionName: 'swap',
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__
+ */
+export const useSimulatePool = /*#__PURE__*/ createUseSimulateContract({
+  abi: poolAbi,
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"burn"`
+ */
+export const useSimulatePoolBurn = /*#__PURE__*/ createUseSimulateContract({
+  abi: poolAbi,
+  functionName: 'burn',
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"collect"`
+ */
+export const useSimulatePoolCollect = /*#__PURE__*/ createUseSimulateContract({
+  abi: poolAbi,
+  functionName: 'collect',
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"collectProtocol"`
+ */
+export const useSimulatePoolCollectProtocol =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: poolAbi,
+    functionName: 'collectProtocol',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"flash"`
+ */
+export const useSimulatePoolFlash = /*#__PURE__*/ createUseSimulateContract({
+  abi: poolAbi,
+  functionName: 'flash',
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"increaseObservationCardinalityNext"`
+ */
+export const useSimulatePoolIncreaseObservationCardinalityNext =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: poolAbi,
+    functionName: 'increaseObservationCardinalityNext',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"initialize"`
+ */
+export const useSimulatePoolInitialize =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: poolAbi,
+    functionName: 'initialize',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"mint"`
+ */
+export const useSimulatePoolMint = /*#__PURE__*/ createUseSimulateContract({
+  abi: poolAbi,
+  functionName: 'mint',
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"setFeeProtocol"`
+ */
+export const useSimulatePoolSetFeeProtocol =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: poolAbi,
+    functionName: 'setFeeProtocol',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"swap"`
+ */
+export const useSimulatePoolSwap = /*#__PURE__*/ createUseSimulateContract({
+  abi: poolAbi,
+  functionName: 'swap',
+})
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__
+ */
+export const useWatchPoolEvent = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: poolAbi,
+})
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"Burn"`
+ */
+export const useWatchPoolBurnEvent = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: poolAbi,
+  eventName: 'Burn',
+})
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"Collect"`
+ */
+export const useWatchPoolCollectEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: poolAbi,
+    eventName: 'Collect',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"CollectProtocol"`
+ */
+export const useWatchPoolCollectProtocolEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: poolAbi,
+    eventName: 'CollectProtocol',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"Flash"`
+ */
+export const useWatchPoolFlashEvent = /*#__PURE__*/ createUseWatchContractEvent(
+  { abi: poolAbi, eventName: 'Flash' },
+)
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"IncreaseObservationCardinalityNext"`
+ */
+export const useWatchPoolIncreaseObservationCardinalityNextEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: poolAbi,
+    eventName: 'IncreaseObservationCardinalityNext',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"Initialize"`
+ */
+export const useWatchPoolInitializeEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: poolAbi,
+    eventName: 'Initialize',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"Mint"`
+ */
+export const useWatchPoolMintEvent = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: poolAbi,
+  eventName: 'Mint',
+})
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"SetFeeProtocol"`
+ */
+export const useWatchPoolSetFeeProtocolEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: poolAbi,
+    eventName: 'SetFeeProtocol',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"Swap"`
+ */
+export const useWatchPoolSwapEvent = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: poolAbi,
+  eventName: 'Swap',
+})
