@@ -49,8 +49,9 @@ export function PositionLoaderOption(props: PositionLoaderOptionProps) {
                             </Typography>
                         </Box>
                         <Collapse in={open}>
-                            {props.helperTexts.map((text) => (
+                            {props.helperTexts.map((text, index) => (
                                 <Typography
+                                    key={index}
                                     textAlign={"left"}
                                     variant="subtitle2"
                                     sx={{

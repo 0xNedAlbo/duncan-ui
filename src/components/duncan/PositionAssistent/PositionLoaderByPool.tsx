@@ -1,13 +1,22 @@
 import { Section } from "@/components/common/Section";
 import { Erc20Token } from "@/utils/erc20Token";
-import { CheckCircle } from "@mui/icons-material";
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { Stack, Grid, Box, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
-import { useChains } from "wagmi";
-import { tokenList, quoteTokenSymbols } from "@/utils/tokenLists";
+import {
+    baseTokensForChain,
+    quoteTokensForChain,
+} from "@/utils/erc20TokenLists";
+import { EvmBlockchain } from "@/utils/evmBlockchain";
+import { BlockchainStep } from "./byPool/BlockchainStep";
+import { QuoteTokenStep } from "./byPool/QuoteTokenStep";
+import { BaseTokenStep } from "./byPool/BaseTokenStep";
+import { PoolStep } from "./byPool/PoolStep";
+import { PriceRangeStep } from "./byPool/PriceRangeStep";
+import { PositionStepper } from "./byPool/PositionStepper";
+import { UniswapV3Pool } from "@/utils/uniswapV3/uniswapV3Pool";
+import { useFindUniswapV3Pools } from "@/hooks/uniswapv3/useFindUniswapV3Pools";
 
 export function PositionLoaderByPool() {
-    const chains = useChains();
     const [baseTokenList, setBaseTokenList] = useState<
         Erc20Token[] | undefined
     >();
@@ -16,207 +25,230 @@ export function PositionLoaderByPool() {
     >();
     const [baseToken, setBaseToken] = useState<Erc20Token | undefined>();
     const [quoteToken, setQuoteToken] = useState<Erc20Token | undefined>();
-    const [chainId, setChainId] = useState<number | undefined>();
+    const [chain, setChain] = useState<EvmBlockchain | undefined>();
+    const [pool, setPool] = useState<UniswapV3Pool | undefined>();
+    const [priceRange, setPriceRange] = useState<{
+        min?: number;
+        max?: number;
+    }>({});
 
-    function onBlockchainSelect(newChainId: number | undefined) {
-        if (newChainId !== chainId) {
+    const {
+        pools,
+        isLoading: loadingPools,
+        error: poolsError,
+    } = useFindUniswapV3Pools({
+        chainId: chain?.id,
+        quoteToken: quoteToken,
+        baseToken: baseToken,
+    });
+
+    // Stepper state and logic
+
+    const getActiveStep = () => {
+        if (!chain) return 0;
+        if (!quoteToken) return 1;
+        if (!baseToken) return 2;
+        if (!pool) return 3;
+        if (!priceRange.min || !priceRange.max) return 4;
+        return 5; // All steps completed
+    };
+
+    function onBlockchainChange(newChain: EvmBlockchain | undefined) {
+        if (!newChain || newChain.id !== chain?.id) {
             setQuoteToken(undefined);
             setBaseToken(undefined);
+            setPool(undefined);
+            setPriceRange({});
         }
-        setChainId(newChainId);
+        setChain(newChain);
     }
 
     useEffect(() => {
-        if (!chainId) {
+        if (!chain) {
             setQuoteToken(undefined);
-        } else {
-            const qTokens = tokenList[chainId]
-                .filter((token) =>
-                    quoteTokenSymbols.find((symbol) => symbol === token.symbol)
-                )
-                .sort((tokenA, tokenB) =>
-                    tokenA.symbol.localeCompare(tokenB.symbol)
-                );
-            const bTokens = tokenList[chainId]
-                .filter(
-                    (token) =>
-                        !quoteTokenSymbols.find(
-                            (symbol) => symbol === token.symbol
-                        )
-                )
-                .sort((tokenA, tokenB) =>
-                    tokenA.symbol.localeCompare(tokenB.symbol)
-                );
-            setQuoteTokenList(qTokens);
-            setBaseTokenList(bTokens);
+            setBaseToken(undefined);
+            setPool(undefined);
+            setPriceRange({});
+            return;
         }
-    }, [chainId]);
+        const qTokens = quoteTokensForChain(chain.id).sort((tokenA, tokenB) =>
+            tokenA.symbol.localeCompare(tokenB.symbol)
+        );
+        const bTokens = baseTokensForChain(chain.id).sort((tokenA, tokenB) =>
+            tokenA.symbol.localeCompare(tokenB.symbol)
+        );
+        setQuoteTokenList(qTokens);
+        setBaseTokenList(bTokens);
+    }, [chain]);
 
-    function onQuoteTokenSelect(newQuoteToken: Erc20Token) {
+    // Reset pool and price range when dependencies change
+    useEffect(() => {
+        setPool(undefined);
+        setPriceRange({});
+    }, [chain, quoteToken, baseToken]);
+
+    function onQuoteTokenChange(newQuoteToken: Erc20Token) {
         setQuoteToken(newQuoteToken);
+        setPool(undefined); // Reset pool when quote token changes
+        setPriceRange({}); // Reset price range when quote token changes
     }
-    function onBaseTokenSelect(newBaseToken: Erc20Token) {
+    function onBaseTokenChange(newBaseToken: Erc20Token) {
         setBaseToken(newBaseToken);
+        setPool(undefined); // Reset pool when base token changes
+        setPriceRange({}); // Reset price range when base token changes
     }
+
+    // Reset functions for stepper navigation
+    const resetToStep = (stepIndex: number) => {
+        switch (stepIndex) {
+            case 0:
+                setChain(undefined);
+            case 1:
+                setQuoteToken(undefined);
+            case 2:
+                setBaseToken(undefined);
+            case 3:
+                setPool(undefined);
+            case 4:
+                setPriceRange({});
+        }
+    };
 
     return (
-        <Section heading="Simulate Position">
-            <Stack direction="column" spacing={4}>
-                <Box display="flex" justifyContent="center">
-                    <Box maxWidth="600px" textAlign="left" width="100%">
-                        <Typography
-                            marginBottom="1em"
-                            variant="subtitle1"
-                            color={"text.primary"}
-                        >
-                            On which blockchain do you want to manage your
-                            liquidity position?
-                        </Typography>
-                        <Box textAlign="center">
-                            <Stack
-                                direction="row"
-                                spacing={3}
-                                justifyContent="center"
-                                flexWrap="wrap"
-                            >
-                                {chains.map((chain) => (
-                                    <Button
-                                        key={chain.id}
-                                        variant="outlined"
-                                        startIcon={
-                                            chain.id === chainId ? (
-                                                <CheckCircle />
-                                            ) : undefined
-                                        }
-                                        onClick={() =>
-                                            onBlockchainSelect(chain.id)
-                                        }
-                                        sx={{ borderRadius: "16px" }}
+        <Section heading="Simulate Liquidity Position">
+            <Grid container spacing={4}>
+                {/* Stepper on the left side */}
+                <Grid item xs={12} md={3}>
+                    <PositionStepper
+                        activeStep={getActiveStep()}
+                        onResetToStep={resetToStep}
+                        selectedChain={chain}
+                        selectedQuoteToken={quoteToken}
+                        selectedBaseToken={baseToken}
+                        selectedPool={pool}
+                        selectedPriceRange={priceRange}
+                    />
+                </Grid>
+
+                {/* Main content on the right side */}
+                <Grid item xs={12} md={9}>
+                    <Stack direction="column" spacing={4}>
+                        {getActiveStep() === 0 && (
+                            <BlockchainStep
+                                onBlockchainChange={onBlockchainChange}
+                                selectedChain={chain}
+                            />
+                        )}
+
+                        {getActiveStep() === 1 && (
+                            <QuoteTokenStep
+                                tokenList={quoteTokenList}
+                                onQuoteTokenChange={onQuoteTokenChange}
+                                selectedToken={quoteToken}
+                            />
+                        )}
+
+                        {getActiveStep() === 2 && (
+                            <BaseTokenStep
+                                tokenList={baseTokenList}
+                                onBaseTokenChange={onBaseTokenChange}
+                                selectedToken={baseToken}
+                            />
+                        )}
+
+                        {getActiveStep() === 3 && (
+                            <PoolStep
+                                chain={chain}
+                                quoteToken={quoteToken}
+                                baseToken={baseToken}
+                                isLoading={loadingPools}
+                                pools={pools}
+                                error={poolsError}
+                                onPoolSelect={setPool}
+                                selectedPool={pool}
+                            />
+                        )}
+
+                        {getActiveStep() === 4 && (
+                            <PriceRangeStep
+                                chain={chain}
+                                quoteToken={quoteToken}
+                                baseToken={baseToken}
+                                pool={pool}
+                                priceRange={priceRange}
+                                onPriceRangeChange={setPriceRange}
+                            />
+                        )}
+
+                        {getActiveStep() === 5 && (
+                            <Box display="flex" justifyContent="center">
+                                <Box maxWidth="600px" textAlign="center">
+                                    <Typography
+                                        variant="h6"
+                                        color="success.main"
+                                        marginBottom="1em"
                                     >
-                                        {chain.name}
-                                    </Button>
-                                ))}
-                            </Stack>
-                        </Box>
-                    </Box>
-                </Box>{" "}
-                {chainId && (
-                    <Box display="flex" justifyContent="center">
-                        <Box maxWidth="600px" textAlign="left">
-                            <Typography
-                                variant="subtitle1"
-                                color={"text.primary"}
-                                marginBottom="1em"
-                            >
-                                Please select a Quote Token for your liquidity
-                                position.
-                            </Typography>
-                            <Box textAlign="center" marginBottom={"1em"}>
-                                <Stack
-                                    direction="row"
-                                    spacing={3}
-                                    justifyContent="center"
-                                    flexWrap="wrap"
-                                >
-                                    {quoteTokenList &&
-                                        quoteTokenList.map((token) => (
-                                            <Button
-                                                key={token.address}
-                                                variant="outlined"
-                                                startIcon={
-                                                    token.address ===
-                                                    quoteToken?.address ? (
-                                                        <CheckCircle />
-                                                    ) : undefined
-                                                }
-                                                onClick={() =>
-                                                    onQuoteTokenSelect(token)
-                                                }
-                                                sx={{ borderRadius: "16px" }}
-                                            >
-                                                {token.symbol}
-                                            </Button>
-                                        ))}
-                                </Stack>
+                                        ✅ All Steps Completed!
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        color="text.secondary"
+                                        marginBottom="1em"
+                                    >
+                                        You have successfully selected:
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        marginBottom="0.5em"
+                                    >
+                                        <strong>Blockchain:</strong>{" "}
+                                        {chain?.name}
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        marginBottom="0.5em"
+                                    >
+                                        <strong>Quote Token:</strong>{" "}
+                                        {quoteToken?.symbol}
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        marginBottom="0.5em"
+                                    >
+                                        <strong>Base Token:</strong>{" "}
+                                        {baseToken?.symbol}
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        marginBottom="0.5em"
+                                    >
+                                        <strong>Pool:</strong>{" "}
+                                        {pool
+                                            ? `${pool.token0.symbol}/${pool.token1.symbol} ${(pool.fee / 10000).toFixed(2)}%`
+                                            : "Not selected"}
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        marginBottom="1em"
+                                    >
+                                        <strong>Price Range:</strong>{" "}
+                                        {priceRange.min && priceRange.max
+                                            ? `${priceRange.min} - ${priceRange.max} ${quoteToken?.symbol} per ${baseToken?.symbol}`
+                                            : "Not set"}
+                                    </Typography>
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                    >
+                                        You can use the stepper on the left to
+                                        modify any selection.
+                                    </Typography>
+                                </Box>
                             </Box>
-
-                            <Typography
-                                variant="inherit"
-                                fontSize={"0.875rem"}
-                                marginBottom="1em"
-                                textAlign={"justify"}
-                            >
-                                <i>
-                                    The quote token represents the asset in
-                                    which the value of the base token is
-                                    expressed. In most trading pairs, the quote
-                                    token is a stablecoin — for example, in the
-                                    pair WETH/USDC, the quote token is USDC, and
-                                    sometimes it could also be USDT.
-                                </i>
-                            </Typography>
-                        </Box>
-                    </Box>
-                )}
-                {chainId && quoteToken && (
-                    <Box display="flex" justifyContent="center">
-                        <Box maxWidth="600px" textAlign="left">
-                            <Typography
-                                variant="subtitle1"
-                                color={"text.primary"}
-                                marginBottom="1em"
-                            >
-                                Please select a Base Token for your liquidity
-                                position.
-                            </Typography>
-                            <Box textAlign="center" marginBottom={"1em"}>
-                                <Stack
-                                    direction="row"
-                                    spacing={3}
-                                    justifyContent="center"
-                                    flexWrap="wrap"
-                                >
-                                    {baseTokenList &&
-                                        baseTokenList.map((token) => (
-                                            <Button
-                                                key={token.address}
-                                                variant="outlined"
-                                                startIcon={
-                                                    token.address ===
-                                                    baseToken?.address ? (
-                                                        <CheckCircle />
-                                                    ) : undefined
-                                                }
-                                                onClick={() =>
-                                                    onBaseTokenSelect(token)
-                                                }
-                                                sx={{ borderRadius: "16px" }}
-                                            >
-                                                {token.symbol}
-                                            </Button>
-                                        ))}
-                                </Stack>
-                            </Box>
-
-                            <Typography
-                                variant="inherit"
-                                fontSize={"0.875rem"}
-                                marginBottom="1em"
-                                textAlign={"justify"}
-                            >
-                                <i>
-                                    The quote token represents the asset in
-                                    which the value of the base token is
-                                    expressed. In most trading pairs, the quote
-                                    token is a stablecoin — for example, in the
-                                    pair WETH/USDC, the quote token is USDC, and
-                                    sometimes it could also be USDT.
-                                </i>
-                            </Typography>
-                        </Box>
-                    </Box>
-                )}
-            </Stack>
+                        )}
+                    </Stack>
+                </Grid>
+            </Grid>
         </Section>
     );
 }

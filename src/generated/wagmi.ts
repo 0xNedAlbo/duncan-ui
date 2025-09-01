@@ -9,6 +9,11 @@ import {
 // NonfungiblePositionManager
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ */
 export const nonfungiblePositionManagerAbi = [
   {
     type: 'constructor',
@@ -613,9 +618,22 @@ export const nonfungiblePositionManagerAbi = [
   { type: 'receive', stateMutability: 'payable' },
 ] as const
 
-export const nonfungiblePositionManagerAddress =
-  '0xC36442b4a4522E871399CD717aBDD847Ab11FE88' as const
+/**
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ */
+export const nonfungiblePositionManagerAddress = {
+  1: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
+  8453: '0x03A520B32c04bf3BEEF7BF5D48c6C4Ec1B7cEAc1',
+  42161: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
+} as const
 
+/**
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ */
 export const nonfungiblePositionManagerConfig = {
   address: nonfungiblePositionManagerAddress,
   abi: nonfungiblePositionManagerAbi,
@@ -626,532 +644,12 @@ export const nonfungiblePositionManagerConfig = {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 export const poolAbi = [
-  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'owner',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'tickLower',
-        internalType: 'int24',
-        type: 'int24',
-        indexed: true,
-      },
-      {
-        name: 'tickUpper',
-        internalType: 'int24',
-        type: 'int24',
-        indexed: true,
-      },
-      {
-        name: 'amount',
-        internalType: 'uint128',
-        type: 'uint128',
-        indexed: false,
-      },
-      {
-        name: 'amount0',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-      {
-        name: 'amount1',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-    ],
-    name: 'Burn',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'owner',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'recipient',
-        internalType: 'address',
-        type: 'address',
-        indexed: false,
-      },
-      {
-        name: 'tickLower',
-        internalType: 'int24',
-        type: 'int24',
-        indexed: true,
-      },
-      {
-        name: 'tickUpper',
-        internalType: 'int24',
-        type: 'int24',
-        indexed: true,
-      },
-      {
-        name: 'amount0',
-        internalType: 'uint128',
-        type: 'uint128',
-        indexed: false,
-      },
-      {
-        name: 'amount1',
-        internalType: 'uint128',
-        type: 'uint128',
-        indexed: false,
-      },
-    ],
-    name: 'Collect',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'sender',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'recipient',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'amount0',
-        internalType: 'uint128',
-        type: 'uint128',
-        indexed: false,
-      },
-      {
-        name: 'amount1',
-        internalType: 'uint128',
-        type: 'uint128',
-        indexed: false,
-      },
-    ],
-    name: 'CollectProtocol',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'sender',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'recipient',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'amount0',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-      {
-        name: 'amount1',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-      {
-        name: 'paid0',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-      {
-        name: 'paid1',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-    ],
-    name: 'Flash',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'observationCardinalityNextOld',
-        internalType: 'uint16',
-        type: 'uint16',
-        indexed: false,
-      },
-      {
-        name: 'observationCardinalityNextNew',
-        internalType: 'uint16',
-        type: 'uint16',
-        indexed: false,
-      },
-    ],
-    name: 'IncreaseObservationCardinalityNext',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'sqrtPriceX96',
-        internalType: 'uint160',
-        type: 'uint160',
-        indexed: false,
-      },
-      { name: 'tick', internalType: 'int24', type: 'int24', indexed: false },
-    ],
-    name: 'Initialize',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'sender',
-        internalType: 'address',
-        type: 'address',
-        indexed: false,
-      },
-      {
-        name: 'owner',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'tickLower',
-        internalType: 'int24',
-        type: 'int24',
-        indexed: true,
-      },
-      {
-        name: 'tickUpper',
-        internalType: 'int24',
-        type: 'int24',
-        indexed: true,
-      },
-      {
-        name: 'amount',
-        internalType: 'uint128',
-        type: 'uint128',
-        indexed: false,
-      },
-      {
-        name: 'amount0',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-      {
-        name: 'amount1',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-    ],
-    name: 'Mint',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'feeProtocol0Old',
-        internalType: 'uint8',
-        type: 'uint8',
-        indexed: false,
-      },
-      {
-        name: 'feeProtocol1Old',
-        internalType: 'uint8',
-        type: 'uint8',
-        indexed: false,
-      },
-      {
-        name: 'feeProtocol0New',
-        internalType: 'uint8',
-        type: 'uint8',
-        indexed: false,
-      },
-      {
-        name: 'feeProtocol1New',
-        internalType: 'uint8',
-        type: 'uint8',
-        indexed: false,
-      },
-    ],
-    name: 'SetFeeProtocol',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'sender',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'recipient',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'amount0',
-        internalType: 'int256',
-        type: 'int256',
-        indexed: false,
-      },
-      {
-        name: 'amount1',
-        internalType: 'int256',
-        type: 'int256',
-        indexed: false,
-      },
-      {
-        name: 'sqrtPriceX96',
-        internalType: 'uint160',
-        type: 'uint160',
-        indexed: false,
-      },
-      {
-        name: 'liquidity',
-        internalType: 'uint128',
-        type: 'uint128',
-        indexed: false,
-      },
-      { name: 'tick', internalType: 'int24', type: 'int24', indexed: false },
-    ],
-    name: 'Swap',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'tickLower', internalType: 'int24', type: 'int24' },
-      { name: 'tickUpper', internalType: 'int24', type: 'int24' },
-      { name: 'amount', internalType: 'uint128', type: 'uint128' },
-    ],
-    name: 'burn',
-    outputs: [
-      { name: 'amount0', internalType: 'uint256', type: 'uint256' },
-      { name: 'amount1', internalType: 'uint256', type: 'uint256' },
-    ],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'recipient', internalType: 'address', type: 'address' },
-      { name: 'tickLower', internalType: 'int24', type: 'int24' },
-      { name: 'tickUpper', internalType: 'int24', type: 'int24' },
-      { name: 'amount0Requested', internalType: 'uint128', type: 'uint128' },
-      { name: 'amount1Requested', internalType: 'uint128', type: 'uint128' },
-    ],
-    name: 'collect',
-    outputs: [
-      { name: 'amount0', internalType: 'uint128', type: 'uint128' },
-      { name: 'amount1', internalType: 'uint128', type: 'uint128' },
-    ],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'recipient', internalType: 'address', type: 'address' },
-      { name: 'amount0Requested', internalType: 'uint128', type: 'uint128' },
-      { name: 'amount1Requested', internalType: 'uint128', type: 'uint128' },
-    ],
-    name: 'collectProtocol',
-    outputs: [
-      { name: 'amount0', internalType: 'uint128', type: 'uint128' },
-      { name: 'amount1', internalType: 'uint128', type: 'uint128' },
-    ],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'factory',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'fee',
-    outputs: [{ name: '', internalType: 'uint24', type: 'uint24' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'feeGrowthGlobal0X128',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'feeGrowthGlobal1X128',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'recipient', internalType: 'address', type: 'address' },
-      { name: 'amount0', internalType: 'uint256', type: 'uint256' },
-      { name: 'amount1', internalType: 'uint256', type: 'uint256' },
-      { name: 'data', internalType: 'bytes', type: 'bytes' },
-    ],
-    name: 'flash',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      {
-        name: 'observationCardinalityNext',
-        internalType: 'uint16',
-        type: 'uint16',
-      },
-    ],
-    name: 'increaseObservationCardinalityNext',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'sqrtPriceX96', internalType: 'uint160', type: 'uint160' },
-    ],
-    name: 'initialize',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
   {
     type: 'function',
     inputs: [],
     name: 'liquidity',
     outputs: [{ name: '', internalType: 'uint128', type: 'uint128' }],
     stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'maxLiquidityPerTick',
-    outputs: [{ name: '', internalType: 'uint128', type: 'uint128' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'recipient', internalType: 'address', type: 'address' },
-      { name: 'tickLower', internalType: 'int24', type: 'int24' },
-      { name: 'tickUpper', internalType: 'int24', type: 'int24' },
-      { name: 'amount', internalType: 'uint128', type: 'uint128' },
-      { name: 'data', internalType: 'bytes', type: 'bytes' },
-    ],
-    name: 'mint',
-    outputs: [
-      { name: 'amount0', internalType: 'uint256', type: 'uint256' },
-      { name: 'amount1', internalType: 'uint256', type: 'uint256' },
-    ],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    name: 'observations',
-    outputs: [
-      { name: 'blockTimestamp', internalType: 'uint32', type: 'uint32' },
-      { name: 'tickCumulative', internalType: 'int56', type: 'int56' },
-      {
-        name: 'secondsPerLiquidityCumulativeX128',
-        internalType: 'uint160',
-        type: 'uint160',
-      },
-      { name: 'initialized', internalType: 'bool', type: 'bool' },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'secondsAgos', internalType: 'uint32[]', type: 'uint32[]' },
-    ],
-    name: 'observe',
-    outputs: [
-      { name: 'tickCumulatives', internalType: 'int56[]', type: 'int56[]' },
-      {
-        name: 'secondsPerLiquidityCumulativeX128s',
-        internalType: 'uint160[]',
-        type: 'uint160[]',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
-    name: 'positions',
-    outputs: [
-      { name: 'liquidity', internalType: 'uint128', type: 'uint128' },
-      {
-        name: 'feeGrowthInside0LastX128',
-        internalType: 'uint256',
-        type: 'uint256',
-      },
-      {
-        name: 'feeGrowthInside1LastX128',
-        internalType: 'uint256',
-        type: 'uint256',
-      },
-      { name: 'tokensOwed0', internalType: 'uint128', type: 'uint128' },
-      { name: 'tokensOwed1', internalType: 'uint128', type: 'uint128' },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'protocolFees',
-    outputs: [
-      { name: 'token0', internalType: 'uint128', type: 'uint128' },
-      { name: 'token1', internalType: 'uint128', type: 'uint128' },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'feeProtocol0', internalType: 'uint8', type: 'uint8' },
-      { name: 'feeProtocol1', internalType: 'uint8', type: 'uint8' },
-    ],
-    name: 'setFeeProtocol',
-    outputs: [],
-    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -1178,95 +676,56 @@ export const poolAbi = [
   },
   {
     type: 'function',
-    inputs: [
-      { name: 'tickLower', internalType: 'int24', type: 'int24' },
-      { name: 'tickUpper', internalType: 'int24', type: 'int24' },
-    ],
-    name: 'snapshotCumulativesInside',
-    outputs: [
-      { name: 'tickCumulativeInside', internalType: 'int56', type: 'int56' },
-      {
-        name: 'secondsPerLiquidityInsideX128',
-        internalType: 'uint160',
-        type: 'uint160',
-      },
-      { name: 'secondsInside', internalType: 'uint32', type: 'uint32' },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'recipient', internalType: 'address', type: 'address' },
-      { name: 'zeroForOne', internalType: 'bool', type: 'bool' },
-      { name: 'amountSpecified', internalType: 'int256', type: 'int256' },
-      { name: 'sqrtPriceLimitX96', internalType: 'uint160', type: 'uint160' },
-      { name: 'data', internalType: 'bytes', type: 'bytes' },
-    ],
-    name: 'swap',
-    outputs: [
-      { name: 'amount0', internalType: 'int256', type: 'int256' },
-      { name: 'amount1', internalType: 'int256', type: 'int256' },
-    ],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: '', internalType: 'int16', type: 'int16' }],
-    name: 'tickBitmap',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     inputs: [],
     name: 'tickSpacing',
     outputs: [{ name: '', internalType: 'int24', type: 'int24' }],
     stateMutability: 'view',
   },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// UniswapV3Factory
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0x1F98431c8aD98523631AE4a59f267346ea31F984)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x33128a8fC17869897dcE68Ed026d694621f6FDfD)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0x1F98431c8aD98523631AE4a59f267346ea31F984)
+ */
+export const uniswapV3FactoryAbi = [
   {
     type: 'function',
-    inputs: [{ name: '', internalType: 'int24', type: 'int24' }],
-    name: 'ticks',
-    outputs: [
-      { name: 'liquidityGross', internalType: 'uint128', type: 'uint128' },
-      { name: 'liquidityNet', internalType: 'int128', type: 'int128' },
-      {
-        name: 'feeGrowthOutside0X128',
-        internalType: 'uint256',
-        type: 'uint256',
-      },
-      {
-        name: 'feeGrowthOutside1X128',
-        internalType: 'uint256',
-        type: 'uint256',
-      },
-      { name: 'tickCumulativeOutside', internalType: 'int56', type: 'int56' },
-      {
-        name: 'secondsPerLiquidityOutsideX128',
-        internalType: 'uint160',
-        type: 'uint160',
-      },
-      { name: 'secondsOutside', internalType: 'uint32', type: 'uint32' },
-      { name: 'initialized', internalType: 'bool', type: 'bool' },
+    inputs: [
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'uint24', type: 'uint24' },
     ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'token0',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'token1',
+    name: 'getPool',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
 ] as const
+
+/**
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0x1F98431c8aD98523631AE4a59f267346ea31F984)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x33128a8fC17869897dcE68Ed026d694621f6FDfD)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0x1F98431c8aD98523631AE4a59f267346ea31F984)
+ */
+export const uniswapV3FactoryAddress = {
+  1: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
+  8453: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD',
+  42161: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
+} as const
+
+/**
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0x1F98431c8aD98523631AE4a59f267346ea31F984)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x33128a8fC17869897dcE68Ed026d694621f6FDfD)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0x1F98431c8aD98523631AE4a59f267346ea31F984)
+ */
+export const uniswapV3FactoryConfig = {
+  address: uniswapV3FactoryAddress,
+  abi: uniswapV3FactoryAbi,
+} as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // React
@@ -1274,6 +733,10 @@ export const poolAbi = [
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManager =
   /*#__PURE__*/ createUseReadContract({
@@ -1283,6 +746,10 @@ export const useReadNonfungiblePositionManager =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"DOMAIN_SEPARATOR"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerDomainSeparator =
   /*#__PURE__*/ createUseReadContract({
@@ -1293,6 +760,10 @@ export const useReadNonfungiblePositionManagerDomainSeparator =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"PERMIT_TYPEHASH"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerPermitTypehash =
   /*#__PURE__*/ createUseReadContract({
@@ -1303,6 +774,10 @@ export const useReadNonfungiblePositionManagerPermitTypehash =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"WETH9"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerWeth9 =
   /*#__PURE__*/ createUseReadContract({
@@ -1313,6 +788,10 @@ export const useReadNonfungiblePositionManagerWeth9 =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"balanceOf"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerBalanceOf =
   /*#__PURE__*/ createUseReadContract({
@@ -1323,6 +802,10 @@ export const useReadNonfungiblePositionManagerBalanceOf =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"baseURI"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerBaseUri =
   /*#__PURE__*/ createUseReadContract({
@@ -1333,6 +816,10 @@ export const useReadNonfungiblePositionManagerBaseUri =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"factory"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerFactory =
   /*#__PURE__*/ createUseReadContract({
@@ -1343,6 +830,10 @@ export const useReadNonfungiblePositionManagerFactory =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"getApproved"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerGetApproved =
   /*#__PURE__*/ createUseReadContract({
@@ -1353,6 +844,10 @@ export const useReadNonfungiblePositionManagerGetApproved =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"isApprovedForAll"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerIsApprovedForAll =
   /*#__PURE__*/ createUseReadContract({
@@ -1363,6 +858,10 @@ export const useReadNonfungiblePositionManagerIsApprovedForAll =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"name"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerName =
   /*#__PURE__*/ createUseReadContract({
@@ -1373,6 +872,10 @@ export const useReadNonfungiblePositionManagerName =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"ownerOf"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerOwnerOf =
   /*#__PURE__*/ createUseReadContract({
@@ -1383,6 +886,10 @@ export const useReadNonfungiblePositionManagerOwnerOf =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"positions"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerPositions =
   /*#__PURE__*/ createUseReadContract({
@@ -1393,6 +900,10 @@ export const useReadNonfungiblePositionManagerPositions =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"supportsInterface"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerSupportsInterface =
   /*#__PURE__*/ createUseReadContract({
@@ -1403,6 +914,10 @@ export const useReadNonfungiblePositionManagerSupportsInterface =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"symbol"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerSymbol =
   /*#__PURE__*/ createUseReadContract({
@@ -1413,6 +928,10 @@ export const useReadNonfungiblePositionManagerSymbol =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"tokenByIndex"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerTokenByIndex =
   /*#__PURE__*/ createUseReadContract({
@@ -1423,6 +942,10 @@ export const useReadNonfungiblePositionManagerTokenByIndex =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"tokenOfOwnerByIndex"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerTokenOfOwnerByIndex =
   /*#__PURE__*/ createUseReadContract({
@@ -1433,6 +956,10 @@ export const useReadNonfungiblePositionManagerTokenOfOwnerByIndex =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"tokenURI"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerTokenUri =
   /*#__PURE__*/ createUseReadContract({
@@ -1443,6 +970,10 @@ export const useReadNonfungiblePositionManagerTokenUri =
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"totalSupply"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useReadNonfungiblePositionManagerTotalSupply =
   /*#__PURE__*/ createUseReadContract({
@@ -1453,6 +984,10 @@ export const useReadNonfungiblePositionManagerTotalSupply =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManager =
   /*#__PURE__*/ createUseWriteContract({
@@ -1462,6 +997,10 @@ export const useWriteNonfungiblePositionManager =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"approve"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerApprove =
   /*#__PURE__*/ createUseWriteContract({
@@ -1472,6 +1011,10 @@ export const useWriteNonfungiblePositionManagerApprove =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"burn"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerBurn =
   /*#__PURE__*/ createUseWriteContract({
@@ -1482,6 +1025,10 @@ export const useWriteNonfungiblePositionManagerBurn =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"collect"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerCollect =
   /*#__PURE__*/ createUseWriteContract({
@@ -1492,6 +1039,10 @@ export const useWriteNonfungiblePositionManagerCollect =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"createAndInitializePoolIfNecessary"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerCreateAndInitializePoolIfNecessary =
   /*#__PURE__*/ createUseWriteContract({
@@ -1502,6 +1053,10 @@ export const useWriteNonfungiblePositionManagerCreateAndInitializePoolIfNecessar
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"decreaseLiquidity"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerDecreaseLiquidity =
   /*#__PURE__*/ createUseWriteContract({
@@ -1512,6 +1067,10 @@ export const useWriteNonfungiblePositionManagerDecreaseLiquidity =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"increaseLiquidity"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerIncreaseLiquidity =
   /*#__PURE__*/ createUseWriteContract({
@@ -1522,6 +1081,10 @@ export const useWriteNonfungiblePositionManagerIncreaseLiquidity =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"mint"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerMint =
   /*#__PURE__*/ createUseWriteContract({
@@ -1532,6 +1095,10 @@ export const useWriteNonfungiblePositionManagerMint =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"multicall"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerMulticall =
   /*#__PURE__*/ createUseWriteContract({
@@ -1542,6 +1109,10 @@ export const useWriteNonfungiblePositionManagerMulticall =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"permit"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerPermit =
   /*#__PURE__*/ createUseWriteContract({
@@ -1552,6 +1123,10 @@ export const useWriteNonfungiblePositionManagerPermit =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"refundETH"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerRefundEth =
   /*#__PURE__*/ createUseWriteContract({
@@ -1562,6 +1137,10 @@ export const useWriteNonfungiblePositionManagerRefundEth =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"safeTransferFrom"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerSafeTransferFrom =
   /*#__PURE__*/ createUseWriteContract({
@@ -1572,6 +1151,10 @@ export const useWriteNonfungiblePositionManagerSafeTransferFrom =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"selfPermit"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerSelfPermit =
   /*#__PURE__*/ createUseWriteContract({
@@ -1582,6 +1165,10 @@ export const useWriteNonfungiblePositionManagerSelfPermit =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"selfPermitAllowed"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerSelfPermitAllowed =
   /*#__PURE__*/ createUseWriteContract({
@@ -1592,6 +1179,10 @@ export const useWriteNonfungiblePositionManagerSelfPermitAllowed =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"selfPermitAllowedIfNecessary"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerSelfPermitAllowedIfNecessary =
   /*#__PURE__*/ createUseWriteContract({
@@ -1602,6 +1193,10 @@ export const useWriteNonfungiblePositionManagerSelfPermitAllowedIfNecessary =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"selfPermitIfNecessary"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerSelfPermitIfNecessary =
   /*#__PURE__*/ createUseWriteContract({
@@ -1612,6 +1207,10 @@ export const useWriteNonfungiblePositionManagerSelfPermitIfNecessary =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"setApprovalForAll"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerSetApprovalForAll =
   /*#__PURE__*/ createUseWriteContract({
@@ -1622,6 +1221,10 @@ export const useWriteNonfungiblePositionManagerSetApprovalForAll =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"sweepToken"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerSweepToken =
   /*#__PURE__*/ createUseWriteContract({
@@ -1632,6 +1235,10 @@ export const useWriteNonfungiblePositionManagerSweepToken =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"transferFrom"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerTransferFrom =
   /*#__PURE__*/ createUseWriteContract({
@@ -1642,6 +1249,10 @@ export const useWriteNonfungiblePositionManagerTransferFrom =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"uniswapV3MintCallback"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerUniswapV3MintCallback =
   /*#__PURE__*/ createUseWriteContract({
@@ -1652,6 +1263,10 @@ export const useWriteNonfungiblePositionManagerUniswapV3MintCallback =
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"unwrapWETH9"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWriteNonfungiblePositionManagerUnwrapWeth9 =
   /*#__PURE__*/ createUseWriteContract({
@@ -1662,6 +1277,10 @@ export const useWriteNonfungiblePositionManagerUnwrapWeth9 =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManager =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1671,6 +1290,10 @@ export const useSimulateNonfungiblePositionManager =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"approve"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerApprove =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1681,6 +1304,10 @@ export const useSimulateNonfungiblePositionManagerApprove =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"burn"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerBurn =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1691,6 +1318,10 @@ export const useSimulateNonfungiblePositionManagerBurn =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"collect"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerCollect =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1701,6 +1332,10 @@ export const useSimulateNonfungiblePositionManagerCollect =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"createAndInitializePoolIfNecessary"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerCreateAndInitializePoolIfNecessary =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1711,6 +1346,10 @@ export const useSimulateNonfungiblePositionManagerCreateAndInitializePoolIfNeces
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"decreaseLiquidity"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerDecreaseLiquidity =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1721,6 +1360,10 @@ export const useSimulateNonfungiblePositionManagerDecreaseLiquidity =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"increaseLiquidity"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerIncreaseLiquidity =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1731,6 +1374,10 @@ export const useSimulateNonfungiblePositionManagerIncreaseLiquidity =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"mint"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerMint =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1741,6 +1388,10 @@ export const useSimulateNonfungiblePositionManagerMint =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"multicall"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerMulticall =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1751,6 +1402,10 @@ export const useSimulateNonfungiblePositionManagerMulticall =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"permit"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerPermit =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1761,6 +1416,10 @@ export const useSimulateNonfungiblePositionManagerPermit =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"refundETH"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerRefundEth =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1771,6 +1430,10 @@ export const useSimulateNonfungiblePositionManagerRefundEth =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"safeTransferFrom"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerSafeTransferFrom =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1781,6 +1444,10 @@ export const useSimulateNonfungiblePositionManagerSafeTransferFrom =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"selfPermit"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerSelfPermit =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1791,6 +1458,10 @@ export const useSimulateNonfungiblePositionManagerSelfPermit =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"selfPermitAllowed"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerSelfPermitAllowed =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1801,6 +1472,10 @@ export const useSimulateNonfungiblePositionManagerSelfPermitAllowed =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"selfPermitAllowedIfNecessary"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerSelfPermitAllowedIfNecessary =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1811,6 +1486,10 @@ export const useSimulateNonfungiblePositionManagerSelfPermitAllowedIfNecessary =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"selfPermitIfNecessary"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerSelfPermitIfNecessary =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1821,6 +1500,10 @@ export const useSimulateNonfungiblePositionManagerSelfPermitIfNecessary =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"setApprovalForAll"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerSetApprovalForAll =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1831,6 +1514,10 @@ export const useSimulateNonfungiblePositionManagerSetApprovalForAll =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"sweepToken"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerSweepToken =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1841,6 +1528,10 @@ export const useSimulateNonfungiblePositionManagerSweepToken =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"transferFrom"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerTransferFrom =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1851,6 +1542,10 @@ export const useSimulateNonfungiblePositionManagerTransferFrom =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"uniswapV3MintCallback"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerUniswapV3MintCallback =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1861,6 +1556,10 @@ export const useSimulateNonfungiblePositionManagerUniswapV3MintCallback =
 
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `functionName` set to `"unwrapWETH9"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useSimulateNonfungiblePositionManagerUnwrapWeth9 =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1871,6 +1570,10 @@ export const useSimulateNonfungiblePositionManagerUnwrapWeth9 =
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWatchNonfungiblePositionManagerEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1880,6 +1583,10 @@ export const useWatchNonfungiblePositionManagerEvent =
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `eventName` set to `"Approval"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWatchNonfungiblePositionManagerApprovalEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1890,6 +1597,10 @@ export const useWatchNonfungiblePositionManagerApprovalEvent =
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `eventName` set to `"ApprovalForAll"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWatchNonfungiblePositionManagerApprovalForAllEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1900,6 +1611,10 @@ export const useWatchNonfungiblePositionManagerApprovalForAllEvent =
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `eventName` set to `"Collect"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWatchNonfungiblePositionManagerCollectEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1910,6 +1625,10 @@ export const useWatchNonfungiblePositionManagerCollectEvent =
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `eventName` set to `"DecreaseLiquidity"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWatchNonfungiblePositionManagerDecreaseLiquidityEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1920,6 +1639,10 @@ export const useWatchNonfungiblePositionManagerDecreaseLiquidityEvent =
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `eventName` set to `"IncreaseLiquidity"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWatchNonfungiblePositionManagerIncreaseLiquidityEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1930,6 +1653,10 @@ export const useWatchNonfungiblePositionManagerIncreaseLiquidityEvent =
 
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link nonfungiblePositionManagerAbi}__ and `eventName` set to `"Transfer"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x03a520b32C04BF3bEEf7BF5d48c6c4EC1B7Ceac1)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0xC36442b4a4522E871399CD717aBDD847Ab11FE88)
  */
 export const useWatchNonfungiblePositionManagerTransferEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1944,86 +1671,11 @@ export const useWatchNonfungiblePositionManagerTransferEvent =
 export const useReadPool = /*#__PURE__*/ createUseReadContract({ abi: poolAbi })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"factory"`
- */
-export const useReadPoolFactory = /*#__PURE__*/ createUseReadContract({
-  abi: poolAbi,
-  functionName: 'factory',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"fee"`
- */
-export const useReadPoolFee = /*#__PURE__*/ createUseReadContract({
-  abi: poolAbi,
-  functionName: 'fee',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"feeGrowthGlobal0X128"`
- */
-export const useReadPoolFeeGrowthGlobal0X128 =
-  /*#__PURE__*/ createUseReadContract({
-    abi: poolAbi,
-    functionName: 'feeGrowthGlobal0X128',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"feeGrowthGlobal1X128"`
- */
-export const useReadPoolFeeGrowthGlobal1X128 =
-  /*#__PURE__*/ createUseReadContract({
-    abi: poolAbi,
-    functionName: 'feeGrowthGlobal1X128',
-  })
-
-/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"liquidity"`
  */
 export const useReadPoolLiquidity = /*#__PURE__*/ createUseReadContract({
   abi: poolAbi,
   functionName: 'liquidity',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"maxLiquidityPerTick"`
- */
-export const useReadPoolMaxLiquidityPerTick =
-  /*#__PURE__*/ createUseReadContract({
-    abi: poolAbi,
-    functionName: 'maxLiquidityPerTick',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"observations"`
- */
-export const useReadPoolObservations = /*#__PURE__*/ createUseReadContract({
-  abi: poolAbi,
-  functionName: 'observations',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"observe"`
- */
-export const useReadPoolObserve = /*#__PURE__*/ createUseReadContract({
-  abi: poolAbi,
-  functionName: 'observe',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"positions"`
- */
-export const useReadPoolPositions = /*#__PURE__*/ createUseReadContract({
-  abi: poolAbi,
-  functionName: 'positions',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"protocolFees"`
- */
-export const useReadPoolProtocolFees = /*#__PURE__*/ createUseReadContract({
-  abi: poolAbi,
-  functionName: 'protocolFees',
 })
 
 /**
@@ -2035,23 +1687,6 @@ export const useReadPoolSlot0 = /*#__PURE__*/ createUseReadContract({
 })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"snapshotCumulativesInside"`
- */
-export const useReadPoolSnapshotCumulativesInside =
-  /*#__PURE__*/ createUseReadContract({
-    abi: poolAbi,
-    functionName: 'snapshotCumulativesInside',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"tickBitmap"`
- */
-export const useReadPoolTickBitmap = /*#__PURE__*/ createUseReadContract({
-  abi: poolAbi,
-  functionName: 'tickBitmap',
-})
-
-/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"tickSpacing"`
  */
 export const useReadPoolTickSpacing = /*#__PURE__*/ createUseReadContract({
@@ -2060,270 +1695,27 @@ export const useReadPoolTickSpacing = /*#__PURE__*/ createUseReadContract({
 })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"ticks"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link uniswapV3FactoryAbi}__
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0x1F98431c8aD98523631AE4a59f267346ea31F984)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x33128a8fC17869897dcE68Ed026d694621f6FDfD)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0x1F98431c8aD98523631AE4a59f267346ea31F984)
  */
-export const useReadPoolTicks = /*#__PURE__*/ createUseReadContract({
-  abi: poolAbi,
-  functionName: 'ticks',
+export const useReadUniswapV3Factory = /*#__PURE__*/ createUseReadContract({
+  abi: uniswapV3FactoryAbi,
+  address: uniswapV3FactoryAddress,
 })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"token0"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link uniswapV3FactoryAbi}__ and `functionName` set to `"getPool"`
+ *
+ * - [__View Contract on Ethereum Etherscan__](https://etherscan.io/address/0x1F98431c8aD98523631AE4a59f267346ea31F984)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x33128a8fC17869897dcE68Ed026d694621f6FDfD)
+ * - [__View Contract on Arbitrum One Arbiscan__](https://arbiscan.io/address/0x1F98431c8aD98523631AE4a59f267346ea31F984)
  */
-export const useReadPoolToken0 = /*#__PURE__*/ createUseReadContract({
-  abi: poolAbi,
-  functionName: 'token0',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"token1"`
- */
-export const useReadPoolToken1 = /*#__PURE__*/ createUseReadContract({
-  abi: poolAbi,
-  functionName: 'token1',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__
- */
-export const useWritePool = /*#__PURE__*/ createUseWriteContract({
-  abi: poolAbi,
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"burn"`
- */
-export const useWritePoolBurn = /*#__PURE__*/ createUseWriteContract({
-  abi: poolAbi,
-  functionName: 'burn',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"collect"`
- */
-export const useWritePoolCollect = /*#__PURE__*/ createUseWriteContract({
-  abi: poolAbi,
-  functionName: 'collect',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"collectProtocol"`
- */
-export const useWritePoolCollectProtocol = /*#__PURE__*/ createUseWriteContract(
-  { abi: poolAbi, functionName: 'collectProtocol' },
-)
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"flash"`
- */
-export const useWritePoolFlash = /*#__PURE__*/ createUseWriteContract({
-  abi: poolAbi,
-  functionName: 'flash',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"increaseObservationCardinalityNext"`
- */
-export const useWritePoolIncreaseObservationCardinalityNext =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: poolAbi,
-    functionName: 'increaseObservationCardinalityNext',
+export const useReadUniswapV3FactoryGetPool =
+  /*#__PURE__*/ createUseReadContract({
+    abi: uniswapV3FactoryAbi,
+    address: uniswapV3FactoryAddress,
+    functionName: 'getPool',
   })
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"initialize"`
- */
-export const useWritePoolInitialize = /*#__PURE__*/ createUseWriteContract({
-  abi: poolAbi,
-  functionName: 'initialize',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"mint"`
- */
-export const useWritePoolMint = /*#__PURE__*/ createUseWriteContract({
-  abi: poolAbi,
-  functionName: 'mint',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"setFeeProtocol"`
- */
-export const useWritePoolSetFeeProtocol = /*#__PURE__*/ createUseWriteContract({
-  abi: poolAbi,
-  functionName: 'setFeeProtocol',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"swap"`
- */
-export const useWritePoolSwap = /*#__PURE__*/ createUseWriteContract({
-  abi: poolAbi,
-  functionName: 'swap',
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__
- */
-export const useSimulatePool = /*#__PURE__*/ createUseSimulateContract({
-  abi: poolAbi,
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"burn"`
- */
-export const useSimulatePoolBurn = /*#__PURE__*/ createUseSimulateContract({
-  abi: poolAbi,
-  functionName: 'burn',
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"collect"`
- */
-export const useSimulatePoolCollect = /*#__PURE__*/ createUseSimulateContract({
-  abi: poolAbi,
-  functionName: 'collect',
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"collectProtocol"`
- */
-export const useSimulatePoolCollectProtocol =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: poolAbi,
-    functionName: 'collectProtocol',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"flash"`
- */
-export const useSimulatePoolFlash = /*#__PURE__*/ createUseSimulateContract({
-  abi: poolAbi,
-  functionName: 'flash',
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"increaseObservationCardinalityNext"`
- */
-export const useSimulatePoolIncreaseObservationCardinalityNext =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: poolAbi,
-    functionName: 'increaseObservationCardinalityNext',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"initialize"`
- */
-export const useSimulatePoolInitialize =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: poolAbi,
-    functionName: 'initialize',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"mint"`
- */
-export const useSimulatePoolMint = /*#__PURE__*/ createUseSimulateContract({
-  abi: poolAbi,
-  functionName: 'mint',
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"setFeeProtocol"`
- */
-export const useSimulatePoolSetFeeProtocol =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: poolAbi,
-    functionName: 'setFeeProtocol',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link poolAbi}__ and `functionName` set to `"swap"`
- */
-export const useSimulatePoolSwap = /*#__PURE__*/ createUseSimulateContract({
-  abi: poolAbi,
-  functionName: 'swap',
-})
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__
- */
-export const useWatchPoolEvent = /*#__PURE__*/ createUseWatchContractEvent({
-  abi: poolAbi,
-})
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"Burn"`
- */
-export const useWatchPoolBurnEvent = /*#__PURE__*/ createUseWatchContractEvent({
-  abi: poolAbi,
-  eventName: 'Burn',
-})
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"Collect"`
- */
-export const useWatchPoolCollectEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: poolAbi,
-    eventName: 'Collect',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"CollectProtocol"`
- */
-export const useWatchPoolCollectProtocolEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: poolAbi,
-    eventName: 'CollectProtocol',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"Flash"`
- */
-export const useWatchPoolFlashEvent = /*#__PURE__*/ createUseWatchContractEvent(
-  { abi: poolAbi, eventName: 'Flash' },
-)
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"IncreaseObservationCardinalityNext"`
- */
-export const useWatchPoolIncreaseObservationCardinalityNextEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: poolAbi,
-    eventName: 'IncreaseObservationCardinalityNext',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"Initialize"`
- */
-export const useWatchPoolInitializeEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: poolAbi,
-    eventName: 'Initialize',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"Mint"`
- */
-export const useWatchPoolMintEvent = /*#__PURE__*/ createUseWatchContractEvent({
-  abi: poolAbi,
-  eventName: 'Mint',
-})
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"SetFeeProtocol"`
- */
-export const useWatchPoolSetFeeProtocolEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: poolAbi,
-    eventName: 'SetFeeProtocol',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link poolAbi}__ and `eventName` set to `"Swap"`
- */
-export const useWatchPoolSwapEvent = /*#__PURE__*/ createUseWatchContractEvent({
-  abi: poolAbi,
-  eventName: 'Swap',
-})
