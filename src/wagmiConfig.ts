@@ -22,7 +22,7 @@ export function getConfig() {
         transports: {
             [mainnet.id]: http(process.env.NEXT_PUBLIC_ETHEREUM_RPC_ENDPOINT!),
             [arbitrum.id]: http(process.env.NEXT_PUBLIC_ARBITRUM_RPC_ENDPOINT!),
-            [base.id]: http(process.env.NEXT_PUBLIC_ARBITRUM_RPC_ENDPOINT!),
+            [base.id]: http(process.env.NEXT_PUBLIC_BASE_RPC_ENDPOINT!),
         },
     });
 }

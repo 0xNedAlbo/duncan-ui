@@ -41,7 +41,6 @@ export async function findUniswapV3Pools(
     quoteToken: Erc20Token,
     baseToken: Erc20Token
 ): Promise<UniswapV3Pool[]> {
-    console.log("findUniswapV3Pools", chainId, quoteToken, baseToken);
     const factoryAddress =
         uniswapV3FactoryAddress[
             chainId as keyof typeof uniswapV3FactoryAddress
