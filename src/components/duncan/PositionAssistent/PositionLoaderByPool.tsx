@@ -4,9 +4,11 @@ import { Stack, Grid, Box, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import {
     baseTokensForChain,
+    defaultTokensByChain,
+    findTokenInList,
     quoteTokensForChain,
 } from "@/utils/erc20TokenLists";
-import { EvmBlockchain } from "@/utils/evmBlockchain";
+import { EvmBlockchain, wrappedEthForChain } from "@/utils/evmBlockchain";
 import { BlockchainStep } from "./byPool/BlockchainStep";
 import { QuoteTokenStep } from "./byPool/QuoteTokenStep";
 import { BaseTokenStep } from "./byPool/BaseTokenStep";
@@ -15,6 +17,7 @@ import { PriceRangeStep } from "./byPool/PriceRangeStep";
 import { PositionStepper } from "./byPool/PositionStepper";
 import { UniswapV3Pool } from "@/utils/uniswapV3/uniswapV3Pool";
 import { useFindUniswapV3Pools } from "@/hooks/uniswapv3/useFindUniswapV3Pools";
+import { sameAddress } from "@/utils/evmAddress";
 
 export function PositionLoaderByPool() {
     const [baseTokenList, setBaseTokenList] = useState<
@@ -23,9 +26,10 @@ export function PositionLoaderByPool() {
     const [quoteTokenList, setQuoteTokenList] = useState<
         Erc20Token[] | undefined
     >();
+    const [chain, setChain] = useState<EvmBlockchain | undefined>();
+    const [wrappedEth, setWrappedEth] = useState<Erc20Token | undefined>();
     const [baseToken, setBaseToken] = useState<Erc20Token | undefined>();
     const [quoteToken, setQuoteToken] = useState<Erc20Token | undefined>();
-    const [chain, setChain] = useState<EvmBlockchain | undefined>();
     const [pool, setPool] = useState<UniswapV3Pool | undefined>();
     const [priceRange, setPriceRange] = useState<{
         min?: number;
@@ -68,16 +72,25 @@ export function PositionLoaderByPool() {
             setQuoteToken(undefined);
             setBaseToken(undefined);
             setPool(undefined);
+            setWrappedEth(undefined);
             setPriceRange({});
             return;
         }
-        const qTokens = quoteTokensForChain(chain.id).sort((tokenA, tokenB) =>
+
+        let qTokens = quoteTokensForChain(chain.id).sort((tokenA, tokenB) =>
             tokenA.symbol.localeCompare(tokenB.symbol)
         );
+        const wrappedEth = findTokenInList(
+            defaultTokensByChain(chain.id),
+            wrappedEthForChain(chain.id)
+        );
+        const d = wrappedEthForChain(chain.id);
+        setWrappedEth(wrappedEth);
+
         const bTokens = baseTokensForChain(chain.id).sort((tokenA, tokenB) =>
             tokenA.symbol.localeCompare(tokenB.symbol)
         );
-        setQuoteTokenList(qTokens);
+        setQuoteTokenList(qTokens.concat(wrappedEth));
         setBaseTokenList(bTokens);
     }, [chain]);
 
@@ -86,6 +99,20 @@ export function PositionLoaderByPool() {
         setPool(undefined);
         setPriceRange({});
     }, [chain, quoteToken, baseToken]);
+
+    useEffect(() => {
+        if (
+            quoteToken &&
+            wrappedEth &&
+            sameAddress(quoteToken.address, wrappedEth.address)
+        ) {
+            setBaseTokenList(
+                baseTokenList?.filter(
+                    (token) => !sameAddress(token.address, wrappedEth.address)
+                )
+            );
+        }
+    }, [quoteToken, wrappedEth]);
 
     function onQuoteTokenChange(newQuoteToken: Erc20Token) {
         setQuoteToken(newQuoteToken);
@@ -224,7 +251,7 @@ export function PositionLoaderByPool() {
                                     >
                                         <strong>Pool:</strong>{" "}
                                         {pool
-                                            ? `${pool.token0.symbol}/${pool.token1.symbol} ${(pool.fee / 10000).toFixed(2)}%`
+                                            ? `${pool.baseToken.symbol}/${pool.quoteToken.symbol} ${(pool.fee / 10000).toFixed(2)}%`
                                             : "Not selected"}
                                     </Typography>
                                     <Typography

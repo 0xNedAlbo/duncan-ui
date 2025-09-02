@@ -15,5 +15,5 @@ export function sortEvmAddresses(
     return BigInt(A) < BigInt(B) ? [A, B] : [B, A];
 }
 
-// example:
-// const { token0, token1 } = sortTokens("0x82af...bab1" /* WETH */, "0xaf88...e5831" /* USDC */);
+export const sameAddress = (a: string, b: string) =>
+    a.toLowerCase() === b.toLowerCase();

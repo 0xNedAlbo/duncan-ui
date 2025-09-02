@@ -10,7 +10,6 @@ export type Erc20TokenSelectProps = {
 
 export function Erc20TokenSelect(props: Erc20TokenSelectProps) {
     const tokenList: Erc20Token[] = props.tokenList || [];
-
     function onTokenSelect(newToken: Erc20Token) {
         props?.onChange?.(newToken);
     }

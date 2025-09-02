@@ -1,9 +1,6 @@
 import { Grid } from "@mui/material";
 import { UniswapPositionContainer } from "./UniswapPositionContainer";
-import {
-    UniswapV3Position,
-    useUniswapV3Position,
-} from "@/hooks/duncan/useUniswapV3Position";
+import { UniswapV3Position } from "@/hooks/duncan/useUniswapV3Position";
 import { useState } from "react";
 import { PositionAssistent } from "./PositionAssistent/PositionAssistent";
 
