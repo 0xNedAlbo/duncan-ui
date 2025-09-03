@@ -10,7 +10,7 @@ export type PositionStepperProps = {
     selectedQuoteToken?: Erc20Token;
     selectedBaseToken?: Erc20Token;
     selectedPool?: UniswapV3Pool;
-    selectedPriceRange?: { min?: number; max?: number };
+    selectedPriceRange?: { min?: bigint; max?: bigint };
 };
 
 export function PositionStepper(props: PositionStepperProps) {
@@ -32,7 +32,7 @@ export function PositionStepper(props: PositionStepperProps) {
                 return props.selectedBaseToken?.symbol;
             case 3:
                 return props.selectedPool
-                    ? `${props.selectedPool.token0.symbol}/${props.selectedPool.token1.symbol} ${(props.selectedPool.fee / 10000).toFixed(2)}%`
+                    ? `${props.selectedPool.quoteToken.symbol}/${props.selectedPool.baseToken.symbol} ${(props.selectedPool.fee / 10000).toFixed(2)}%`
                     : undefined;
             case 4:
                 return props.selectedPriceRange?.min &&

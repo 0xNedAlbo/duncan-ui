@@ -3,7 +3,7 @@ import { useConfig } from "wagmi";
 import { Erc20Token } from "@/utils/erc20Token";
 import {
     UniswapV3Pool,
-    findUniswapV3Pools,
+    findPoolsByTokenPair,
 } from "@/utils/uniswapV3/uniswapV3Pool";
 
 export interface UseFindUniswapV3PoolsParams {
@@ -50,11 +50,11 @@ export function useFindUniswapV3Pools({
         setPools([]);
 
         try {
-            const foundPools = await findUniswapV3Pools(
+            const foundPools = await findPoolsByTokenPair(
                 config,
                 chainId!,
-                quoteToken!,
-                baseToken!
+                baseToken!,
+                quoteToken!
             );
             setPools(foundPools);
         } catch (err) {

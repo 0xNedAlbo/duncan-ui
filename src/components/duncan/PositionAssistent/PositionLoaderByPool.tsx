@@ -32,9 +32,9 @@ export function PositionLoaderByPool() {
     const [quoteToken, setQuoteToken] = useState<Erc20Token | undefined>();
     const [pool, setPool] = useState<UniswapV3Pool | undefined>();
     const [priceRange, setPriceRange] = useState<{
-        min?: number;
-        max?: number;
-    }>({});
+        min?: bigint;
+        max?: bigint;
+    }>({ min: undefined, max: undefined });
 
     const {
         pools,
@@ -101,14 +101,10 @@ export function PositionLoaderByPool() {
     }, [chain, quoteToken, baseToken]);
 
     useEffect(() => {
-        if (
-            quoteToken &&
-            wrappedEth &&
-            sameAddress(quoteToken.address, wrappedEth.address)
-        ) {
+        if (quoteToken) {
             setBaseTokenList(
                 baseTokenList?.filter(
-                    (token) => !sameAddress(token.address, wrappedEth.address)
+                    (token) => !sameAddress(token.address, quoteToken.address)
                 )
             );
         }

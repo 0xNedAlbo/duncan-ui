@@ -14,7 +14,7 @@ import { ContentCopy, OpenInNew } from "@mui/icons-material";
 import { useState } from "react";
 import { EvmBlockchain, evmChainlist } from "@/utils/evmBlockchain";
 import { Erc20Token } from "@/utils/erc20Token";
-import { UniswapV3Pool, poolName } from "@/utils/uniswapV3/uniswapV3Pool";
+import { PoolUtils, UniswapV3Pool } from "@/utils/uniswapV3/uniswapV3Pool";
 
 export type PoolStepProps = {
     chain?: EvmBlockchain;
@@ -152,7 +152,7 @@ export function PoolStep(props: PoolStepProps) {
                                               }
                                           >
                                               <ListItemText
-                                                  primary={poolName(pool)}
+                                                  primary={PoolUtils.name(pool)}
                                                   secondary={
                                                       <Box
                                                           display="flex"
@@ -270,7 +270,9 @@ export function PoolStep(props: PoolStepProps) {
                                                   }
                                               >
                                                   <ListItemText
-                                                      primary={poolName(pool)}
+                                                      primary={PoolUtils.name(
+                                                          pool
+                                                      )}
                                                       secondary={
                                                           <Box
                                                               display="flex"

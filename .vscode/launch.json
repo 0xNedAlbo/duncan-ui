@@ -5,14 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "command": "npm run dev",
+            "name": "Run next.js dev server",
+            "request": "launch",
+            "type": "node-terminal"
+        },
+        {
             "name": "duncan-ui: debug client",
             "type": "chrome",
             "request": "launch",
-            "userDataDir": false,
-            "runtimeArgs": [
-                "--profile-directory=Web3DebugProfile",
-            ],
+            "userDataDir": "${workspaceFolder}/.vscode/chrome-profile",
             "url": "http://localhost:3000/",
+            /*            "runtimeArgs": [
+                "--profile-directory=Web3DebugProfile",
+            ],*/
             "sourceMaps": true,
             "resolveSourceMapLocations": [
                 "${workspaceFolder}/**",
