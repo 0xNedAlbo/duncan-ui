@@ -7,14 +7,16 @@ import { config } from '@/lib/wagmi'
 import '@rainbow-me/rainbowkit/styles.css'
 
 import { useState } from 'react'
+import { useSettingsStore } from '@/store/settings-store'
 
 export function Web3Provider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
+  const { locale } = useSettingsStore()
 
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>
+        <RainbowKitProvider locale={locale}>
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>

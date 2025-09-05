@@ -1,0 +1,227 @@
+'use client'
+
+import { useMemo } from 'react'
+import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area, Tooltip } from 'recharts'
+import { generatePnLCurve, PositionParams, PnLPoint } from '@/lib/calculations/pnl'
+
+interface PnLCurveProps {
+  params: PositionParams
+  width?: number
+  height?: number
+  className?: string
+}
+
+export function PnLCurve({ params, width, height = 400, className }: PnLCurveProps) {
+  const curveData = useMemo(() => {
+    const data = generatePnLCurve(params)
+    // Add background color data based on profit/loss
+    return data.map(point => ({
+      ...point,
+      profitZone: point.pnl > 0 ? point.pnl : null,
+      lossZone: point.pnl < 0 ? point.pnl : null
+    }))
+  }, [params])
+
+  const { entryPrice, lowerPrice, upperPrice } = params
+
+  // Custom tooltip component
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || !payload.length) return null
+    
+    const data = payload[0].payload as PnLPoint
+    // Handle scatter points that might not have all properties
+    if (!data.hasOwnProperty('positionValue')) return null
+    const phaseColors = {
+      'below': 'text-red-400',
+      'in-range': 'text-green-400', 
+      'above': 'text-amber-400'
+    }
+    
+    return (
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl backdrop-blur-sm">
+        <p className="text-slate-300 text-sm">
+          <strong>Preis:</strong> ${Number(label).toLocaleString()} USDC
+        </p>
+        <p className="text-slate-300 text-sm">
+          <strong>Position Wert:</strong> ${data.positionValue.toLocaleString()}
+        </p>
+        <p className={`text-sm font-medium ${data.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+          <strong>PnL:</strong> ${data.pnl.toLocaleString()} ({data.pnlPercent.toFixed(2)}%)
+        </p>
+        <p className={`text-xs ${phaseColors[data.phase]}`}>
+          Phase: {data.phase}
+        </p>
+      </div>
+    )
+  }
+
+  // Create background areas for the three phases
+  const backgroundAreas = useMemo(() => {
+    const minPrice = Math.min(...curveData.map(d => d.price))
+    const maxPrice = Math.max(...curveData.map(d => d.price))
+    
+    return [
+      // Red zone (below range)
+      { 
+        x1: minPrice, 
+        x2: lowerPrice, 
+        fill: 'rgba(239, 68, 68, 0.1)',
+        label: 'Verlust Zone'
+      },
+      // Green zone (in range)  
+      {
+        x1: lowerPrice,
+        x2: upperPrice, 
+        fill: 'rgba(34, 197, 94, 0.1)',
+        label: 'Fee Zone'
+      },
+      // Yellow zone (above range)
+      {
+        x1: upperPrice,
+        x2: maxPrice,
+        fill: 'rgba(245, 158, 11, 0.1)', 
+        label: 'Plateau'
+      }
+    ]
+  }, [curveData, lowerPrice, upperPrice])
+
+  return (
+    <div className={`w-full ${className}`}>
+      <ResponsiveContainer width="100%" height={height}>
+        <ComposedChart
+          data={curveData}
+          margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+          
+          {/* Background zones based on profit/loss */}
+          <Area
+            type="monotone"
+            dataKey="profitZone"
+            fill="rgba(34, 197, 94, 0.3)"
+            stroke="transparent"
+            connectNulls={false}
+          />
+          <Area
+            type="monotone"
+            dataKey="lossZone"
+            fill="rgba(239, 68, 68, 0.3)"
+            stroke="transparent"
+            connectNulls={false}
+          />
+          
+          <XAxis 
+            dataKey="price"
+            type="number"
+            scale="linear"
+            domain={['dataMin', 'dataMax']}
+            ticks={[lowerPrice, entryPrice, upperPrice]}
+            tickFormatter={(value) => `$${value.toLocaleString()}`}
+            stroke="#94a3b8"
+            fontSize={12}
+            axisLine={{ stroke: '#475569' }}
+          />
+          
+          <YAxis 
+            domain={['dataMin - 500', 'dataMax + 500']}
+            tickFormatter={(value) => `$${value.toLocaleString()}`}
+            stroke="#94a3b8"
+            fontSize={12}
+            axisLine={{ stroke: '#475569' }}
+            tick={(props) => {
+              const { x, y, payload } = props
+              const isZero = payload.value === 0
+              return (
+                <text
+                  x={x}
+                  y={y}
+                  dy={4}
+                  textAnchor="end"
+                  fill={isZero ? "#e2e8f0" : "#94a3b8"}
+                  fontSize={12}
+                  fontWeight={isZero ? "bold" : "normal"}
+                >
+                  ${payload.value.toLocaleString()}
+                </text>
+              )
+            }}
+          />
+          
+          
+          {/* Lower range boundary */}
+          <ReferenceLine 
+            x={lowerPrice} 
+            stroke="#06b6d4"
+            strokeWidth={2}
+            strokeDasharray="8 4"
+          />
+          
+          {/* Upper range boundary */}
+          <ReferenceLine 
+            x={upperPrice} 
+            stroke="#06b6d4" 
+            strokeWidth={2}
+            strokeDasharray="8 4"
+          />
+          
+          {/* Break-even line (PnL = 0) */}
+          <ReferenceLine 
+            y={0} 
+            stroke="#64748b" 
+            strokeDasharray="3 3"
+            strokeWidth={2}
+          />
+          
+          {/* Main PnL curve */}
+          <Line 
+            type="monotone"
+            dataKey="pnl" 
+            stroke="#ffffff"
+            strokeWidth={3}
+            dot={(props) => {
+              const { payload } = props
+              // Show empty circle at entry price
+              if (Math.abs(payload.price - entryPrice) < 10) {
+                return (
+                  <circle
+                    cx={props.cx}
+                    cy={props.cy}
+                    r={6}
+                    fill="transparent"
+                    stroke="#60a5fa"
+                    strokeWidth={2}
+                  />
+                )
+              }
+              return null
+            }}
+            activeDot={{ 
+              r: 6, 
+              fill: "#ffffff",
+              stroke: "#1e293b",
+              strokeWidth: 2
+            }}
+          />
+          
+          <Tooltip content={<CustomTooltip />} />
+        </ComposedChart>
+      </ResponsiveContainer>
+      
+      {/* Legend */}
+      <div className="flex justify-center gap-6 mt-1 text-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-red-500/30 border border-red-500 rounded"></div>
+          <span className="text-red-400">Verlust</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-green-500/30 border border-green-500 rounded"></div>
+          <span className="text-green-400">Gewinn</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-1 bg-cyan-500 rounded"></div>
+          <span className="text-cyan-400">Range-Grenzen</span>
+        </div>
+      </div>
+    </div>
+  )
+}

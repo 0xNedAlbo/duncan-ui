@@ -159,23 +159,55 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - ✅ Phase 1 feature scope definition
 - ✅ Business model and regulatory strategy
 - ✅ Legacy code backup and clean slate preparation
+- ✅ Next.js 15 + Wagmi v2 + RainbowKit project setup
+- ✅ Dark theme UI design with glassmorphism effects
+- ✅ Internationalization system (English/German) with next-intl
+- ✅ Settings system with language selection and persistent storage
+- ✅ PnL curve visualization design (SVG mockups with correct mathematical form)
+- ✅ Conditional wallet connection UX (connect-to-use pattern)
+- ✅ Hydration-safe Web3 integration
 
 **Next Steps:**
-- 🔄 New project architecture setup
-- 📋 Modern tech stack implementation
-- 🎨 UI/UX design with focus on PnL curve visualization
-- 📊 Core risk calculation engine
-- 📱 Mobile-responsive implementation
+- 📊 Interactive React PnL curve component implementation
+- 🔧 Position calculator form with token pair selection
+- 📈 Risk calculation engine for three-phase structure
+- 📱 Mobile-responsive fine-tuning
+- 🔌 Real-time data integration (Subgraph + APIs)
 
 ## Technology Vision
 
 **Modern Stack for Phase 1:**
-- **Frontend:** Next.js 14+ with modern UI framework (Shadcn/UI + Tailwind)
-- **Web3:** Wagmi v2 + Viem for blockchain integration  
-- **State Management:** Zustand for global state
-- **Data:** React Query for server state
-- **Visualization:** Custom chart components for PnL curve
-- **Mobile:** PWA-ready responsive design
+- **Frontend:** Next.js 15 with App Router + Tailwind CSS
+- **Web3:** Wagmi v2 + Viem + RainbowKit for blockchain integration  
+- **State Management:** Zustand with persistence for settings and positions
+- **Data:** TanStack Query (React Query) for server state
+- **Visualization:** Custom SVG-based chart components for PnL curve
+- **Internationalization:** next-intl for English/German localization
+- **Design System:** Dark theme with glassmorphism effects and consistent Slate color palette
+- **Mobile:** PWA-ready responsive design with mobile-first approach
+
+## Development Guidelines
+
+**Environment Setup:**
+- Requires `.env.local` or `.env.development` with `NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID`
+- Support for Ethereum, Arbitrum, and Base networks
+- Development server: `npm run dev`
+- Build command: `npm run build`
+- Linting: `npm run lint`
+
+**UI/UX Principles:**
+- Dark theme as primary design language
+- Informal German localization using "Ihr/eure" form (not formal "Sie") for community feel - "Plant und analysiert eure Positionen" style
+- Conditional wallet connection (connect-to-use pattern)
+- Hydration-safe rendering to prevent SSR mismatches
+- Glassmorphism cards with backdrop-blur effects
+
+**Code Conventions:**
+- TypeScript strict mode enabled
+- Zustand stores with devtools and persistence
+- Component-based architecture with clear separation of concerns
+- Translation keys organized by feature area
+- Comprehensive error handling for Web3 interactions
 
 ## Success Metrics
 

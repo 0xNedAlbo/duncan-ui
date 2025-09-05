@@ -2,67 +2,120 @@
 
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { usePositionStore } from '@/store/position-store'
+import { SettingsModal } from '@/components/settings-modal'
+import { PnLCurve } from '@/components/pnl-curve'
+import { getExamplePosition } from '@/lib/calculations/pnl'
+import { useTranslations } from '@/i18n/client'
+import { useAccount } from 'wagmi'
+import { useState, useEffect } from 'react'
 
 export default function Home() {
   const { selectedChain, currentPosition } = usePositionStore()
+  const { isConnected } = useAccount()
+  const t = useTranslations()
+  const [hasMounted, setHasMounted] = useState(false)
+  
+  // Example position data for demonstration
+  const examplePosition = getExamplePosition()
+
+  useEffect(() => {
+    setHasMounted(true)
+  }, [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-blue-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <header className="flex justify-between items-center mb-12">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-              DUNCAN
+            <h1 className="text-4xl font-bold text-white mb-2">
+              {t('header.title')}
             </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-300">
-              Uniswap V3 Risk Management Platform
+            <p className="text-lg text-slate-300">
+              {t('header.subtitle')}
             </p>
           </div>
-          <ConnectButton />
+          <div className="flex items-center gap-3">
+            <SettingsModal />
+            {hasMounted && isConnected && <ConnectButton />}
+          </div>
         </header>
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Position Planner */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-white">
-              Position Planner
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl shadow-xl p-6 backdrop-blur-sm">
+            <h2 className="text-2xl font-semibold mb-4 text-white">
+              {t('positionPlanner.title')}
             </h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              Plan and analyze your Uniswap V3 liquidity positions with advanced risk metrics.
+            <p className="text-slate-300 mb-6">
+              {t('positionPlanner.description')}
             </p>
             
-            {/* Placeholder for Position Form */}
+            {/* Wallet Connection or Position Form */}
             <div className="space-y-4">
-              <div className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-center">
-                <p className="text-gray-500 dark:text-gray-400">
-                  Position configuration form coming soon...
-                </p>
-              </div>
+              {!hasMounted ? (
+                <div className="p-4 border-2 border-dashed border-slate-600 rounded-lg text-center bg-slate-900/30">
+                  <p className="text-slate-400">
+                    {t('common.loading')}
+                  </p>
+                </div>
+              ) : !isConnected ? (
+                <div className="p-8 border-2 border-dashed border-slate-600 rounded-lg text-center bg-slate-900/30">
+                  <p className="text-slate-400 mb-4">
+                    {t('positionPlanner.connectWallet')}
+                  </p>
+                  <ConnectButton />
+                </div>
+              ) : (
+                <div className="p-4 border-2 border-dashed border-slate-600 rounded-lg text-center bg-slate-900/30">
+                  <p className="text-slate-400">
+                    {t('positionPlanner.comingSoon')}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* PnL Curve Visualization */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-white">
-              Risk Visualization
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl shadow-xl p-6 backdrop-blur-sm">
+            <h2 className="text-2xl font-semibold mb-4 text-white">
+              {t('riskVisualization.title')}
             </h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              Interactive PnL curve showing the three-phase risk structure.
+            <p className="text-slate-300 mb-6">
+              {t('riskVisualization.description')}
             </p>
             
-            {/* Placeholder for PnL Curve */}
-            <div className="aspect-video bg-gradient-to-r from-red-100 via-green-100 to-yellow-100 dark:from-red-900/20 dark:via-green-900/20 dark:to-yellow-900/20 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600">
-              <div className="text-center">
-                <p className="text-gray-500 dark:text-gray-400 mb-2">
-                  PnL Curve Visualization
-                </p>
-                <div className="flex gap-4 text-sm">
-                  <span className="text-red-600">Red Zone</span>
-                  <span className="text-green-600">Green Zone</span>
-                  <span className="text-yellow-600">Yellow Zone</span>
+            {/* PnL Curve Visualization */}
+            <PnLCurve 
+              params={examplePosition}
+              height={350}
+              className="bg-slate-900/30 rounded-lg p-4"
+            />
+            
+            {/* Position Details */}
+            <div className="mt-4 p-4 bg-slate-900/30 rounded-lg border border-slate-600">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-slate-400">Position Size:</span>
+                  <span className="text-white ml-2 font-mono">
+                    ${((examplePosition.initialBaseAmount * examplePosition.entryPrice) + examplePosition.initialQuoteAmount).toLocaleString()}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Entry Price:</span>
+                  <span className="text-white ml-2 font-mono">${examplePosition.entryPrice.toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Range:</span>
+                  <span className="text-white ml-2 font-mono">
+                    ${examplePosition.lowerPrice.toLocaleString()} - ${examplePosition.upperPrice.toLocaleString()}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Asset Pair:</span>
+                  <span className="text-white ml-2 font-mono">WETH/USDC</span>
                 </div>
               </div>
             </div>
@@ -71,11 +124,11 @@ export default function Home() {
         </div>
 
         {/* Status Info */}
-        <div className="mt-8 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            Selected Chain: {selectedChain} | 
-            Current Position: {currentPosition ? 'Active' : 'None'} |
-            Status: Development Mode
+        <div className="mt-8 p-4 bg-slate-800/30 border border-slate-700 rounded-lg backdrop-blur-sm">
+          <p className="text-sm text-slate-400">
+            {t('status.selectedChain')}: {selectedChain} | 
+            {t('status.currentPosition')}: {currentPosition ? t('status.active') : t('status.none')} |
+            {t('status.developmentMode')}
           </p>
         </div>
 

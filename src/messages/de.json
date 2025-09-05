@@ -1,0 +1,60 @@
+{
+  "common": {
+    "loading": "Lädt...",
+    "error": "Fehler",
+    "cancel": "Abbrechen",
+    "done": "Fertig",
+    "save": "Speichern"
+  },
+  "header": {
+    "title": "DUNCAN",
+    "subtitle": "Uniswap V3 Risikomanagement Platform"
+  },
+  "positionPlanner": {
+    "title": "Positions-Planer",
+    "description": "Plant und analysiert eure Uniswap V3 Liquiditätspositionen mit erweiterten Risikometriken.",
+    "comingSoon": "Positions-Konfigurations-Formular kommt bald...",
+    "connectWallet": "Verbindet euer Wallet, um mit der Positionsplanung zu beginnen"
+  },
+  "riskVisualization": {
+    "title": "Risiko-Visualisierung",
+    "description": "Interaktive PnL-Kurve zeigt die Drei-Phasen-Risikostruktur.",
+    "placeholder": "PnL-Kurven Visualisierung",
+    "lossZone": "Verlust-Zone",
+    "feeZone": "Fee-Zone",
+    "plateau": "Plateau"
+  },
+  "pnlCurve": {
+    "price": "Preis",
+    "positionValue": "Positionswert",
+    "pnl": "PnL",
+    "phase": "Phase",
+    "entry": "Einstieg",
+    "lower": "Untergrenze",
+    "upper": "Obergrenze",
+    "breakEven": "Break-Even",
+    "lossZone": "Verlust-Zone",
+    "feeZone": "Fee-Zone",
+    "plateau": "Plateau",
+    "positionSize": "Positionsgröße",
+    "entryPrice": "Einstiegspreis",
+    "range": "Range",
+    "assetPair": "Asset-Paar"
+  },
+  "status": {
+    "selectedChain": "Ausgewählte Chain",
+    "currentPosition": "Aktuelle Position",
+    "active": "Aktiv",
+    "none": "Keine",
+    "developmentMode": "Entwicklungsmodus"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "language": "Sprache",
+    "currency": "Währung",
+    "notifications": "Benachrichtigungen", 
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert",
+    "moreComing": "Weitere Einstellungen folgen bald..."
+  }
+}
