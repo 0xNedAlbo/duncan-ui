@@ -53,17 +53,11 @@ export function PnLCurve({ params, width, height = 400, className }: PnLCurvePro
     const data = payload[0].payload as PnLPoint
     // Handle scatter points that might not have all properties
     if (!data.hasOwnProperty('positionValue')) return null
-    const phaseColors = {
-      'below': 'text-red-400',
-      'in-range': 'text-green-400', 
-      'above': 'text-amber-400'
-    }
     
-    const phaseLabels = {
-      'below': t('pnlCurve.lossZone'),
-      'in-range': t('pnlCurve.feeZone'),
-      'above': t('pnlCurve.plateau')
-    }
+    // Determine actual profit/loss status based on PnL value
+    const isProfitable = data.pnl > 0
+    const statusLabel = isProfitable ? t('pnlCurve.feeZone') : t('pnlCurve.lossZone')
+    const statusColor = isProfitable ? 'text-green-400' : 'text-red-400'
     
     return (
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl backdrop-blur-sm">
@@ -76,8 +70,8 @@ export function PnLCurve({ params, width, height = 400, className }: PnLCurvePro
         <p className={`text-sm font-medium ${data.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
           <strong>{t('pnlCurve.pnl')}:</strong> ${data.pnl.toLocaleString()} ({data.pnlPercent.toFixed(2)}%)
         </p>
-        <p className={`text-xs ${phaseColors[data.phase]}`}>
-          {t('pnlCurve.phase')}: {phaseLabels[data.phase]}
+        <p className={`text-xs ${statusColor}`}>
+          {t('pnlCurve.phase')}: {statusLabel}
         </p>
       </div>
     )
