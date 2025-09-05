@@ -33,12 +33,12 @@
     "lower": "Lower",
     "upper": "Upper",
     "breakEven": "Break-Even",
-    "lossZone": "Loss Zone",
-    "feeZone": "Fee Zone",
+    "lossZone": "Loss",
+    "feeZone": "Profit",
     "plateau": "Plateau",
     "positionSize": "Position Size",
     "entryPrice": "Entry Price",
-    "range": "Range",
+    "range": "Range Boundaries",
     "assetPair": "Asset Pair"
   },
   "status": {

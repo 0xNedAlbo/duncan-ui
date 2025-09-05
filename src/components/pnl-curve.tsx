@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area, Tooltip } from 'recharts'
 import { generatePnLCurve, PositionParams, PnLPoint } from '@/lib/calculations/pnl'
+import { useTranslations } from '@/i18n/client'
 
 interface PnLCurveProps {
   params: PositionParams
@@ -12,6 +13,8 @@ interface PnLCurveProps {
 }
 
 export function PnLCurve({ params, width, height = 400, className }: PnLCurveProps) {
+  const t = useTranslations()
+  
   const curveData = useMemo(() => {
     const data = generatePnLCurve(params)
     // Add background color data based on profit/loss
@@ -23,6 +26,25 @@ export function PnLCurve({ params, width, height = 400, className }: PnLCurvePro
   }, [params])
 
   const { entryPrice, lowerPrice, upperPrice } = params
+
+  // Custom dot component for entry point
+  const CustomDot = (props: any) => {
+    const { payload, cx, cy } = props
+    // Show empty circle only at entry price
+    if (payload && Math.abs(payload.price - entryPrice) < 10) {
+      return (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={6}
+          fill="transparent"
+          stroke="#60a5fa"
+          strokeWidth={2}
+        />
+      )
+    }
+    return <></>
+  }
 
   // Custom tooltip component
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -37,19 +59,25 @@ export function PnLCurve({ params, width, height = 400, className }: PnLCurvePro
       'above': 'text-amber-400'
     }
     
+    const phaseLabels = {
+      'below': t('pnlCurve.lossZone'),
+      'in-range': t('pnlCurve.feeZone'),
+      'above': t('pnlCurve.plateau')
+    }
+    
     return (
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl backdrop-blur-sm">
         <p className="text-slate-300 text-sm">
-          <strong>Preis:</strong> ${Number(label).toLocaleString()} USDC
+          <strong>{t('pnlCurve.price')}:</strong> ${Number(label).toLocaleString()} USDC
         </p>
         <p className="text-slate-300 text-sm">
-          <strong>Position Wert:</strong> ${data.positionValue.toLocaleString()}
+          <strong>{t('pnlCurve.positionValue')}:</strong> ${data.positionValue.toLocaleString()}
         </p>
         <p className={`text-sm font-medium ${data.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-          <strong>PnL:</strong> ${data.pnl.toLocaleString()} ({data.pnlPercent.toFixed(2)}%)
+          <strong>{t('pnlCurve.pnl')}:</strong> ${data.pnl.toLocaleString()} ({data.pnlPercent.toFixed(2)}%)
         </p>
         <p className={`text-xs ${phaseColors[data.phase]}`}>
-          Phase: {data.phase}
+          {t('pnlCurve.phase')}: {phaseLabels[data.phase]}
         </p>
       </div>
     )
@@ -178,23 +206,7 @@ export function PnLCurve({ params, width, height = 400, className }: PnLCurvePro
             dataKey="pnl" 
             stroke="#ffffff"
             strokeWidth={3}
-            dot={(props) => {
-              const { payload } = props
-              // Show empty circle at entry price
-              if (Math.abs(payload.price - entryPrice) < 10) {
-                return (
-                  <circle
-                    cx={props.cx}
-                    cy={props.cy}
-                    r={6}
-                    fill="transparent"
-                    stroke="#60a5fa"
-                    strokeWidth={2}
-                  />
-                )
-              }
-              return null
-            }}
+            dot={<CustomDot />}
             activeDot={{ 
               r: 6, 
               fill: "#ffffff",
@@ -210,16 +222,16 @@ export function PnLCurve({ params, width, height = 400, className }: PnLCurvePro
       {/* Legend */}
       <div className="flex justify-center gap-6 mt-1 text-sm">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-red-500/30 border border-red-500 rounded"></div>
-          <span className="text-red-400">Verlust</span>
+          <div className="w-3 h-3 bg-green-500/30 border border-green-500 rounded"></div>
+          <span className="text-green-400">{t('pnlCurve.feeZone')}</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-green-500/30 border border-green-500 rounded"></div>
-          <span className="text-green-400">Gewinn</span>
+          <div className="w-3 h-3 bg-red-500/30 border border-red-500 rounded"></div>
+          <span className="text-red-400">{t('pnlCurve.lossZone')}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-1 bg-cyan-500 rounded"></div>
-          <span className="text-cyan-400">Range-Grenzen</span>
+          <span className="text-cyan-400">{t('pnlCurve.range')}</span>
         </div>
       </div>
     </div>

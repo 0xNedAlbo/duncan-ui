@@ -33,12 +33,12 @@
     "lower": "Untergrenze",
     "upper": "Obergrenze",
     "breakEven": "Break-Even",
-    "lossZone": "Verlust-Zone",
-    "feeZone": "Fee-Zone",
+    "lossZone": "Verlust",
+    "feeZone": "Gewinn",
     "plateau": "Plateau",
     "positionSize": "Positionsgröße",
     "entryPrice": "Einstiegspreis",
-    "range": "Range",
+    "range": "Range-Grenzen",
     "assetPair": "Asset-Paar"
   },
   "status": {
