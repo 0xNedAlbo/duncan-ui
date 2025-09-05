@@ -1,6 +1,5 @@
 "use client";
 
-import { RequiredChainPrompt } from "@/components/inputs/RequiredChainPrompt";
 import { NavigationMenu } from "@/components/duncan/NavigationMenu";
 import { CssBaseline } from "@mui/material";
 import { useState } from "react";
@@ -13,16 +12,7 @@ function App() {
         <>
             <CssBaseline />
             <NavigationMenu></NavigationMenu>
-            <RequiredChainPrompt
-                requiredChainId={42161}
-                onChainConnected={setChainConnected}
-                heading="The Hedge Manager is on Arbitrum!"
-            ></RequiredChainPrompt>
-            {isChainConnected && (
-                <>
-                    <MainContainer></MainContainer>
-                </>
-            )}
+            <MainContainer></MainContainer>
         </>
     );
 }

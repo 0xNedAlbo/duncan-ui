@@ -1,16 +1,16 @@
-import { Button, Grid, IconButton, Typography } from "@mui/material";
+"use client";
+
+import { Grid, IconButton, Typography } from "@mui/material";
 import { ConnectButton } from "../common/ConnectButton";
-import {
-    DarkModeOutlined,
-    ForwardOutlined,
-    LightModeOutlined,
-} from "@mui/icons-material";
+import { DarkModeOutlined, LightModeOutlined } from "@mui/icons-material";
 import { useContext } from "react";
 import { ColorModeContext } from "../common/ColorModeContext";
-import Link from "next/link";
+import { useAccount } from "wagmi";
 
 export function NavigationMenu() {
     const { mode, toggleColorMode } = useContext(ColorModeContext);
+    const { isConnected } = useAccount();
+
     function changeColorMode() {
         toggleColorMode();
     }
@@ -27,12 +27,12 @@ export function NavigationMenu() {
                     style={{ marginLeft: "0.2em", marginRight: "0.6em" }}
                 >
                     {mode == "dark" ? (
-                        <LightModeOutlined></LightModeOutlined>
+                        <LightModeOutlined />
                     ) : (
-                        <DarkModeOutlined></DarkModeOutlined>
+                        <DarkModeOutlined />
                     )}
-                </IconButton>{" "}
-                <ConnectButton></ConnectButton>
+                </IconButton>
+                {isConnected && <ConnectButton />}
             </Grid>
             <Grid item xs={1}></Grid>
         </Grid>
