@@ -3,27 +3,4 @@
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
-    "configurations": [
-        {
-            "command": "npm run dev",
-            "name": "Run next.js dev server",
-            "request": "launch",
-            "type": "node-terminal"
-        },
-        {
-            "name": "duncan-ui: debug client",
-            "type": "chrome",
-            "request": "launch",
-            "userDataDir": "${workspaceFolder}/.vscode/chrome-profile",
-            "url": "http://localhost:3000/",
-            /*            "runtimeArgs": [
-                "--profile-directory=Web3DebugProfile",
-            ],*/
-            "sourceMaps": true,
-            "resolveSourceMapLocations": [
-                "${workspaceFolder}/**",
-                "!**/node_modules/**"
-            ]
-        }
-    ]
 }

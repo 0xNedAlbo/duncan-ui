@@ -1,11 +1,9 @@
 "use client";
 
-import { usePositionStore } from "@/store/position-store";
 import { SettingsModal } from "@/components/settings-modal";
 import { useTranslations } from "@/i18n/client";
 
 export default function Home() {
-    const { selectedChain, currentPosition } = usePositionStore();
     const t = useTranslations();
 
     return (
@@ -26,18 +24,6 @@ export default function Home() {
                         {/* hasMounted && isConnected && <ConnectButton /> */}
                     </div>
                 </header>
-
-                {/* Status Info */}
-                <div className="mt-8 p-4 bg-slate-800/30 border border-slate-700 rounded-lg backdrop-blur-sm">
-                    <p className="text-sm text-slate-400">
-                        {t("status.selectedChain")}: {selectedChain} |
-                        {t("status.currentPosition")}:{" "}
-                        {currentPosition
-                            ? t("status.active")
-                            : t("status.none")}{" "}
-                        |{t("status.developmentMode")}
-                    </p>
-                </div>
             </div>
         </div>
     );
