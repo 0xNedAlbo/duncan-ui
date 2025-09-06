@@ -6,12 +6,29 @@ import { RainbowKitProvider } from '@rainbow-me/rainbowkit'
 import { config } from '@/lib/wagmi'
 import '@rainbow-me/rainbowkit/styles.css'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSettingsStore } from '@/store/settings-store'
 
 export function Web3Provider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
-  const { locale } = useSettingsStore()
+  const [isHydrated, setIsHydrated] = useState(false)
+  const locale = useSettingsStore((state) => state.locale)
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
+  if (!isHydrated) {
+    return (
+      <WagmiProvider config={config}>
+        <QueryClientProvider client={queryClient}>
+          <RainbowKitProvider locale="en-US">
+            {children}
+          </RainbowKitProvider>
+        </QueryClientProvider>
+      </WagmiProvider>
+    )
+  }
 
   return (
     <WagmiProvider config={config}>

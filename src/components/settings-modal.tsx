@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Settings, Globe, DollarSign, Bell } from 'lucide-react'
+import { X, Settings, Globe } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings-store'
 import { useTranslations } from '@/i18n/client'
 
@@ -9,11 +9,7 @@ export function SettingsModal() {
   const [isOpen, setIsOpen] = useState(false)
   const { 
     locale, 
-    currency, 
-    notifications, 
-    setLocale, 
-    setCurrency, 
-    setNotifications 
+    setLocale
   } = useSettingsStore()
   const t = useTranslations()
 
@@ -72,49 +68,6 @@ export function SettingsModal() {
                 <option value="en-US">English (US)</option>
                 <option value="de-DE">Deutsch (DE)</option>
               </select>
-            </div>
-
-            {/* Currency Setting */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <DollarSign size={16} />
-                {t('settings.currency')}
-              </label>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value as any)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="USD">USD ($)</option>
-                <option value="EUR">EUR (€)</option>
-              </select>
-            </div>
-
-            {/* Notifications Setting */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <Bell size={16} />
-                {t('settings.notifications')}
-              </label>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setNotifications(!notifications)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    notifications 
-                      ? 'bg-blue-600' 
-                      : 'bg-slate-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      notifications ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-                <span className="text-sm text-slate-400">
-                  {notifications ? t('settings.enabled') : t('settings.disabled')}
-                </span>
-              </div>
             </div>
 
             {/* Future Settings Placeholder */}
