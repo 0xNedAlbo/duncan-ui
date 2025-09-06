@@ -39,3 +39,5 @@ next-env.d.ts
 
 # generated files
 .vscode/chrome-profile/
+
+/src/generated/prisma
