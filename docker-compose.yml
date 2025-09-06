@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: duncan-postgres
+    environment:
+      POSTGRES_DB: duncan_dev
+      POSTGRES_USER: duncan
+      POSTGRES_PASSWORD: dev123
+      POSTGRES_INITDB_ARGS: "--no-locale --encoding=UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U duncan -d duncan_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

@@ -56,5 +56,35 @@
     "enabled": "Aktiviert",
     "disabled": "Deaktiviert",
     "moreComing": "Weitere Einstellungen folgen bald..."
+  },
+  "userDropdown": {
+    "profile": "Profil",
+    "settings": "Einstellungen",
+    "signOut": "Abmelden",
+    "signIn": "Anmelden",
+    "register": "Registrieren"
+  },
+  "auth": {
+    "signIn": {
+      "title": "Anmelden",
+      "orText": "Oder",
+      "registerLink": "registriert euch hier",
+      "emailPlaceholder": "E-Mail-Adresse",
+      "passwordPlaceholder": "Passwort",
+      "submitButton": "Anmelden",
+      "loading": "Lädt...",
+      "errorInvalidCredentials": "E-Mail oder Passwort ist falsch",
+      "errorGeneral": "Ein Fehler ist aufgetreten"
+    },
+    "signUp": {
+      "title": "Registrieren",
+      "orText": "Oder",
+      "signInLink": "meldet euch hier an",
+      "namePlaceholder": "Name (optional)",
+      "emailPlaceholder": "E-Mail-Adresse",
+      "passwordPlaceholder": "Passwort (mindestens 6 Zeichen)",
+      "submitButton": "Registrieren",
+      "loading": "Lädt..."
+    }
   }
 }

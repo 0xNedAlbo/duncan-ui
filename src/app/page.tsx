@@ -1,5 +1,6 @@
 "use client";
 
+import { UserDropdown } from "@/components/auth/user-dropdown";
 import { SettingsModal } from "@/components/settings-modal";
 import { useTranslations } from "@/i18n/client";
 
@@ -21,7 +22,7 @@ export default function Home() {
                     </div>
                     <div className="flex items-center gap-3">
                         <SettingsModal />
-                        {/* hasMounted && isConnected && <ConnectButton /> */}
+                        <UserDropdown />
                     </div>
                 </header>
             </div>

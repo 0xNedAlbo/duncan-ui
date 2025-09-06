@@ -56,5 +56,35 @@
     "enabled": "Enabled",
     "disabled": "Disabled",
     "moreComing": "More settings coming soon..."
+  },
+  "userDropdown": {
+    "profile": "Profile",
+    "settings": "Settings",
+    "signOut": "Sign Out",
+    "signIn": "Sign In",
+    "register": "Register"
+  },
+  "auth": {
+    "signIn": {
+      "title": "Sign In",
+      "orText": "Or",
+      "registerLink": "register here",
+      "emailPlaceholder": "Email address",
+      "passwordPlaceholder": "Password",
+      "submitButton": "Sign In",
+      "loading": "Loading...",
+      "errorInvalidCredentials": "Email or password is incorrect",
+      "errorGeneral": "An error occurred"
+    },
+    "signUp": {
+      "title": "Register",
+      "orText": "Or",
+      "signInLink": "sign in here",
+      "namePlaceholder": "Name (optional)",
+      "emailPlaceholder": "Email address", 
+      "passwordPlaceholder": "Password (at least 6 characters)",
+      "submitButton": "Register",
+      "loading": "Loading..."
+    }
   }
 }
