@@ -172,6 +172,12 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - ✅ **Entry price marker and range boundary indicators**
 - ✅ **Interactive tooltips with localized labels**
 - ✅ **Complete multilingual support for all UI components**
+- ✅ **User authentication system with NextAuth.js**
+- ✅ **PostgreSQL database integration with Prisma ORM**
+- ✅ **Docker-based database setup for development**
+- ✅ **Email/password registration and login**
+- ✅ **User dropdown with authentication state**
+- ✅ **Comprehensive auth flow translations (EN/DE)**
 
 **Next Steps:**
 - 🔧 Position calculator form with token pair selection
@@ -179,23 +185,34 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - 📱 Mobile-responsive fine-tuning and touch interactions
 - 🔌 Real-time data integration (Subgraph + APIs)
 - 💡 Advanced features: drag-and-drop range adjustment, position comparison
+- 👤 User profile page and settings management
+- 💾 Save and manage multiple positions per user
 
 ## Technology Vision
 
 **Modern Stack for Phase 1:**
 - **Frontend:** Next.js 15 with App Router + Tailwind CSS
 - **Web3:** Wagmi v2 + Viem + RainbowKit for blockchain integration  
+- **Authentication:** NextAuth.js v4 with credentials provider
+- **Database:** PostgreSQL with Prisma ORM
 - **State Management:** Zustand with persistence for settings and positions
 - **Data:** TanStack Query (React Query) for server state
 - **Visualization:** Custom SVG-based chart components for PnL curve
 - **Internationalization:** next-intl for English/German localization
 - **Design System:** Dark theme with glassmorphism effects and consistent Slate color palette
 - **Mobile:** PWA-ready responsive design with mobile-first approach
+- **Development:** Docker containers for database setup
 
 ## Development Guidelines
 
 **Environment Setup:**
-- Requires `.env.local` or `.env.development` with `NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID`
+- Requires `.env.local` or `.env.development` with:
+  - `NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` for Web3 integration
+  - `DATABASE_URL` for PostgreSQL connection
+  - `NEXTAUTH_URL` and `NEXTAUTH_SECRET` for authentication
+- PostgreSQL database via Docker: `docker-compose up -d`
+- Database migrations: `npx prisma migrate dev`
+- Database seeding: `npx prisma db push`
 - Support for Ethereum, Arbitrum, and Base networks
 - Development server: `npm run dev`
 - Build command: `npm run build`
