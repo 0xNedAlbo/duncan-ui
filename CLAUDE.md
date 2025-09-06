@@ -184,6 +184,9 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - ✅ **Complete token management system with Alchemy integration**
 - ✅ **Production-ready testing infrastructure (51 unit tests)**
 - ✅ **Token API endpoints with validation and error handling**
+- ✅ **Comprehensive API authentication system with NextAuth middleware**
+- ✅ **Secure API endpoints requiring user authentication (83 unit tests)**
+- ✅ **Professional homepage with landing page and internationalization**
 
 **Next Steps:**
 - 🔧 Pool service integration with Uniswap V3 data
@@ -200,12 +203,12 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 **Modern Stack for Phase 1:**
 - **Frontend:** Next.js 15 with App Router + Tailwind CSS
 - **Web3:** Wagmi v2 + Viem + RainbowKit for blockchain integration  
-- **Authentication:** NextAuth.js v4 with credentials provider
+- **Authentication:** NextAuth.js v4 with credentials provider + API middleware protection
 - **Database:** PostgreSQL with Prisma ORM (normalized Token/Pool/Position schema)
 - **State Management:** Zustand with persistence for settings and positions
 - **Data:** TanStack Query (React Query) for server state
 - **Token Data:** Alchemy Token API with comprehensive caching system
-- **Testing:** Vitest + MSW (Mock Service Worker) + 51 comprehensive unit tests
+- **Testing:** Vitest + MSW (Mock Service Worker) + 83 comprehensive unit tests
 - **Visualization:** Custom SVG-based chart components for PnL curve
 - **Internationalization:** next-intl for English/German localization
 - **Design System:** Dark theme with glassmorphism effects and consistent Slate color palette
@@ -236,6 +239,15 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - Conditional wallet connection (connect-to-use pattern)
 - Hydration-safe rendering to prevent SSR mismatches
 - Glassmorphism cards with backdrop-blur effects
+
+**API Security & Authentication:**
+- **All API routes require authentication** except `/api/auth/*` (registration, login)
+- **NextAuth middleware** (`src/middleware.ts`) automatically protects API endpoints
+- **Session-based authentication** using `getSession()` in route handlers
+- **Consistent 401 responses** with "Unauthorized - Please sign in" messages
+- **Comprehensive test coverage** including auth integration tests
+- **Public routes:** `/api/auth/register`, `/api/auth/[...nextauth]`
+- **Protected routes:** `/api/tokens/*`, `/api/positions/*`, all other APIs
 
 **Code Conventions:**
 - TypeScript strict mode enabled
