@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { X, Settings, Globe } from 'lucide-react'
-import { useSettingsStore } from '@/store/settings-store'
+import { useSettingsStore, type SupportedLocale } from '@/store/settings-store'
 import { useTranslations } from '@/i18n/client'
 
 export function SettingsModal() {
@@ -12,6 +12,12 @@ export function SettingsModal() {
     setLocale
   } = useSettingsStore()
   const t = useTranslations()
+
+  const handleLocaleChange = (value: string) => {
+    if (value === 'en-US' || value === 'de-DE') {
+      setLocale(value as SupportedLocale)
+    }
+  }
 
   if (!isOpen) {
     return (
@@ -62,7 +68,7 @@ export function SettingsModal() {
               </label>
               <select
                 value={locale}
-                onChange={(e) => setLocale(e.target.value as any)}
+                onChange={(e) => handleLocaleChange(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="en-US">English (US)</option>
