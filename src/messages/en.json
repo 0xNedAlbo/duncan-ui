@@ -113,5 +113,32 @@
       "submitButton": "Register",
       "loading": "Loading..."
     }
+  },
+  "homepage": {
+    "hero": {
+      "title": "Manage Your Uniswap V3 Positions",
+      "description": "Plan, visualize, and manage your liquidity positions with advanced risk analysis and comprehensive PnL curve visualization.",
+      "getStarted": "Get Started",
+      "signIn": "Sign In"
+    },
+    "features": {
+      "riskPlanning": {
+        "title": "Risk-Aware Planning",
+        "description": "Understand your position's risk profile with our three-phase PnL visualization."
+      },
+      "interactiveCharts": {
+        "title": "Interactive Charts",
+        "description": "Visualize profit and loss scenarios with dynamic, interactive curve displays."
+      },
+      "multiChain": {
+        "title": "Multi-Chain Support",
+        "description": "Import and manage positions across Ethereum, Arbitrum, and Base networks."
+      }
+    },
+    "cta": {
+      "title": "Ready to optimize your DeFi strategy?",
+      "description": "Join DUNCAN and take control of your Uniswap V3 liquidity positions.",
+      "createAccount": "Create Account"
+    }
   }
 }

@@ -113,5 +113,32 @@
       "submitButton": "Registrieren",
       "loading": "Lädt..."
     }
+  },
+  "homepage": {
+    "hero": {
+      "title": "Verwaltet eure Uniswap V3 Positionen",
+      "description": "Plant, visualisiert und verwaltet eure Liquiditätspositionen mit fortgeschrittener Risikoanalyse und umfassender PnL-Kurven-Visualisierung.",
+      "getStarted": "Loslegen",
+      "signIn": "Anmelden"
+    },
+    "features": {
+      "riskPlanning": {
+        "title": "Risikobewusste Planung",
+        "description": "Versteht euer Positionsrisikoprofil mit unserer Drei-Phasen-PnL-Visualisierung."
+      },
+      "interactiveCharts": {
+        "title": "Interaktive Charts",
+        "description": "Visualisiert Gewinn- und Verlustszenarien mit dynamischen, interaktiven Kurven-Displays."
+      },
+      "multiChain": {
+        "title": "Multi-Chain-Unterstützung",
+        "description": "Importiert und verwaltet Positionen über Ethereum, Arbitrum und Base Netzwerke hinweg."
+      }
+    },
+    "cta": {
+      "title": "Bereit, eure DeFi-Strategie zu optimieren?",
+      "description": "Tretet DUNCAN bei und übernehmt die Kontrolle über eure Uniswap V3 Liquiditätspositionen.",
+      "createAccount": "Account erstellen"
+    }
   }
 }

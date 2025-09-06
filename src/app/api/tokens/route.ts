@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TokenService } from '@/services/tokens/tokenService';
 import { PrismaClient } from '@prisma/client';
+import { getSession } from '@/lib/auth';
 
 // Allow test injection of prisma client
 const prisma = globalThis.__testPrisma || new PrismaClient();
 const tokenService = new TokenService(prisma);
 
 export async function GET(request: NextRequest) {
+  // Check authentication
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json(
+      { error: 'Unauthorized - Please sign in' },
+      { status: 401 }
+    );
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const chain = searchParams.get('chain');
@@ -52,6 +62,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Check authentication
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json(
+      { error: 'Unauthorized - Please sign in' },
+      { status: 401 }
+    );
+  }
+
   try {
     const body = await request.json();
     const { chain, address, symbol, name, decimals, logoUrl, verified } = body;

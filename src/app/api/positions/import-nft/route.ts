@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchNFTPosition } from '@/services/uniswap/nftPosition';
+import { getSession } from '@/lib/auth';
 
 export interface NFTImportRequest {
   chain: string;
@@ -26,6 +27,15 @@ export interface NFTImportResponse {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<NFTImportResponse>> {
+  // Check authentication
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({
+      success: false,
+      error: 'Unauthorized - Please sign in',
+    }, { status: 401 });
+  }
+
   try {
     const body = await request.json() as NFTImportRequest;
     const { chain, nftId } = body;

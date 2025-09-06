@@ -1,8 +1,15 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { GET, POST } from './route';
 import { createTestRequest } from '../../../__tests__/utils/testRequest';
 import { TOKEN_ADDRESSES } from '../../../__tests__/fixtures/tokens';
+
+// Mock getSession
+vi.mock('@/lib/auth', () => ({
+  getSession: vi.fn(),
+}));
+
+import { getSession } from '@/lib/auth';
 
 describe('/api/tokens', () => {
   let testPrisma: PrismaClient;
@@ -31,6 +38,11 @@ describe('/api/tokens', () => {
     await testPrisma.pool.deleteMany();
     await testPrisma.token.deleteMany();
     await testPrisma.user.deleteMany();
+    
+    // Mock authenticated session by default
+    vi.mocked(getSession).mockResolvedValue({
+      user: { id: 'test-user', email: 'test@example.com', name: 'Test User' }
+    } as any);
   });
 
   afterAll(async () => {
