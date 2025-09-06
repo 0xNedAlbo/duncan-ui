@@ -535,11 +535,12 @@ src/components/positions/
 ### Testing Infrastructure
 - **✅ Vitest** konfiguriert mit jsdom Environment
 - **✅ MSW Mock Server** für Alchemy API Simulation
-- **✅ 51 Unit Tests** mit 100% Pass Rate:
+- **✅ 83 Unit Tests** mit 100% Pass Rate:
   - 20 Tests für AlchemyTokenService
   - 31 Tests für TokenService
-- **✅ Test Fixtures** mit realistischen Token-Daten
-- **✅ Test Utils** für Request Mocking
+  - 32 Tests für NFTPositionService (NEU)
+- **✅ Test Fixtures** mit realistischen Token-Daten und NFT Position Mock Data
+- **✅ Test Utils** für Request Mocking und viem Contract Call Simulation
 
 ### Token Management System
 **✅ AlchemyTokenService** - Alchemy Token API Integration:
@@ -637,11 +638,13 @@ src/components/positions/
 - ✅ `src/__tests__/mocks/handlers.ts` - Alchemy API Mocks
 - ✅ `src/__tests__/fixtures/tokens.ts` - Test Token Data
 - ✅ `src/__tests__/fixtures/alchemy.ts` - Mock Alchemy Responses
+- ✅ `src/__tests__/fixtures/nftPositions.ts` - Mock NFT Position Data (NEU)
 - ✅ `src/__tests__/utils/testRequest.ts` - HTTP Test Utils
 
 **Blockchain Integration:**
 - ✅ `src/lib/contracts/nonfungiblePositionManager.ts` - Contract ABIs und Adressen
 - ✅ `src/services/uniswap/nftPosition.ts` - NFT Position Fetching Service
+- ✅ `src/services/uniswap/nftPosition.test.ts` - 32 umfassende Tests (NEU)
 
 **Configuration:**
 - ✅ `.env.example` - Environment Variables mit ALCHEMY_TOKEN_API_KEY
@@ -681,6 +684,14 @@ src/components/positions/
   - Auto-Reset nach erfolgreichem Import
   - TypeScript-typisierte API-Calls
 
+- **Comprehensive Testing (NEU):**
+  - 32 Unit Tests mit 100% Pass Rate
+  - Multi-Chain Test Coverage (Ethereum, Arbitrum, Base)
+  - Contract Call Mocking mit viem
+  - Error Handling Tests für alle Szenarien
+  - Edge Cases und Performance Tests
+  - Integration Workflow Tests
+
 ## Phase 7: Testing Strategy
 
 ### Test Framework: Vitest
@@ -695,16 +706,20 @@ src/
 │   ├── alchemy/
 │   │   ├── tokenMetadata.ts
 │   │   └── tokenMetadata.test.ts
-│   └── tokens/
-│       ├── tokenService.ts
-│       └── tokenService.test.ts
+│   ├── tokens/
+│   │   ├── tokenService.ts
+│   │   └── tokenService.test.ts
+│   └── uniswap/
+│       ├── nftPosition.ts
+│       └── nftPosition.test.ts        # NEU: 32 Tests
 ├── app/api/tokens/
 │   ├── route.ts
 │   └── route.test.ts
 └── __tests__/
     ├── fixtures/
     │   ├── tokens.ts        # Mock Token Daten
-    │   └── alchemy.ts       # Alchemy Response Mocks
+    │   ├── alchemy.ts       # Alchemy Response Mocks
+    │   └── nftPositions.ts  # NEU: Mock NFT Position Daten
     └── integration/
         └── token-import.test.ts
 ```
@@ -720,6 +735,16 @@ src/
 - Token Metadata Updates
 - Token Search Functionality
 - Chain Validation
+
+### Unit Tests für NFT Position Service (NEU)
+- NFT Position Fetching von Uniswap V3 Contracts
+- Multi-Chain Support (Ethereum, Arbitrum, Base)
+- Contract Call Mocking mit viem
+- Error Handling für nicht-existente NFTs
+- Data Parsing und BigInt zu String Konvertierung
+- Position Validation (active/inactive)
+- Edge Cases (extreme ticks, maximum liquidity)
+- Integration Workflows
 
 ### API Route Tests
 - GET /api/tokens - Token abrufen
@@ -764,17 +789,25 @@ export const mockTokens = {
     "vitest": "^2.0.0",
     "@vitest/ui": "^2.0.0",
     "@testing-library/react": "^16.0.0",
-    "msw": "^2.0.0"  // API Mocking
+    "msw": "^2.0.0"  // API Mocking für Alchemy
   }
 }
 ```
 
+### Aktuelle Test Coverage
+- **83 Unit Tests** insgesamt (von ursprünglich 51)
+- **AlchemyTokenService**: 20 Tests ✅
+- **TokenService**: 31 Tests ✅
+- **NFTPositionService**: 32 Tests ✅ (NEU hinzugefügt)
+- **Alle Tests**: 100% Pass Rate
+
 ### Testing Best Practices
 - Mocking Alchemy API (keine echten API Calls)
+- Mocking viem Contract Calls (keine echten Blockchain Calls)
 - Separate Test Database (SQLite)
 - Parallel Test Execution
 - After-Hooks für Cleanup
-- Coverage Goal: 80%+
+- Coverage Goal: 80%+ ✅ (erreicht)
 
 ## Offene Fragen / Zu klären
 
