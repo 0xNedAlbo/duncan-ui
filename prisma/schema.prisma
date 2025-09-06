@@ -54,6 +54,8 @@ model User {
   accounts      Account[]
   sessions      Session[]
   positions     Position[]
+  userTokens    UserToken[]  // User's custom token list
+  ownedPools    Pool[]    @relation("PoolOwner")  // Pools with custom tokens
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -70,7 +72,7 @@ model VerificationToken {
   @@map("verificationtokens")
 }
 
-// Token Model - globale Token-Daten
+// Token Model - NUR verifizierte Tokens von Alchemy (global)
 model Token {
   id            String   @id @default(cuid())
   
@@ -85,7 +87,7 @@ model Token {
   
   // Alchemy Metadata
   logoUrl       String?
-  verified      Boolean  @default(false)  // Von Alchemy verified flag
+  verified      Boolean  @default(true)   // Immer true für globale Tokens
   
   // Metadata Caching
   lastUpdatedAt DateTime?  // Wann zuletzt von Alchemy aktualisiert
@@ -103,7 +105,42 @@ model Token {
   @@map("tokens")
 }
 
-// Pool Model - zentrale Pool-Daten
+// UserToken Model - User-spezifische Custom Tokens
+model UserToken {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Chain & Address
+  chain         String   // "ethereum", "arbitrum", "base"
+  address       String
+  
+  // Token Information
+  symbol        String
+  name          String
+  decimals      Int
+  logoUrl       String?
+  
+  // Metadata
+  source        String   // "contract", "manual", "placeholder"
+  addedAt       DateTime @default(now())
+  lastUsedAt    DateTime @updatedAt
+  
+  // User kann eigene Labels vergeben
+  userLabel     String?  // z.B. "My Test Token"
+  notes         String?  // User Notizen
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([userId, chain, address])
+  @@index([userId, chain])
+  @@index([userId, symbol])
+  @@map("user_tokens")
+}
+
+// Pool Model - zentrale Pool-Daten mit flexiblen Token References
 model Pool {
   id            String   @id @default(cuid())
   
@@ -111,11 +148,15 @@ model Pool {
   chain         String   // "ethereum", "arbitrum", "base"
   poolAddress   String
   
-  // Token Relations
-  token0Id      String
-  token0        Token    @relation("Token0", fields: [token0Id], references: [id])
-  token1Id      String
-  token1        Token    @relation("Token1", fields: [token1Id], references: [id])
+  // Flexible Token Relations (kann null sein wenn custom token)
+  token0Id      String?
+  token0        Token?   @relation("Token0", fields: [token0Id], references: [id])
+  token1Id      String?
+  token1        Token?   @relation("Token1", fields: [token1Id], references: [id])
+  
+  // Token Addresses (immer gesetzt für custom tokens)
+  token0Address String
+  token1Address String
   
   // Pool Parameters
   fee           Int      // Fee in basis points (100 = 0.01%, 500 = 0.05%, 3000 = 0.3%, 10000 = 1%)
@@ -129,6 +170,10 @@ model Pool {
   volume24h     String?
   apr           Float?
   
+  // Pool Owner (für custom tokens)
+  ownerId       String?
+  owner         User?    @relation("PoolOwner", fields: [ownerId], references: [id])
+  
   // Relations
   positions     Position[]
   
@@ -137,7 +182,10 @@ model Pool {
   updatedAt     DateTime @updatedAt
   
   @@unique([chain, poolAddress])
+  @@unique([chain, token0Address, token1Address, fee])
   @@index([chain, token0Id, token1Id])
+  @@index([chain, token0Address, token1Address])
+  @@index([ownerId])
   @@map("pools")
 }
 

@@ -117,14 +117,14 @@ model User {
 }
 ```
 
-### Vorteile der vollständig normalisierten Struktur
-- **Maximale Normalisierung**: Tokens werden global gespeichert, nicht pro Pool
-- **Keine Redundanz**: Jeder Token existiert nur einmal pro Chain in der DB
-- **Zentrale Token-Daten**: Logo, Preis, Name für alle Pools verfügbar
-- **Zentrale Pool-Daten**: APR, TVL, Volume für alle Positionen verfügbar
-- **Bessere Performance**: Minimale Daten-Duplizierung
-- **Einfachere Updates**: Token-Preise und Pool-Statistiken per Background-Job
-- **Skalierbar**: Bereit für Features wie Token-Listen, Pool-Vergleiche, Portfolio-Übersicht
+### Vorteile der User-Scoped Token Architecture ✅
+- **🔒 Token Isolation**: Unbekannte Tokens landen nur beim jeweiligen User
+- **🛡️ Spam Protection**: Globale DB bleibt sauber, nur verifizierte Alchemy-Tokens global
+- **👤 Privacy**: Custom Tokens anderer User sind nicht sichtbar
+- **📈 Progressive Enhancement**: Tokens werden über Zeit von Custom → Global promoted
+- **⚡ Performance**: Cache für wiederholte Token-Zugriffe
+- **🧹 Sauberkeit**: Keine Token-Redundanz oder Spam in globaler Tabelle
+- **🔄 Robustheit**: Funktioniert mit ALLEN Tokens, auch Scam/neue/unbekannte
 
 ## Phase 2: Dashboard mit Positionsliste
 
@@ -217,58 +217,104 @@ model User {
 4. **Speicherung**
    - In DB mit NFT Referenz
 
-## Phase 4: API Routes
+## Phase 4: API Routes (Updated Security Architecture)
 
-### `/api/positions`
-- **GET**: Alle Positionen des Users (mit Pool-Daten)
-  - Automatisches `include: { pool: true }` für vollständige Daten
-- **POST**: Neue Position erstellen
-  - Pool automatisch anlegen falls nicht vorhanden
-- **PUT**: Position aktualisieren
-- **DELETE**: Position entfernen
+### 🔒 **SECURITY UPDATE: Pool API Refactoring**
+**Neue Sicherheitsarchitektur implementiert - Pools können nicht mehr direkt manipuliert werden**
 
-### `/api/tokens`
+### Position APIs (Primary Interface)
+
+#### `/api/positions`
+- **GET**: Alle Positionen des Users mit Token-Info und Pagination
+  - Query Parameter: `status`, `chain`, `limit`, `offset`
+  - Automatische Token-Resolution für Custom Tokens
+  - Zusammenfassung der Position-Stati
+
+#### `/api/positions/create`
+- **POST**: Manuelle Position erstellen
+  - Body: `{ chain, token0Address, token1Address, fee, tickLower, tickUpper, liquidity }`
+  - Pool wird intern erstellt/gefunden
+  - Tick-Range Validierung mit Pool-spezifischem `tickSpacing`
+
+#### `/api/positions/import-nft`
+- **POST**: NFT Position importieren mit integrierter Pool-Erstellung
+  - Body: `{ chain, nftId }`
+  - Pool und Position werden atomisch erstellt
+  - Ownership-Validation und Duplikats-Check
+
+#### `/api/positions/[id]/refresh`
+- **POST**: Einzelne Position refreshen (1min Cooldown)
+  - Refresht Pool-State intern und berechnet Position-Value
+  - User kann nur eigene Positionen refreshen
+  - Rate Limiting mit Cooldown-Anzeige
+
+#### `/api/positions/refresh-all`
+- **POST**: Alle User-Positionen batch-refreshen (5min Cooldown)
+  - Effizient: Jeder Pool wird nur einmal refreshed
+  - Zusammenfassung der Refresh-Ergebnisse
+  - Rate Limiting für Batch-Operationen
+
+### Token APIs (Enhanced)
+
+#### `/api/tokens`
 - **GET**: Token-Daten abrufen
   - Query Parameter: chain, address oder symbol
 - **POST**: Token anlegen/aktualisieren
   - Automatisch beim Pool-Import
 
-### `/api/tokens/search`
+#### `/api/tokens/search`
 - **GET**: Token suchen
   - Query Parameter: chain, query (Symbol oder Name)
   - Für Autocomplete in UI
 
-### `/api/pools`
-- **GET**: Pool-Daten abrufen (mit Token-Relationen)
-  - Query Parameter: chain, poolAddress
-  - Automatisches `include: { token0: true, token1: true }`
-- **POST**: Pool anlegen/aktualisieren
-  - Tokens werden automatisch angelegt falls nicht vorhanden
+#### `/api/user-tokens`
+- **GET**: User's Custom Token List
+  - Query Parameter: chain (optional)
+- **POST**: Custom Token manuell hinzufügen
+  - Body: Token-Metadaten mit userLabel und notes
 
-### `/api/pools/search`
+#### `/api/user-tokens/[id]`
+- **PUT**: User Token aktualisieren (Label, Notes)
+- **DELETE**: User Token entfernen
+  - Verhindert Löschung wenn Token in Pools verwendet
+
+### Pool APIs (Read-Only + Compute)
+
+#### `/api/pools`
+- **GET**: Pool-Suche mit Filtering (READ-ONLY)
+  - Query Parameter: `chain`, `token0`, `token1`, `includeUserPools`
+  - ~~POST: ENTFERNT~~ - Keine direkte Pool-Erstellung mehr
+
+#### `/api/pools/[id]`
+- **GET**: Einzelpool abrufen mit Token-Info (READ-ONLY)
+
+#### `/api/pools/search`
 - **GET**: Pools für Token-Pair suchen
-  - Query Parameter: chain, token0, token1
+  - Query Parameter: chain, token0Address, token1Address
   - Gibt alle Fee Tiers zurück (0.01%, 0.05%, 0.3%, 1%)
 
-### `/api/pools/update`
-- **POST**: Pool-Statistiken aktualisieren
-  - TVL, Volume, APR, Current Price
-  - Kann als Cron-Job laufen
+#### `/api/pools/compute-address`
+- **POST**: Pool-Adresse berechnen (UTILITY-ONLY)
+  - Body: `{ chain, token0Address, token1Address, fee }`
+  - Prüft On-Chain Existenz ohne DB-Änderung
 
-### `/api/tokens/refresh-metadata`
-- **POST**: Token-Metadata aktualisieren
-  - Logos und Metadaten von Alchemy
-  - Batch-Update für veraltete Tokens
+#### ~~`/api/pools/[id]/refresh`~~ → **ENTFERNT**
+- Pool-Refreshs passieren nur intern über Position-Refreshs
 
-### `/api/uniswap/import-wallet`
-- **POST**: Import Positionen von Wallet
-- Body: walletAddress, chain
-- Legt automatisch benötigte Pools an
+### Security Benefits
 
-### `/api/uniswap/import-nft`
-- **POST**: Import Position von NFT
-- Body: nftId, chain
-- Pool wird automatisch angelegt/verknüpft
+1. **🚫 Keine direkten Pool-Manipulationen** - User können keine Pools erstellen/ändern
+2. **👤 Ownership-Validation** - User können nur eigene Positionen refreshen  
+3. **⏱️ Rate Limiting** - Schutz vor DoS durch Refresh-Spam
+4. **🔒 Resource Protection** - Pools nur bei legitimen Position-Operationen
+5. **📊 Data Integrity** - Atomische Transaktionen für Pool+Position Creation
+
+### Deprecated/Removed APIs
+
+- ~~`POST /api/pools`~~ → Use `POST /api/positions/create`
+- ~~`POST /api/pools/[id]/refresh`~~ → Use `POST /api/positions/[id]/refresh`
+- ~~`POST /api/uniswap/import-wallet`~~ → Future: Use Subgraph Integration
+- ~~`POST /api/uniswap/import-nft`~~ → Moved to `POST /api/positions/import-nft`
 
 ## Phase 5: Alchemy Token API Integration
 
@@ -517,14 +563,15 @@ src/components/positions/
 8. ✅ **Testing Setup** → Vitest konfiguriert, MSW Mock Server (ABGESCHLOSSEN)
 9. ✅ **Token Service** → Alchemy Integration & Business Logic (ABGESCHLOSSEN)
 10. ✅ **Token API Routes** → CRUD Operations für Tokens (ABGESCHLOSSEN)
-11. 🔄 **Pool Service** → Pool-Daten von Uniswap abrufen (NÄCHSTER SCHRITT)
-12. 🔄 **Position List** → Mit echten Daten aus DB
-13. 🔄 **Manual Creation** → Token-Auswahl und Pool-Konfiguration
-14. 🔄 **Wallet Import** → Subgraph Integration
-15. 🔄 **Background Jobs** → Pool-Statistiken Updates
-16. 🔄 **Polish** → Error Handling, Loading States, Performance
+11. ✅ **Pool Service** → Pool-Daten von Uniswap mit User-Scoped Tokens (ABGESCHLOSSEN)
+12. ✅ **Pool API Security** → Position-centric Architecture mit Rate Limiting (ABGESCHLOSSEN)
+13. 🔄 **Position List** → Mit echten Daten aus DB (NÄCHSTER SCHRITT)
+14. 🔄 **Manual Creation** → Token-Auswahl und Pool-Konfiguration
+15. 🔄 **Wallet Import** → Subgraph Integration
+16. 🔄 **Background Jobs** → Pool-Statistiken Updates
+17. 🔄 **Polish** → Error Handling, Loading States, Performance
 
-## ✅ AKTUELLE IMPLEMENTATION (Stand: Token-Integration Komplett)
+## ✅ AKTUELLE IMPLEMENTATION (Stand: Pool Service + Security Architecture Komplett)
 
 ### Database & Schema
 - **✅ Prisma Schema** mit Token, Pool & Position Models

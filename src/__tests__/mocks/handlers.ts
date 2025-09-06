@@ -5,6 +5,7 @@ import {
   createAlchemyErrorResponse,
 } from '../fixtures/alchemy'
 import { TOKEN_ADDRESSES } from '../fixtures/tokens'
+import { poolHandlers } from './poolHandlers'
 
 export const handlers = [
   // Alchemy API mocks
@@ -138,4 +139,7 @@ export const handlers = [
     
     return HttpResponse.json(createAlchemyErrorResponse('Unknown method'));
   }),
+  
+  // Include pool-specific handlers
+  ...poolHandlers,
 ]

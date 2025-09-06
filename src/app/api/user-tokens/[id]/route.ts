@@ -1,0 +1,119 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+import { TokenResolutionService } from '@/services/tokens/tokenResolutionService';
+import { z } from 'zod';
+
+interface RouteParams {
+  params: {
+    id: string;
+  };
+}
+
+const UpdateUserTokenSchema = z.object({
+  userLabel: z.string().max(50).optional(),
+  notes: z.string().max(500).optional(),
+});
+
+/**
+ * PUT /api/user-tokens/[id] - Update user token (label, notes)
+ * Body: { userLabel?, notes? }
+ */
+export async function PUT(request: NextRequest, { params }: RouteParams) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = params;
+    
+    if (!id || typeof id !== 'string') {
+      return NextResponse.json(
+        { error: 'Invalid token ID' },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const validatedData = UpdateUserTokenSchema.parse(body);
+
+    const tokenResolver = new TokenResolutionService();
+    const updatedToken = await tokenResolver.updateUserToken(
+      session.user.id,
+      id,
+      validatedData
+    );
+
+    return NextResponse.json({ userToken: updatedToken });
+
+  } catch (error) {
+    console.error('Error updating user token:', error);
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Invalid request data', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/user-tokens/[id] - Remove user token
+ */
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = params;
+    
+    if (!id || typeof id !== 'string') {
+      return NextResponse.json(
+        { error: 'Invalid token ID' },
+        { status: 400 }
+      );
+    }
+
+    const tokenResolver = new TokenResolutionService();
+    await tokenResolver.removeUserToken(session.user.id, id);
+
+    return NextResponse.json({ message: 'Token removed successfully' });
+
+  } catch (error) {
+    console.error('Error removing user token:', error);
+    
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

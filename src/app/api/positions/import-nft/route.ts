@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { fetchNFTPosition } from '@/services/uniswap/nftPosition';
-import { getSession } from '@/lib/auth';
+import { PoolService } from '@/services/uniswap/poolService';
+import { PrismaClient } from '@prisma/client';
 
 export interface NFTImportRequest {
   chain: string;
@@ -9,34 +12,35 @@ export interface NFTImportRequest {
 
 export interface NFTImportResponse {
   success: boolean;
-  data?: {
+  position?: {
+    id: string;
     nftId: string;
-    chainId: number;
-    chainName: string;
-    token0Address: string;
-    token1Address: string;
-    fee: number;
     tickLower: number;
     tickUpper: number;
     liquidity: string;
-    tokensOwed0: string;
-    tokensOwed1: string;
-    isActive: boolean;
+    pool: {
+      id: string;
+      chain: string;
+      poolAddress: string;
+      fee: number;
+      token0Info?: any;
+      token1Info?: any;
+    };
   };
   error?: string;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<NFTImportResponse>> {
-  // Check authentication
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({
-      success: false,
-      error: 'Unauthorized - Please sign in',
-    }, { status: 401 });
-  }
-
   try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({
+        success: false,
+        error: 'Unauthorized - Please sign in',
+      }, { status: 401 });
+    }
+
     const body = await request.json() as NFTImportRequest;
     const { chain, nftId } = body;
 
@@ -66,29 +70,114 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
       }, { status: 400 });
     }
 
-    // Fetch the NFT position
+    // 1. Fetch NFT position data from blockchain
+    const nftPositionData = await fetchNFTPosition(chain.toLowerCase(), nftId);
+    
+    if (!nftPositionData.isActive) {
+      return NextResponse.json({
+        success: false,
+        error: 'NFT position is not active (liquidity = 0)',
+      }, { status: 400 });
+    }
+
+    // 2. Initialize services
+    const poolService = new PoolService();
+    const prisma = new PrismaClient();
+
     try {
-      const positionData = await fetchNFTPosition(chain.toLowerCase(), nftId);
+      // 3. Find or create pool internally
+      const pool = await poolService.findOrCreatePool(
+        nftPositionData.chainName,
+        nftPositionData.token0Address,
+        nftPositionData.token1Address,
+        nftPositionData.fee,
+        session.user.id
+      );
+
+      // 4. Check if position already exists
+      const existingPosition = await prisma.position.findFirst({
+        where: {
+          userId: session.user.id,
+          nftId: nftPositionData.nftId,
+          importType: 'nft'
+        }
+      });
+
+      if (existingPosition) {
+        return NextResponse.json({
+          success: false,
+          error: 'This NFT position has already been imported',
+        }, { status: 409 });
+      }
+
+      // 5. Create position in database
+      const position = await prisma.position.create({
+        data: {
+          userId: session.user.id,
+          poolId: pool.id,
+          tickLower: nftPositionData.tickLower,
+          tickUpper: nftPositionData.tickUpper,
+          liquidity: nftPositionData.liquidity,
+          importType: 'nft',
+          nftId: nftPositionData.nftId,
+          status: 'active'
+        },
+        include: {
+          pool: {
+            include: {
+              token0: true,
+              token1: true
+            }
+          }
+        }
+      });
 
       return NextResponse.json({
         success: true,
-        data: positionData,
+        position: {
+          id: position.id,
+          nftId: position.nftId!,
+          tickLower: position.tickLower,
+          tickUpper: position.tickUpper,
+          liquidity: position.liquidity,
+          pool: {
+            id: pool.id,
+            chain: pool.chain,
+            poolAddress: pool.poolAddress,
+            fee: pool.fee,
+            token0Info: pool.token0Info,
+            token1Info: pool.token1Info
+          }
+        }
       });
-    } catch (error) {
-      console.error('NFT position fetch error:', error);
+
+    } catch (poolError) {
+      console.error('Pool/Position creation error:', poolError);
       
       return NextResponse.json({
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        error: poolError instanceof Error ? poolError.message : 'Failed to create pool or position',
+      }, { status: 400 });
+      
+    } finally {
+      await poolService.disconnect();
+      await prisma.$disconnect();
+    }
+
+  } catch (error) {
+    console.error('NFT import error:', error);
+    
+    if (error instanceof Error && error.message.includes('does not exist')) {
+      return NextResponse.json({
+        success: false,
+        error: error.message,
       }, { status: 404 });
     }
-  } catch (error) {
-    console.error('API error:', error);
     
     return NextResponse.json({
       success: false,
-      error: 'Invalid request format',
-    }, { status: 400 });
+      error: error instanceof Error ? error.message : 'Internal server error',
+    }, { status: 500 });
   }
 }
 
