@@ -53,6 +53,7 @@ model User {
   image         String?
   accounts      Account[]
   sessions      Session[]
+  positions     Position[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -69,10 +70,104 @@ model VerificationToken {
   @@map("verificationtokens")
 }
 
-model Test {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
+// Token Model - globale Token-Daten
+model Token {
+  id            String   @id @default(cuid())
   
-  @@map("test")
+  // Chain & Address (unique zusammen)
+  chain         String   // "ethereum", "arbitrum", "base"
+  address       String
+  
+  // Token Information
+  symbol        String
+  name          String
+  decimals      Int
+  
+  // Alchemy Metadata
+  logoUrl       String?
+  verified      Boolean  @default(false)  // Von Alchemy verified flag
+  
+  // Metadata Caching
+  lastUpdatedAt DateTime?  // Wann zuletzt von Alchemy aktualisiert
+  
+  // Relations
+  poolsAsToken0 Pool[]   @relation("Token0")
+  poolsAsToken1 Pool[]   @relation("Token1")
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([chain, address])
+  @@index([chain, symbol])
+  @@map("tokens")
+}
+
+// Pool Model - zentrale Pool-Daten
+model Pool {
+  id            String   @id @default(cuid())
+  
+  // Chain & Address (unique zusammen)
+  chain         String   // "ethereum", "arbitrum", "base"
+  poolAddress   String
+  
+  // Token Relations
+  token0Id      String
+  token0        Token    @relation("Token0", fields: [token0Id], references: [id])
+  token1Id      String
+  token1        Token    @relation("Token1", fields: [token1Id], references: [id])
+  
+  // Pool Parameters
+  fee           Int      // Fee in basis points (100 = 0.01%, 500 = 0.05%, 3000 = 0.3%, 10000 = 1%)
+  tickSpacing   Int
+  
+  // Current State (updated periodically)
+  currentTick   Int?
+  currentPrice  String?  // As decimal string
+  sqrtPriceX96  String?  // Uniswap V3 price format
+  tvl           String?
+  volume24h     String?
+  apr           Float?
+  
+  // Relations
+  positions     Position[]
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([chain, poolAddress])
+  @@index([chain, token0Id, token1Id])
+  @@map("pools")
+}
+
+// Simplified Position Model
+model Position {
+  id            String   @id @default(cuid())
+  
+  // Relations
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  poolId        String
+  pool          Pool     @relation(fields: [poolId], references: [id])
+  
+  // Position Details
+  tickLower     Int
+  tickUpper     Int
+  liquidity     String   // BigInt as String
+  
+  // Import Metadata
+  importType    String   // "manual", "wallet", "nft"
+  nftId         String?  // For NFT imports
+  walletAddress String?  // For wallet imports
+  
+  // Position State
+  status        String   @default("active") // "active", "closed", "archived"
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([userId, status])
+  @@map("positions")
 }

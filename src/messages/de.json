@@ -64,6 +64,33 @@
     "signIn": "Anmelden",
     "register": "Registrieren"
   },
+  "dashboard": {
+    "title": "Eure Positionen",
+    "subtitle": "Verwaltet und analysiert eure Uniswap V3 Liquiditätspositionen",
+    "emptyState": {
+      "title": "Noch keine Positionen vorhanden",
+      "description": "Startet mit eurer ersten Uniswap V3 Position über den Button oben."
+    },
+    "addPosition": {
+      "button": "Position hinzufügen",
+      "manual": {
+        "title": "Manuell konfigurieren",
+        "description": "Chain und Tokens auswählen"
+      },
+      "wallet": {
+        "title": "Aus Wallet importieren",
+        "description": "Bestehende Positionen laden"
+      },
+      "nft": {
+        "title": "NFT Position importieren",
+        "description": "Position über NFT ID laden",
+        "blockchain": "Blockchain",
+        "nftId": "NFT ID",
+        "placeholder": "z.B. 123456",
+        "import": "Position importieren"
+      }
+    }
+  },
   "auth": {
     "signIn": {
       "title": "Anmelden",
