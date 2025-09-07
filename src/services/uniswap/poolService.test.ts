@@ -89,7 +89,7 @@ describe('PoolService', () => {
     await service.disconnect();
   });
 
-  describe('findOrCreatePool', () => {
+  describe('findOrCreatePoolLegacy', () => {
     it('should return existing pool if found', async () => {
       // Create existing pool
       const existingPool = await prisma.pool.create({
@@ -97,7 +97,7 @@ describe('PoolService', () => {
         include: { token0: true, token1: true }
       });
 
-      const result = await service.findOrCreatePool(
+      const result = await service.findOrCreatePoolLegacy(
         'ethereum',
         mockTokens.WETH.address,
         mockTokens.USDC.address,
@@ -112,7 +112,7 @@ describe('PoolService', () => {
     });
 
     it('should create new pool if not found', async () => {
-      const result = await service.findOrCreatePool(
+      const result = await service.findOrCreatePoolLegacy(
         'ethereum',
         mockTokens.WETH.address,
         mockTokens.USDC.address,
@@ -135,7 +135,7 @@ describe('PoolService', () => {
 
     it('should sort token addresses correctly', async () => {
       // Pass tokens in reverse order (USDC, WETH)
-      const result = await service.findOrCreatePool(
+      const result = await service.findOrCreatePoolLegacy(
         'ethereum',
         mockTokens.USDC.address,
         mockTokens.WETH.address,
@@ -150,7 +150,7 @@ describe('PoolService', () => {
 
     it('should throw error for invalid fee tier', async () => {
       await expect(
-        service.findOrCreatePool(
+        service.findOrCreatePoolLegacy(
           'ethereum',
           mockTokens.WETH.address,
           mockTokens.USDC.address,
@@ -165,7 +165,7 @@ describe('PoolService', () => {
       const nonExistentToken = '0x1111111111111111111111111111111111111111';
       
       await expect(
-        service.findOrCreatePool(
+        service.findOrCreatePoolLegacy(
           'ethereum',
           mockTokens.WETH.address,
           nonExistentToken,
@@ -181,7 +181,7 @@ describe('PoolService', () => {
         data: mockUserTokens.CUSTOM_TOKEN
       });
 
-      const result = await service.findOrCreatePool(
+      const result = await service.findOrCreatePoolLegacy(
         'ethereum',
         mockUserTokens.CUSTOM_TOKEN.address,
         mockTokens.USDC.address,
@@ -361,7 +361,7 @@ describe('PoolService', () => {
     it('should handle address normalization', async () => {
       const upperCaseAddress = mockTokens.WETH.address.toUpperCase();
       
-      const result = await service.findOrCreatePool(
+      const result = await service.findOrCreatePoolLegacy(
         'ethereum',
         upperCaseAddress,
         mockTokens.USDC.address,
@@ -374,7 +374,7 @@ describe('PoolService', () => {
 
     it('should handle unsupported chain', async () => {
       await expect(
-        service.findOrCreatePool(
+        service.findOrCreatePoolLegacy(
           'unsupported-chain',
           mockTokens.WETH.address,
           mockTokens.USDC.address,
@@ -386,7 +386,7 @@ describe('PoolService', () => {
 
     it('should handle identical token addresses', async () => {
       await expect(
-        service.findOrCreatePool(
+        service.findOrCreatePoolLegacy(
           'ethereum',
           mockTokens.WETH.address,
           mockTokens.WETH.address, // Same token
@@ -411,7 +411,7 @@ describe('PoolService', () => {
         data: mockUserTokens.CUSTOM_TOKEN
       });
 
-      const result = await service.findOrCreatePool(
+      const result = await service.findOrCreatePoolLegacy(
         'ethereum',
         mockUserTokens.CUSTOM_TOKEN.address,
         mockTokens.USDC.address,

@@ -144,7 +144,7 @@ export class TokenResolutionService {
                     symbol: metadata.symbol,
                     name: metadata.name,
                     decimals: metadata.decimals,
-                    logoUrl: metadata.logo,
+                    logoUrl: metadata.logo ?? undefined,
                     verified: true,
                 });
 
@@ -434,7 +434,7 @@ export class TokenResolutionService {
                         symbol: metadata.symbol,
                         name: metadata.name,
                         decimals: metadata.decimals,
-                        logoUrl: metadata.logo,
+                        logoUrl: metadata.logo ?? undefined,
                         verified: true,
                     });
 
@@ -445,6 +445,7 @@ export class TokenResolutionService {
 
                     enrichedCount++;
                 }
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
             } catch (error) {
                 // Token still not in Alchemy
                 continue;

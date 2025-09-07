@@ -12,7 +12,7 @@ interface RouteParams {
 /**
  * GET /api/pools/[id] - Get pool by ID
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const poolService = new PoolService();
-    const pool = await poolService.getPoolById(id, session.user.id);
+    const pool = await poolService.getPoolById(id);
 
     if (!pool) {
       return NextResponse.json(

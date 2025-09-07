@@ -24,8 +24,8 @@ export interface NFTImportResponse {
       chain: string;
       poolAddress: string;
       fee: number;
-      token0Info?: any;
-      token1Info?: any;
+      token0Data?: any;
+      token1Data?: any;
     };
   };
   error?: string;
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
 
     try {
       // 3. Find or create pool internally
-      const pool = await poolService.findOrCreatePoolWithReferences(
+      const pool = await poolService.findOrCreatePool(
         nftPositionData.chainName,
         nftPositionData.token0Address,
         nftPositionData.token1Address,
@@ -170,8 +170,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
             chain: pool.chain,
             poolAddress: pool.poolAddress,
             fee: pool.fee,
-            token0Info: pool.token0Data,
-            token1Info: pool.token1Data
+            token0Data: pool.token0Data,
+            token1Data: pool.token1Data
           }
         }
       });

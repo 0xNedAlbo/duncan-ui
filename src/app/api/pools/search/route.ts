@@ -43,8 +43,7 @@ export async function GET(request: NextRequest) {
     const pools = await poolService.getPoolsForTokenPair(
       validatedData.chain,
       validatedData.token0Address,
-      validatedData.token1Address,
-      session.user.id
+      validatedData.token1Address
     );
 
     // Transform response to include formatted fee percentages

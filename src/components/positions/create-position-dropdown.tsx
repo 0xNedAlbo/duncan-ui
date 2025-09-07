@@ -133,8 +133,8 @@ export function CreatePositionDropdown({ onImportSuccess }: CreatePositionDropdo
                                                 if (result.success && result.position) {
                                                     // Create display data for success message
                                                     const displayData = {
-                                                        token0Address: result.position.pool.token0Info?.address || 'Unknown',
-                                                        token1Address: result.position.pool.token1Info?.address || 'Unknown',
+                                                        token0Address: result.position.pool.token0Data?.address || 'Unknown',
+                                                        token1Address: result.position.pool.token1Data?.address || 'Unknown',
                                                         fee: result.position.pool.fee,
                                                         isActive: true
                                                     };

@@ -1,10 +1,7 @@
-import { PrismaClient, Pool, Token } from "@prisma/client";
+import { PrismaClient, Pool } from "@prisma/client";
 import { createPublicClient, http } from "viem";
 import { mainnet, arbitrum, base } from "viem/chains";
-import {
-    TokenResolutionService,
-    TokenInfo,
-} from "../tokens/tokenResolutionService";
+import { TokenResolutionService } from "../tokens/tokenResolutionService";
 import {
     TokenReferenceService,
     TokenReferenceWithToken,
@@ -39,20 +36,12 @@ export interface PoolSearchOptions {
     includeUserPools?: boolean;
 }
 
-// Legacy interface - deprecated, use PoolWithUnifiedTokens instead
-export interface PoolWithTokens extends Pool {
-    token0?: Token | null;
-    token1?: Token | null;
-    token0Info?: TokenInfo;
-    token1Info?: TokenInfo;
-}
-
 export interface PoolWithTokenReferences extends Pool {
     token0Ref: TokenReferenceWithToken;
     token1Ref: TokenReferenceWithToken;
 }
 
-export interface PoolWithUnifiedTokens extends Pool {
+export interface PoolWithTokens extends Pool {
     token0Data: UnifiedTokenData;
     token1Data: UnifiedTokenData;
 }
@@ -69,16 +58,15 @@ export class PoolService {
     }
 
     /**
-     * Find or create a pool using the new TokenReference system
-     * This is the preferred method going forward
+     * Find or create a pool using the TokenReference system
      */
-    async findOrCreatePoolWithReferences(
+    async findOrCreatePool(
         chain: string,
         token0Address: string,
         token1Address: string,
         fee: number,
         userId: string
-    ): Promise<PoolWithUnifiedTokens> {
+    ): Promise<PoolWithTokens> {
         // Validate inputs
         if (!isValidFeeTier(fee)) {
             throw new Error(`Invalid fee tier: ${fee}`);
@@ -183,9 +171,6 @@ export class PoolService {
                 fee,
                 tickSpacing: getTickSpacing(fee),
                 ownerId: poolOwnerId,
-                // Legacy fields (will be populated for backward compatibility)
-                token0Id: token0Ref.globalTokenId,
-                token1Id: token1Ref.globalTokenId,
             },
             include: {
                 token0Ref: {
@@ -220,9 +205,7 @@ export class PoolService {
     /**
      * Get pool by ID with resolved token references
      */
-    async getPoolWithReferences(
-        poolId: string
-    ): Promise<PoolWithUnifiedTokens | null> {
+    async getPoolById(poolId: string): Promise<PoolWithTokens | null> {
         const pool = await this.prisma.pool.findUnique({
             where: { id: poolId },
             include: {
@@ -257,178 +240,12 @@ export class PoolService {
     }
 
     /**
-     * Find or create a pool with automatic token resolution (legacy method)
-     * @deprecated Use findOrCreatePoolWithReferences instead - this method will be removed in a future version
-     * @todo Migrate all tests to use findOrCreatePoolWithReferences
-     */
-    async findOrCreatePool(
-        chain: string,
-        token0Address: string,
-        token1Address: string,
-        fee: number,
-        userId: string
-    ): Promise<PoolWithTokens> {
-        // Validate inputs
-        if (!isValidFeeTier(fee)) {
-            throw new Error(`Invalid fee tier: ${fee}`);
-        }
-
-        // Normalize and sort token addresses
-        const [sortedToken0, sortedToken1] = sortTokens(
-            normalizeAddress(token0Address),
-            normalizeAddress(token1Address)
-        );
-
-        // Resolve both tokens
-        const [token0Info, token1Info] = await Promise.all([
-            this.tokenResolver.resolveToken(chain, sortedToken0, userId),
-            this.tokenResolver.resolveToken(chain, sortedToken1, userId),
-        ]);
-
-        // Check if pool already exists
-        const existingPool = await this.prisma.pool.findUnique({
-            where: {
-                chain_token0Address_token1Address_fee: {
-                    chain,
-                    token0Address: sortedToken0,
-                    token1Address: sortedToken1,
-                    fee,
-                },
-            },
-            include: {
-                token0: true,
-                token1: true,
-            },
-        });
-
-        if (existingPool) {
-            return {
-                ...existingPool,
-                token0Info,
-                token1Info,
-            };
-        }
-
-        // Compute pool address from factory
-        const poolAddress = await this.computePoolAddress(
-            chain,
-            sortedToken0,
-            sortedToken1,
-            fee
-        );
-
-        // Verify pool exists on-chain
-        const poolExists = await this.verifyPoolExists(chain, poolAddress);
-        if (!poolExists) {
-            throw new Error(
-                `Pool does not exist on-chain for ${token0Info.symbol}/${
-                    token1Info.symbol
-                } with ${fee / 100}% fee`
-            );
-        }
-
-        // Create temporary token references for legacy compatibility
-        const [token0Ref, token1Ref] = await Promise.all([
-            this.tokenRefService.findOrCreateReference(
-                chain,
-                sortedToken0,
-                userId
-            ),
-            this.tokenRefService.findOrCreateReference(
-                chain,
-                sortedToken1,
-                userId
-            ),
-        ]);
-
-        // Create pool in database
-        const pool = await this.prisma.pool.create({
-            data: {
-                chain,
-                poolAddress,
-                token0RefId: token0Ref.id,
-                token1RefId: token1Ref.id,
-                token0Id: token0Info.isGlobal ? token0Info.id : null,
-                token1Id: token1Info.isGlobal ? token1Info.id : null,
-                token0Address: sortedToken0,
-                token1Address: sortedToken1,
-                fee,
-                tickSpacing: getTickSpacing(fee),
-                ownerId:
-                    !token0Info.isGlobal || !token1Info.isGlobal
-                        ? userId
-                        : null,
-            },
-            include: {
-                token0: true,
-                token1: true,
-            },
-        });
-
-        // Fetch initial pool state
-        await this.updatePoolState(pool.id);
-
-        return {
-            ...pool,
-            token0Info,
-            token1Info,
-        };
-    }
-
-    /**
-     * Get pool by ID with resolved token information (legacy method)
-     * @deprecated Use getPoolWithReferences instead for better performance and type safety
-     */
-    async getPoolById(
-        poolId: string,
-        userId?: string
-    ): Promise<PoolWithTokens | null> {
-        const pool = await this.prisma.pool.findUnique({
-            where: { id: poolId },
-            include: {
-                token0: true,
-                token1: true,
-            },
-        });
-
-        if (!pool) {
-            return null;
-        }
-
-        // If userId provided, resolve custom tokens
-        if (userId) {
-            const [token0Info, token1Info] = await Promise.all([
-                this.tokenResolver.resolveToken(
-                    pool.chain,
-                    pool.token0Address,
-                    userId
-                ),
-                this.tokenResolver.resolveToken(
-                    pool.chain,
-                    pool.token1Address,
-                    userId
-                ),
-            ]);
-
-            return {
-                ...pool,
-                token0Info,
-                token1Info,
-            };
-        }
-
-        return pool;
-    }
-
-    /**
-     * Search pools by token pair (legacy method)
-     * @deprecated Consider using pools with TokenReference for better token handling
+     * Search pools by token pair
      */
     async getPoolsForTokenPair(
         chain: string,
         token0Address: string,
-        token1Address: string,
-        userId?: string
+        token1Address: string
     ): Promise<PoolWithTokens[]> {
         const [sortedToken0, sortedToken1] = sortTokens(
             normalizeAddress(token0Address),
@@ -442,32 +259,35 @@ export class PoolService {
                 token1Address: sortedToken1,
             },
             include: {
-                token0: true,
-                token1: true,
+                token0Ref: {
+                    include: {
+                        globalToken: true,
+                        userToken: true,
+                    },
+                },
+                token1Ref: {
+                    include: {
+                        globalToken: true,
+                        userToken: true,
+                    },
+                },
             },
             orderBy: [{ fee: "asc" }],
         });
 
-        // Add token info if userId provided
-        if (userId && pools.length > 0) {
-            const [token0Info, token1Info] = await Promise.all([
-                this.tokenResolver.resolveToken(chain, sortedToken0, userId),
-                this.tokenResolver.resolveToken(chain, sortedToken1, userId),
-            ]);
-
-            return pools.map((pool) => ({
-                ...pool,
-                token0Info,
-                token1Info,
-            }));
-        }
-
-        return pools;
+        return pools.map((pool) => ({
+            ...pool,
+            token0Data: this.tokenRefService.getUnifiedTokenData(
+                pool.token0Ref
+            ),
+            token1Data: this.tokenRefService.getUnifiedTokenData(
+                pool.token1Ref
+            ),
+        }));
     }
 
     /**
-     * Search pools with various filters (legacy method)  
-     * @deprecated Consider using pools with TokenReference for better token handling
+     * Search pools with various filters
      */
     async searchPools(
         options: PoolSearchOptions = {}
@@ -516,15 +336,35 @@ export class PoolService {
             ];
         }
 
-        return await this.prisma.pool.findMany({
+        const pools = await this.prisma.pool.findMany({
             where,
             include: {
-                token0: true,
-                token1: true,
+                token0Ref: {
+                    include: {
+                        globalToken: true,
+                        userToken: true,
+                    },
+                },
+                token1Ref: {
+                    include: {
+                        globalToken: true,
+                        userToken: true,
+                    },
+                },
             },
             orderBy: [{ tvl: "desc" }, { fee: "asc" }],
             take: 50, // Limit results
         });
+
+        return pools.map((pool) => ({
+            ...pool,
+            token0Data: this.tokenRefService.getUnifiedTokenData(
+                pool.token0Ref
+            ),
+            token1Data: this.tokenRefService.getUnifiedTokenData(
+                pool.token1Ref
+            ),
+        }));
     }
 
     /**
