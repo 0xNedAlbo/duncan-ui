@@ -13,8 +13,6 @@ export const mockPools = {
     poolAddress: '0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8',
     token0RefId: 'tokenref_weth_ethereum',
     token1RefId: 'tokenref_usdc_ethereum',
-    token0Id: 'token_weth_ethereum',  // Legacy field for compatibility
-    token1Id: 'token_usdc_ethereum', // Legacy field for compatibility
     token0Address: '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2',
     token1Address: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
     fee: 3000,
@@ -36,8 +34,6 @@ export const mockPools = {
     poolAddress: '0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640',
     token0RefId: 'tokenref_weth_ethereum',
     token1RefId: 'tokenref_usdc_ethereum',
-    token0Id: 'token_weth_ethereum',  // Legacy field for compatibility
-    token1Id: 'token_usdc_ethereum', // Legacy field for compatibility
     token0Address: '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2',
     token1Address: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
     fee: 500,
@@ -60,8 +56,6 @@ export const mockPools = {
     poolAddress: '0x1234567890123456789012345678901234567890',
     token0RefId: 'tokenref_custom_user1',
     token1RefId: 'tokenref_usdc_ethereum',
-    token0Id: null,  // Legacy field - no global token
-    token1Id: 'token_usdc_ethereum',  // Legacy field - global USDC
     token0Address: '0x0123456789012345678901234567890123456789', // Custom token
     token1Address: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', // USDC
     fee: 3000,
