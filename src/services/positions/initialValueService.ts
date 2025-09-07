@@ -26,8 +26,18 @@ export class InitialValueService {
       include: {
         pool: {
           include: {
-            token0: true,
-            token1: true
+            token0Ref: {
+              include: {
+                globalToken: true,
+                userToken: true,
+              },
+            },
+            token1Ref: {
+              include: {
+                globalToken: true,
+                userToken: true,
+              },
+            },
           }
         }
       }
@@ -111,8 +121,18 @@ export class InitialValueService {
       include: {
         pool: {
           include: {
-            token0: true,
-            token1: true
+            token0Ref: {
+              include: {
+                globalToken: true,
+                userToken: true,
+              },
+            },
+            token1Ref: {
+              include: {
+                globalToken: true,
+                userToken: true,
+              },
+            },
           }
         }
       }

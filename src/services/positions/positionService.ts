@@ -6,6 +6,8 @@ import {
     TokenReferenceService,
     UnifiedTokenData,
 } from "../tokens/tokenReferenceService";
+import { calculatePositionValue } from "@/lib/utils/uniswap-v3/liquidity";
+import { priceToTick, tickToPrice } from "@/lib/utils/uniswap-v3/price";
 
 export interface PositionWithPnL {
     // Basic Position Data
@@ -158,13 +160,21 @@ export class PositionService {
 
         for (const position of positions) {
             try {
+                console.log(`🔄 Calculating PnL for position ${position.id}`);
                 const pnlData = await this.calculatePositionPnL(position.id);
+                console.log(`✅ PnL Data for ${position.id}:`, {
+                    initialValue: pnlData.initialValue,
+                    currentValue: pnlData.currentValue,
+                    pnl: pnlData.pnl,
+                    pnlPercent: pnlData.pnlPercent
+                });
                 positionsWithPnL.push(pnlData);
             } catch (error) {
                 console.error(
-                    `Error calculating PnL for position ${position.id}:`,
-                    error
+                    `❌ Error calculating PnL for position ${position.id}:`,
+                    error.message
                 );
+                console.error('Stack:', error.stack);
                 
                 // Create fallback position data instead of skipping
                 const { token0Data, token1Data } = this.getUnifiedTokenData(position.pool);
@@ -306,8 +316,16 @@ export class PositionService {
             });
         }
 
-        // 4. Aktuellen Wert berechnen (Simplified)
-        const currentValue = await this.calculateCurrentValue(position);
+        // 4. Aktuellen Wert berechnen
+        let currentValue: string;
+        
+        try {
+            currentValue = await this.calculateCurrentValue(position);
+        } catch (error) {
+            console.warn(`Using initialValue as currentValue for position ${positionId}:`, error.message);
+            // Fallback: verwende initialValue als currentValue wenn Berechnung fehlschlägt
+            currentValue = initialValue.value;
+        }
 
         // 5. PnL berechnen
         const pnl = parseFloat(currentValue) - parseFloat(initialValue.value);
@@ -379,17 +397,75 @@ export class PositionService {
     }
 
     /**
-     * Berechnet aktuellen Wert der Position
-     * TODO: Richtige Implementierung mit Uniswap V3 SDK
+     * Berechnet aktuellen Wert der Position mit korrekter Uniswap V3 Formel
      */
     private async calculateCurrentValue(position: any): Promise<string> {
-        // Simplified Implementation - wird später durch Uniswap V3 SDK ersetzt
         const liquidity = BigInt(position.liquidity);
+        const { tickLower, tickUpper } = position;
+        const pool = position.pool;
 
-        // Dummy calculation based on liquidity
-        const value = (Number(liquidity) / 1e18) * 3000; // ~3000 USD pro "unit"
+        // Benötigte Pool-Daten überprüfen
+        if (!pool.currentTick && !pool.currentPrice) {
+            throw new Error(`Pool ${pool.poolAddress} has no current price data`);
+        }
 
-        return value.toFixed(2);
+        // Extract unified token data
+        const { token0Data, token1Data } = this.getUnifiedTokenData(pool);
+
+        // Quote Token bestimmen
+        const quoteConfig = determineQuoteToken(
+            token0Data.symbol,
+            pool.token0Address,
+            token1Data.symbol,
+            pool.token1Address,
+            pool.chain
+        );
+
+        // Current Tick bestimmen
+        let currentTick: number;
+        let currentPrice: bigint;
+
+        if (pool.currentTick !== null) {
+            currentTick = pool.currentTick;
+            // Preis aus Tick berechnen
+            currentPrice = tickToPrice(
+                currentTick,
+                quoteConfig.baseTokenAddress,
+                quoteConfig.quoteTokenAddress,
+                quoteConfig.baseTokenDecimals
+            );
+        } else if (pool.currentPrice) {
+            // Preis parsen und Tick berechnen
+            currentPrice = BigInt(Math.floor(parseFloat(pool.currentPrice) * (10 ** quoteConfig.baseTokenDecimals)));
+            currentTick = priceToTick(
+                currentPrice,
+                pool.tickSpacing,
+                quoteConfig.baseTokenAddress,
+                quoteConfig.quoteTokenAddress,
+                quoteConfig.baseTokenDecimals
+            );
+        } else {
+            throw new Error("No price data available");
+        }
+
+        // Base Token ist token0 oder token1?
+        const baseIsToken0 = quoteConfig.baseTokenAddress.toLowerCase() === pool.token0Address.toLowerCase();
+
+        // Position Value berechnen
+        const positionValue = calculatePositionValue(
+            liquidity,
+            currentTick,
+            tickLower,
+            tickUpper,
+            currentPrice,
+            baseIsToken0,
+            quoteConfig.baseTokenDecimals
+        );
+
+        // Als Quote-Token decimal string zurückgeben
+        const valueInQuoteDecimals = Number(positionValue) / (10 ** quoteConfig.quoteTokenDecimals);
+        
+        return valueInQuoteDecimals.toFixed(6);
     }
 
     /**
