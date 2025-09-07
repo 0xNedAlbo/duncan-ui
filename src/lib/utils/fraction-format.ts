@@ -85,7 +85,7 @@ export function fractionToDecimalParts(
     }
 
     const s: -1 | 1 = ((num < 0n ? -1 : 1) * (den < 0n ? -1 : 1)) as -1 | 1;
-    let n = num < 0n ? -num : num;
+    const n = num < 0n ? -num : num;
     const d = den < 0n ? -den : den;
 
     const intPartBig = n / d;
@@ -199,7 +199,14 @@ export function formatFractionHuman(
         const normalZeros = "0".repeat(zeros);
         const tail = fracDigits.slice(zeros, zeros + mantissaDigits);
         const hasMore = fracDigits.length > zeros + tail.length || truncated;
-        return signStr + "0" + decimalSep + normalZeros + tail + (hasMore ? "…" : "");
+        return (
+            signStr +
+            "0" +
+            decimalSep +
+            normalZeros +
+            tail +
+            (hasMore ? "…" : "")
+        );
     }
 }
 
@@ -286,10 +293,7 @@ export function formatFractionRangeHuman(
     return `0.${skip}${common}[${leftRest}–${rightRest}]${dots}`;
 }
 
-export function formatFractionAsPreciseString(
-    fr: Fraction<bigint>,
-    opts?: FormatOpts
-): string {
+export function formatFractionAsPreciseString(fr: Fraction<bigint>): string {
     return ((fr.num * 10n ** 18n) / fr.den / 10n ** 18n).toString();
 }
 

@@ -281,3 +281,4 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 ---
 
 *This document represents the foundational concept for DUNCAN v1 as developed through collaborative planning sessions. The focus remains on creating an intuitive, educational, and powerful risk management tool for the DeFi community.*
+- formatFractionHuman() Funktion aus src/lib/utils/fraction-format.ts verwenden, wenn Tokenmengen oder Preise angezeigt werden sollen.
