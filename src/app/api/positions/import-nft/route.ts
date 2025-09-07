@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { fetchNFTPositionWithOwner } from '@/services/uniswap/nftPosition';
 import { PoolService } from '@/services/uniswap/poolService';
+import { determineQuoteToken } from '@/services/positions/quoteTokenService';
 import { PrismaClient } from '@prisma/client';
 
 export interface NFTImportRequest {
@@ -34,12 +35,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user?.id || typeof session.user.id !== 'string') {
+      console.error('Invalid session:', session);
       return NextResponse.json({
         success: false,
-        error: 'Unauthorized - Please sign in',
+        error: 'Invalid session - Please sign in again',
       }, { status: 401 });
     }
+    
+    console.log('Session user ID:', session.user.id);
 
     const body = await request.json() as NFTImportRequest;
     const { chain, nftId } = body;
@@ -110,7 +114,16 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
         }, { status: 409 });
       }
 
-      // 5. Create position in database
+      // 5. Determine quote token for PnL calculations
+      const quoteTokenResult = determineQuoteToken(
+        pool.token0Info?.symbol || 'UNKNOWN',
+        pool.token0Address,
+        pool.token1Info?.symbol || 'UNKNOWN',
+        pool.token1Address,
+        pool.chain
+      );
+
+      // 6. Create position in database
       const position = await prisma.position.create({
         data: {
           userId: session.user.id,
@@ -118,6 +131,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
           tickLower: nftPositionData.tickLower,
           tickUpper: nftPositionData.tickUpper,
           liquidity: nftPositionData.liquidity,
+          token0IsQuote: quoteTokenResult.token0IsQuote,
           importType: 'nft',
           nftId: nftPositionData.nftId,
           owner: nftPositionData.owner, // Store NFT owner address

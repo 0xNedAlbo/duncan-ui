@@ -6,7 +6,11 @@ import { useTranslations } from "@/i18n/client";
 import type { NFTImportResponse } from "@/app/api/positions/import-nft/route";
 import type { ParsedNFTPosition } from "@/services/uniswap/nftPosition";
 
-export function CreatePositionDropdown() {
+interface CreatePositionDropdownProps {
+  onImportSuccess?: (position: any) => void;
+}
+
+export function CreatePositionDropdown({ onImportSuccess }: CreatePositionDropdownProps = {}) {
     const t = useTranslations();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [showNftForm, setShowNftForm] = useState(false);
@@ -126,10 +130,19 @@ export function CreatePositionDropdown() {
                                                 
                                                 const result: NFTImportResponse = await response.json();
                                                 
-                                                if (result.success && result.data) {
-                                                    setImportSuccess(result.data);
-                                                    console.log('Successfully imported NFT position:', result.data);
-                                                    // TODO: Save to database or state management
+                                                if (result.success && result.position) {
+                                                    // Create display data for success message
+                                                    const displayData = {
+                                                        token0Address: result.position.pool.token0Info?.address || 'Unknown',
+                                                        token1Address: result.position.pool.token1Info?.address || 'Unknown',
+                                                        fee: result.position.pool.fee,
+                                                        isActive: true
+                                                    };
+                                                    setImportSuccess(displayData);
+                                                    console.log('Successfully imported NFT position:', result.position);
+                                                    
+                                                    // Notify parent component
+                                                    onImportSuccess?.(result.position);
                                                     
                                                     // Reset form after 2 seconds
                                                     setTimeout(() => {

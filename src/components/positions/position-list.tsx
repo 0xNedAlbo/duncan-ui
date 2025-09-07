@@ -37,9 +37,10 @@ interface PositionListResponse {
 
 interface PositionListProps {
   className?: string;
+  refreshTrigger?: number;
 }
 
-export function PositionList({ className }: PositionListProps) {
+export function PositionList({ className, refreshTrigger }: PositionListProps) {
   const t = useTranslations();
   const [positions, setPositions] = useState<PositionWithPnL[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,6 +161,13 @@ export function PositionList({ className }: PositionListProps) {
       fetchPositions(false);
     }
   }, [offset]);
+
+  // Effect for external refresh trigger (e.g., after import)
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      fetchPositions(true);
+    }
+  }, [refreshTrigger]);
 
   if (loading && positions.length === 0) {
     return (

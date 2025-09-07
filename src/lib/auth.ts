@@ -61,7 +61,7 @@ export const authOptions: NextAuthOptions = {
       ...session,
       user: {
         ...session.user,
-        id: token.sub as string,
+        id: token.uid as string,
       },
     }),
     jwt: ({ user, token }) => {

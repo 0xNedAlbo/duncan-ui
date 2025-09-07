@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { UserDropdown } from "@/components/auth/user-dropdown";
 import { SettingsModal } from "@/components/settings-modal";
 import { CreatePositionDropdown } from "@/components/positions/create-position-dropdown";
@@ -11,6 +12,13 @@ import { redirect } from "next/navigation";
 export default function Dashboard() {
     const t = useTranslations();
     const { data: session, status } = useSession();
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    // Handle successful position import
+    const handleImportSuccess = (position: any) => {
+        // Trigger refresh of position list
+        setRefreshTrigger(prev => prev + 1);
+    };
 
     // Redirect if not authenticated
     if (status === "loading") {
@@ -57,11 +65,11 @@ export default function Dashboard() {
                             </p>
                         </div>
                         
-                        <CreatePositionDropdown />
+                        <CreatePositionDropdown onImportSuccess={handleImportSuccess} />
                     </div>
 
                     {/* Position List */}
-                    <PositionList />
+                    <PositionList refreshTrigger={refreshTrigger} />
                 </div>
             </div>
         </div>

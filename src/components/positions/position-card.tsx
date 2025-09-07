@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { RefreshCw, TrendingUp, TrendingDown, Clock, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import Image from "next/image";
+import { RefreshCw, TrendingUp, TrendingDown, Clock, Loader2, AlertCircle, CheckCircle2, Copy, ChevronDown } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
+import { formatCurrency, formatPercent, formatLiquidity } from "@/lib/utils/formatters";
 import type { PositionWithPnL } from "@/services/positions/positionService";
 
 interface PositionCardProps {
@@ -14,24 +16,10 @@ interface PositionCardProps {
 export function PositionCard({ position, onRefresh, isRefreshing }: PositionCardProps) {
   const t = useTranslations();
   const [showDetails, setShowDetails] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [token0ImageError, setToken0ImageError] = useState(false);
+  const [token1ImageError, setToken1ImageError] = useState(false);
 
-  // Format currency values
-  const formatCurrency = (value: string) => {
-    const num = parseFloat(value);
-    if (num >= 1000000) {
-      return `$${(num / 1000000).toFixed(2)}M`;
-    } else if (num >= 1000) {
-      return `$${(num / 1000).toFixed(2)}K`;
-    } else {
-      return `$${num.toFixed(2)}`;
-    }
-  };
-
-  // Format percentage
-  const formatPercent = (value: number) => {
-    const sign = value >= 0 ? "+" : "";
-    return `${sign}${value.toFixed(2)}%`;
-  };
 
   // Get PnL color classes
   const getPnLColorClasses = (pnlPercent: number) => {
@@ -56,19 +44,6 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
     }
   };
 
-  // Get chain badge color
-  const getChainColor = (chain: string) => {
-    switch (chain.toLowerCase()) {
-      case "ethereum":
-        return "bg-blue-500/20 text-blue-400 border-blue-500/30";
-      case "arbitrum":
-        return "bg-purple-500/20 text-purple-400 border-purple-500/30";
-      case "base":
-        return "bg-indigo-500/20 text-indigo-400 border-indigo-500/30";
-      default:
-        return "bg-slate-500/20 text-slate-400 border-slate-500/30";
-    }
-  };
 
   // Get confidence icon
   const getConfidenceIcon = () => {
@@ -79,31 +54,73 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
     }
   };
 
+  // Get NFT explorer link
+  const getNFTExplorerLink = (chain: string, nftId: string) => {
+    const uniswapV3NFTAddresses = {
+      ethereum: "0xc36442b4a4522e871399cd717abdd847ab11fe88",
+      arbitrum: "0xc36442b4a4522e871399cd717abdd847ab11fe88", 
+      base: "0x03a520b32c04bf3beef7beb72e919cf822ed34f1"
+    };
+
+    const explorers = {
+      ethereum: "https://etherscan.io",
+      arbitrum: "https://arbiscan.io",
+      base: "https://basescan.org"
+    };
+
+    const contractAddress = uniswapV3NFTAddresses[chain.toLowerCase() as keyof typeof uniswapV3NFTAddresses];
+    const explorerUrl = explorers[chain.toLowerCase() as keyof typeof explorers];
+
+    if (contractAddress && explorerUrl) {
+      return `${explorerUrl}/token/${contractAddress}?a=${nftId}`;
+    }
+    return null;
+  };
+
+  // Copy NFT ID to clipboard
+  const copyNFTId = async (nftId: string) => {
+    try {
+      await navigator.clipboard.writeText(nftId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy NFT ID:', err);
+    }
+  };
+
   return (
-    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 hover:border-slate-600/50 transition-all duration-200">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-6 py-4 hover:border-slate-600/50 transition-all duration-200">
+      {/* Header - Always Visible */}
+      <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
+          {/* Expand/Collapse Button */}
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            title={showDetails ? t("dashboard.positions.hideDetails") : t("dashboard.positions.showDetails")}
+          >
+            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showDetails ? 'rotate-180' : ''}`} />
+          </button>
           {/* Token Logos */}
           <div className="flex items-center -space-x-2">
-            {position.pool.token0.logoUrl && (
-              <img
+            {position.pool.token0.logoUrl && !token0ImageError && (
+              <Image
                 src={position.pool.token0.logoUrl}
                 alt={position.pool.token0.symbol}
+                width={32}
+                height={32}
                 className="w-8 h-8 rounded-full border-2 border-slate-800 bg-slate-700"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
+                onError={() => setToken0ImageError(true)}
               />
             )}
-            {position.pool.token1.logoUrl && (
-              <img
+            {position.pool.token1.logoUrl && !token1ImageError && (
+              <Image
                 src={position.pool.token1.logoUrl}
                 alt={position.pool.token1.symbol}
+                width={32}
+                height={32}
                 className="w-8 h-8 rounded-full border-2 border-slate-800 bg-slate-700"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
+                onError={() => setToken1ImageError(true)}
               />
             )}
           </div>
@@ -114,7 +131,7 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
               {position.tokenPair}
             </h3>
             <div className="flex items-center gap-2 text-sm text-slate-400">
-              <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getChainColor(position.pool.chain)}`}>
+              <span className="px-2 py-0.5 rounded text-xs font-medium border bg-slate-500/20 text-slate-400 border-slate-500/30">
                 {position.pool.chain.charAt(0).toUpperCase() + position.pool.chain.slice(1)}
               </span>
               <span>•</span>
@@ -122,9 +139,65 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
               {position.nftId && (
                 <>
                   <span>•</span>
-                  <span>#{position.nftId}</span>
+                  <span>{t("dashboard.addPosition.nft.nftId")}: </span>
+                  <div className="inline-flex items-center gap-1">
+                    {(() => {
+                      const explorerLink = getNFTExplorerLink(position.pool.chain, position.nftId);
+                      return explorerLink ? (
+                        <a
+                          href={explorerLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300 transition-colors"
+                        >
+                          #{position.nftId}
+                        </a>
+                      ) : (
+                        <span>#{position.nftId}</span>
+                      );
+                    })()}
+                    <div className="relative">
+                      <button
+                        onClick={() => position.nftId && copyNFTId(position.nftId)}
+                        className="p-0.5 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                        title="Copy NFT ID"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                      {copied && (
+                        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-green-600 text-white text-xs px-2 py-1 rounded shadow-lg z-10">
+                          Copied!
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Current Value & PnL */}
+        <div className="flex items-center gap-6">
+          <div className="text-right">
+            <div className="text-xs text-slate-400 mb-0.5">{t("dashboard.positions.currentValue")}</div>
+            <div className="text-lg font-semibold text-white">
+              {formatCurrency(position.currentValue)}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-slate-400 mb-0.5">{t("dashboard.positions.pnl")}</div>
+            <div className={`text-lg font-semibold flex items-center gap-1 ${
+              position.pnlPercent > 0 ? 'text-green-400' : position.pnlPercent < 0 ? 'text-red-400' : 'text-slate-400'
+            }`}>
+              {position.pnlPercent > 0 ? <TrendingUp className="w-4 h-4" /> : 
+               position.pnlPercent < 0 ? <TrendingDown className="w-4 h-4" /> : null}
+              <div className="flex flex-col items-end">
+                <span>{formatCurrency(position.pnl)}</span>
+                <span className="text-xs text-slate-400">
+                  {formatPercent(position.pnlPercent)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -140,63 +213,33 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
         </button>
       </div>
 
-      {/* Values & PnL */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div>
-          <div className="text-sm text-slate-400 mb-1">{t("dashboard.positions.currentValue")}</div>
-          <div className="text-xl font-semibold text-white">
-            {formatCurrency(position.currentValue)}
-          </div>
-        </div>
-        <div>
-          <div className="text-sm text-slate-400 mb-1">{t("dashboard.positions.pnl")}</div>
-          <div className={`text-xl font-semibold flex items-center gap-2 ${
-            position.pnlPercent > 0 ? 'text-green-400' : position.pnlPercent < 0 ? 'text-red-400' : 'text-slate-400'
-          }`}>
-            {position.pnlPercent > 0 ? <TrendingUp className="w-5 h-5" /> : 
-             position.pnlPercent < 0 ? <TrendingDown className="w-5 h-5" /> : null}
-            {formatCurrency(position.pnl)}
-          </div>
-          <div className="text-sm text-slate-400">
-            ({formatPercent(position.pnlPercent)})
-          </div>
-        </div>
-      </div>
-
-      {/* Status Badges */}
-      <div className="flex items-center gap-2 mb-4">
-        {/* Range Status */}
-        <span className={`px-2 py-1 rounded-md text-xs font-medium border ${getRangeStatusColor(position.rangeStatus)}`}>
-          {position.rangeStatus === "in-range" ? t("dashboard.positions.rangeStatus.inRange") :
-           position.rangeStatus === "out-of-range" ? t("dashboard.positions.rangeStatus.outOfRange") : 
-           t("dashboard.positions.rangeStatus.unknown")}
-        </span>
-
-        {/* Data Quality Badge */}
-        <span className={`px-2 py-1 rounded-md text-xs font-medium border flex items-center gap-1 ${
-          position.confidence === "exact" ? "text-green-400 bg-green-500/10 border-green-500/20" : "text-yellow-400 bg-yellow-500/10 border-yellow-500/20"
-        }`}>
-          {getConfidenceIcon()}
-          {position.confidence === "exact" ? t("dashboard.positions.dataQuality.exact") : t("dashboard.positions.dataQuality.estimated")}
-        </span>
-
-        {/* Data Source */}
-        <span className="px-2 py-1 rounded-md text-xs font-medium text-slate-400 bg-slate-500/10 border border-slate-500/20">
-          {position.initialSource === "subgraph" ? t("dashboard.positions.dataQuality.subgraph") : t("dashboard.positions.dataQuality.snapshot")}
-        </span>
-      </div>
-
-      {/* Details Toggle */}
-      <button
-        onClick={() => setShowDetails(!showDetails)}
-        className="w-full text-sm text-slate-400 hover:text-white transition-colors"
-      >
-        {showDetails ? t("dashboard.positions.hideDetails") : t("dashboard.positions.showDetails")}
-      </button>
 
       {/* Collapsible Details */}
       {showDetails && (
-        <div className="mt-4 pt-4 border-t border-slate-700/50 space-y-3">
+        <div className="mt-3 pt-3 border-t border-slate-700/50 space-y-3">
+          {/* Status Badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Range Status */}
+            <span className={`px-2 py-1 rounded-md text-xs font-medium border ${getRangeStatusColor(position.rangeStatus)}`}>
+              {position.rangeStatus === "in-range" ? t("dashboard.positions.rangeStatus.inRange") :
+               position.rangeStatus === "out-of-range" ? t("dashboard.positions.rangeStatus.outOfRange") : 
+               t("dashboard.positions.rangeStatus.unknown")}
+            </span>
+
+            {/* Data Quality Badge */}
+            <span className={`px-2 py-1 rounded-md text-xs font-medium border flex items-center gap-1 ${
+              position.confidence === "exact" ? "text-green-400 bg-green-500/10 border-green-500/20" : "text-yellow-400 bg-yellow-500/10 border-yellow-500/20"
+            }`}>
+              {getConfidenceIcon()}
+              {position.confidence === "exact" ? t("dashboard.positions.dataQuality.exact") : t("dashboard.positions.dataQuality.estimated")}
+            </span>
+
+            {/* Data Source */}
+            <span className="px-2 py-1 rounded-md text-xs font-medium text-slate-400 bg-slate-500/10 border border-slate-500/20">
+              {position.initialSource === "subgraph" ? t("dashboard.positions.dataQuality.subgraph") : t("dashboard.positions.dataQuality.snapshot")}
+            </span>
+          </div>
+
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <div className="text-slate-400 mb-1">{t("dashboard.positions.initialValue")}</div>
@@ -205,7 +248,7 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
             <div>
               <div className="text-slate-400 mb-1">{t("dashboard.positions.liquidity")}</div>
               <div className="text-slate-200 font-mono">
-                {parseFloat(position.liquidity).toExponential(2)}
+                {formatLiquidity(position.liquidity)}
               </div>
             </div>
           </div>
