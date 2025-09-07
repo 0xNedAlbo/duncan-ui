@@ -156,7 +156,7 @@ export function CreatePositionDropdown({ onImportSuccess }: CreatePositionDropdo
                                                 }
                                             } catch (error) {
                                                 console.error('Import error:', error);
-                                                setImportError('Failed to connect to server');
+                                                setImportError(t("dashboard.addPosition.nft.importError"));
                                             } finally {
                                                 setIsImporting(false);
                                             }
@@ -165,7 +165,7 @@ export function CreatePositionDropdown({ onImportSuccess }: CreatePositionDropdo
                                         className="w-full px-3 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:text-slate-400 text-white rounded transition-colors flex items-center justify-center gap-2"
                                     >
                                         {isImporting && <Loader2 className="w-3 h-3 animate-spin" />}
-                                        {isImporting ? 'Importing...' : t("dashboard.addPosition.nft.import")}
+                                        {isImporting ? t("dashboard.addPosition.nft.importing") : t("dashboard.addPosition.nft.import")}
                                     </button>
                                     
                                     {/* Error Message */}
@@ -178,14 +178,14 @@ export function CreatePositionDropdown({ onImportSuccess }: CreatePositionDropdo
                                     {/* Success Message */}
                                     {importSuccess && (
                                         <div className="px-3 py-2 bg-green-500/10 border border-green-500/20 rounded text-xs text-green-400">
-                                            <div className="font-medium">Position imported successfully!</div>
+                                            <div className="font-medium">{t("dashboard.addPosition.nft.importSuccess")}</div>
                                             <div className="mt-1 text-slate-300">
                                                 {importSuccess.token0Address.slice(0, 6)}...{importSuccess.token0Address.slice(-4)} / 
                                                 {importSuccess.token1Address.slice(0, 6)}...{importSuccess.token1Address.slice(-4)}
                                             </div>
                                             <div className="text-slate-400">
                                                 Fee: {(importSuccess.fee / 10000).toFixed(2)}% • 
-                                                {importSuccess.isActive ? ' Active' : ' Inactive'}
+                                                {importSuccess.isActive ? ` ${t("status.active")}` : ` ${t("dashboard.positions.rangeStatus.outOfRange")}`}
                                             </div>
                                         </div>
                                     )}

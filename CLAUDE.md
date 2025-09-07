@@ -209,6 +209,7 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - 👤 User profile page and advanced settings management
 - 🚀 Performance optimizations: Redis caching, batch operations
 - 📊 Export/import functionality for position data
+- 🔧 Zentraler API-Service für alle HTTP-Requests (Auth-Header-Injection, Retry-Logik, Type-Safety)
 
 ## Technology Vision
 

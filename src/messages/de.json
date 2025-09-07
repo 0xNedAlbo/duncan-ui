@@ -87,7 +87,10 @@
         "blockchain": "Blockchain",
         "nftId": "NFT ID",
         "placeholder": "z.B. 123456",
-        "import": "Position importieren"
+        "import": "Position importieren",
+        "importing": "Importiere...",
+        "importSuccess": "Position erfolgreich importiert!",
+        "importError": "Position konnte nicht importiert werden"
       }
     },
     "positions": {
