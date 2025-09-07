@@ -248,6 +248,15 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - Linting: `npm run lint`
 - Testing: `npm run test` (51+ unit tests with comprehensive API coverage)
 
+**Known Issues / TODOs:**
+- **SubgraphService Tests:** 4 von 13 Tests schlagen fehl aufgrund von MSW-Handler Problemen
+  - `fetchPositionHistory > should fetch position history successfully` 
+  - `fetchPositionHistory > should work with API key`
+  - `fetchPositionsByOwner > should fetch positions by owner successfully`
+  - `parseInitialValue > should calculate initial value correctly`
+  - Problem: MSW-Handler werden nicht korrekt aufgerufen (wahrscheinlich undici/Node.js Kompatibilitätsproblem)
+  - Workaround: Tests könnten mit direktem Mocking statt MSW umgeschrieben werden
+
 **UI/UX Principles:**
 - Dark theme as primary design language
 - Informal German localization using "Ihr/eure" form (not formal "Sie") for community feel - "Plant und analysiert eure Positionen" style

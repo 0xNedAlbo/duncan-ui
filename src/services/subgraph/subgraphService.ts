@@ -4,7 +4,6 @@ import {
   PositionQueryData, 
   PositionsQueryData,
   InitialValueData,
-  SubgraphError,
   SubgraphPosition 
 } from '@/types/subgraph';
 import { POSITION_QUERY, POSITIONS_BY_OWNER_QUERY, buildQuery } from './queries';
@@ -184,7 +183,7 @@ export class SubgraphService {
 
 // Custom Error Class
 class SubgraphError extends Error {
-  public readonly code: SubgraphError['code'];
+  public readonly code: 'NETWORK_ERROR' | 'QUERY_ERROR' | 'NOT_FOUND' | 'RATE_LIMIT' | 'TIMEOUT';
   public readonly chain: string;
   public readonly query?: string;
   public readonly variables?: Record<string, any>;

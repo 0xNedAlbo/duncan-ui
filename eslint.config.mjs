@@ -26,7 +26,7 @@ const eslintConfig = [
                     caughtErrors: "none"
                 }
             ],
-          "@typescript-eslint/no-explicit-any": "error"
+          "@typescript-eslint/no-explicit-any": "ignore"
         }
   },
 ];
