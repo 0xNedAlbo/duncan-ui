@@ -93,8 +93,9 @@ model Token {
   lastUpdatedAt DateTime?  // When last updated from Alchemy
   
   // Relations
-  poolsAsToken0 Pool[]   @relation("Token0")
-  poolsAsToken1 Pool[]   @relation("Token1")
+  // poolsAsToken0 Pool[]   @relation("Token0")
+  // poolsAsToken1 Pool[]   @relation("Token1")
+  references    TokenReference[] @relation("TokenReferenceToGlobal")
   
   // Timestamps
   createdAt     DateTime @default(now())
@@ -130,6 +131,9 @@ model UserToken {
   userLabel     String?  // e.g. "My Test Token"
   notes         String?  // User notes
   
+  // Relations
+  references    TokenReference[] @relation("TokenReferenceToUser")
+  
   // Timestamps
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -140,6 +144,44 @@ model UserToken {
   @@map("user_tokens")
 }
 
+// TokenReference Model - Polymorphic token reference for unified Pool relations
+model TokenReference {
+  id            String   @id @default(cuid())
+  
+  // Polymorphic token type discriminator
+  tokenType     String   // "global" | "user"
+  
+  // XOR relationship - exactly one must be set
+  globalTokenId String?
+  globalToken   Token?   @relation("TokenReferenceToGlobal", fields: [globalTokenId], references: [id], onDelete: Cascade)
+  
+  userTokenId   String?
+  userToken     UserToken? @relation("TokenReferenceToUser", fields: [userTokenId], references: [id], onDelete: Cascade)
+  
+  // Denormalized fields for query performance
+  chain         String
+  address       String
+  symbol        String   // Cached for quick access
+  
+  // Pool relations
+  poolsAsToken0 Pool[]   @relation("PoolToken0Reference")
+  poolsAsToken1 Pool[]   @relation("PoolToken1Reference")
+  
+  // Metadata
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Constraints
+  @@unique([tokenType, globalTokenId])  // Each global token has max one reference
+  @@unique([tokenType, userTokenId])    // Each user token has max one reference
+  @@unique([chain, address, tokenType, globalTokenId])  // Prevent duplicate global references
+  @@unique([chain, address, tokenType, userTokenId])    // Prevent duplicate user references
+  @@index([chain, address])
+  @@index([tokenType])
+  @@index([symbol])
+  @@map("token_references")
+}
+
 // Pool Model - central Pool data with flexible Token references
 model Pool {
   id            String   @id @default(cuid())
@@ -148,15 +190,21 @@ model Pool {
   chain         String   // "ethereum", "arbitrum", "base"
   poolAddress   String
   
-  // Flexible Token Relations (can be null for custom tokens)
-  token0Id      String?
-  token0        Token?   @relation("Token0", fields: [token0Id], references: [id])
-  token1Id      String?
-  token1        Token?   @relation("Token1", fields: [token1Id], references: [id])
+  // TokenReference Relations (polymorphic token handling)
+  token0RefId   String
+  token0Ref     TokenReference @relation("PoolToken0Reference", fields: [token0RefId], references: [id])
+  token1RefId   String
+  token1Ref     TokenReference @relation("PoolToken1Reference", fields: [token1RefId], references: [id])
   
-  // Token Addresses (always set for custom tokens)
+  // Token Addresses (kept for backward compatibility and direct queries)
   token0Address String
   token1Address String
+  
+  // Legacy token relations (deprecated, will be removed after migration)
+  // token0Id      String?
+  // token0        Token?   @relation("Token0", fields: [token0Id], references: [id])
+  // token1Id      String?
+  // token1        Token?   @relation("Token1", fields: [token1Id], references: [id])
   
   // Pool Parameters
   fee           Int      // Fee in basis points (100 = 0.01%, 500 = 0.05%, 3000 = 0.3%, 10000 = 1%)
@@ -183,7 +231,7 @@ model Pool {
   
   @@unique([chain, poolAddress])
   @@unique([chain, token0Address, token1Address, fee])
-  @@index([chain, token0Id, token1Id])
+  // @@index([chain, token0Id, token1Id])
   @@index([chain, token0Address, token1Address])
   @@index([ownerId])
   @@map("pools")

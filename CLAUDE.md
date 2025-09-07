@@ -282,3 +282,4 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 
 *This document represents the foundational concept for DUNCAN v1 as developed through collaborative planning sessions. The focus remains on creating an intuitive, educational, and powerful risk management tool for the DeFi community.*
 - formatFractionHuman() Funktion aus src/lib/utils/fraction-format.ts verwenden, wenn Tokenmengen oder Preise angezeigt werden sollen.
+- if you use any as a type in typescript and it gives a linter error/warning "Unexpected any.", please use "        // eslint-disable-next-line @typescript-eslint/no-explicit-any" to disable the warning or error

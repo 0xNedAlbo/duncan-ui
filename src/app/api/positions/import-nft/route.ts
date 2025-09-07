@@ -90,7 +90,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
 
     try {
       // 3. Find or create pool internally
-      const pool = await poolService.findOrCreatePool(
+      const pool = await poolService.findOrCreatePoolWithReferences(
         nftPositionData.chainName,
         nftPositionData.token0Address,
         nftPositionData.token1Address,
@@ -116,9 +116,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
 
       // 5. Determine quote token for PnL calculations
       const quoteTokenResult = determineQuoteToken(
-        pool.token0Info?.symbol || 'UNKNOWN',
+        pool.token0Data.symbol,
         pool.token0Address,
-        pool.token1Info?.symbol || 'UNKNOWN',
+        pool.token1Data.symbol,
         pool.token1Address,
         pool.chain
       );
@@ -140,8 +140,18 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
         include: {
           pool: {
             include: {
-              token0: true,
-              token1: true
+              token0Ref: {
+                include: {
+                  globalToken: true,
+                  userToken: true
+                }
+              },
+              token1Ref: {
+                include: {
+                  globalToken: true,
+                  userToken: true
+                }
+              }
             }
           }
         }
@@ -160,8 +170,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
             chain: pool.chain,
             poolAddress: pool.poolAddress,
             fee: pool.fee,
-            token0Info: pool.token0Info,
-            token1Info: pool.token1Info
+            token0Info: pool.token0Data,
+            token1Info: pool.token1Data
           }
         }
       });

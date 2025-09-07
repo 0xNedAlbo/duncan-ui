@@ -126,7 +126,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreatePos
 
     try {
       // 5. Find or create pool internally
-      const pool = await poolService.findOrCreatePool(
+      const pool = await poolService.findOrCreatePoolWithReferences(
         chain,
         token0Address,
         token1Address,
@@ -198,8 +198,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreatePos
             poolAddress: pool.poolAddress,
             fee: pool.fee,
             feePercentage: (pool.fee / 10000).toFixed(2) + '%',
-            token0Info: pool.token0Info || pool.token0,
-            token1Info: pool.token1Info || pool.token1
+            token0Info: pool.token0Data,
+            token1Info: pool.token1Data
           }
         }
       });

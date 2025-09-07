@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { getInitialValueService } from './initialValueService';
 import { determineQuoteToken, formatTokenPair } from './quoteTokenService';
+import { TokenReferenceService, UnifiedTokenData } from '../tokens/tokenReferenceService';
 import type { InitialValueResult } from './initialValueService';
 
 export interface PositionWithPnL {
@@ -72,6 +73,18 @@ export interface PositionListOptions {
 
 export class PositionService {
   private readonly initialValueService = getInitialValueService();
+  private readonly tokenRefService = new TokenReferenceService();
+
+  /**
+   * Extract unified token data from pool references
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private getUnifiedTokenData(pool: any): { token0Data: UnifiedTokenData, token1Data: UnifiedTokenData } {
+    return {
+      token0Data: this.tokenRefService.getUnifiedTokenData(pool.token0Ref),
+      token1Data: this.tokenRefService.getUnifiedTokenData(pool.token1Ref)
+    };
+  }
 
   /**
    * Holt alle Positionen eines Users mit PnL-Berechnungen
@@ -108,8 +121,18 @@ export class PositionService {
         include: {
           pool: {
             include: {
-              token0: true,
-              token1: true
+              token0Ref: {
+                include: {
+                  globalToken: true,
+                  userToken: true
+                }
+              },
+              token1Ref: {
+                include: {
+                  globalToken: true,
+                  userToken: true
+                }
+              }
             }
           }
         },
@@ -160,8 +183,18 @@ export class PositionService {
         include: {
           pool: {
             include: {
-              token0: true,
-              token1: true
+              token0Ref: {
+                include: {
+                  globalToken: true,
+                  userToken: true
+                }
+              },
+              token1Ref: {
+                include: {
+                  globalToken: true,
+                  userToken: true
+                }
+              }
             }
           }
         }
@@ -173,11 +206,14 @@ export class PositionService {
       throw new Error(`Position ${positionId} not found`);
     }
 
+    // Extract unified token data
+    const { token0Data, token1Data } = this.getUnifiedTokenData(position.pool);
+
     // 2. Quote Token bestimmen
     const quoteConfig = determineQuoteToken(
-      position.pool.token0!.symbol,
+      token0Data.symbol,
       position.pool.token0Address,
-      position.pool.token1!.symbol,
+      token1Data.symbol,
       position.pool.token1Address,
       position.pool.chain
     );
@@ -220,26 +256,26 @@ export class PositionService {
         fee: position.pool.fee,
         currentPrice: position.pool.currentPrice || undefined,
         token0: {
-          id: position.pool.token0!.id,
-          symbol: position.pool.token0!.symbol,
-          name: position.pool.token0!.name,
-          decimals: position.pool.token0!.decimals,
-          logoUrl: position.pool.token0!.logoUrl || undefined
+          id: token0Data.id,
+          symbol: token0Data.symbol,
+          name: token0Data.name,
+          decimals: token0Data.decimals,
+          logoUrl: token0Data.logoUrl || undefined
         },
         token1: {
-          id: position.pool.token1!.id,
-          symbol: position.pool.token1!.symbol,
-          name: position.pool.token1!.name,
-          decimals: position.pool.token1!.decimals,
-          logoUrl: position.pool.token1!.logoUrl || undefined
+          id: token1Data.id,
+          symbol: token1Data.symbol,
+          name: token1Data.name,
+          decimals: token1Data.decimals,
+          logoUrl: token1Data.logoUrl || undefined
         }
       },
 
       // Quote Token Configuration
       token0IsQuote: quoteConfig.token0IsQuote,
       tokenPair: formatTokenPair(
-        position.pool.token0!.symbol,
-        position.pool.token1!.symbol,
+        token0Data.symbol,
+        token1Data.symbol,
         quoteConfig.token0IsQuote
       ),
       baseSymbol: quoteConfig.baseSymbol,
@@ -322,6 +358,13 @@ export class PositionService {
 
     // 3. Neue PnL berechnen
     return await this.calculatePositionPnL(positionId);
+  }
+
+  /**
+   * Close database connections (for cleanup in tests)
+   */
+  async disconnect(): Promise<void> {
+    await this.tokenRefService.disconnect();
   }
 }
 
