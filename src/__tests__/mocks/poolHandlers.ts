@@ -141,6 +141,9 @@ export const mockViemCalls = {
     if (address === '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2') return 'Wrapped Ether';
     if (address === '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48') return 'USD Coin';
     if (address === '0x0123456789012345678901234567890123456789') return 'Custom Test Token';
+    if (address === '0xffffffffffffffffffffffffffffffffffffffff') {
+      throw new Error('Contract call failed');
+    }
     return 'Unknown Token';
   },
 
@@ -149,6 +152,9 @@ export const mockViemCalls = {
     if (address === '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2') return 'WETH';
     if (address === '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48') return 'USDC';
     if (address === '0x0123456789012345678901234567890123456789') return 'CUSTOM';
+    if (address === '0xffffffffffffffffffffffffffffffffffffffff') {
+      throw new Error('Contract call failed');
+    }
     return 'UNKNOWN';
   },
 
@@ -157,6 +163,9 @@ export const mockViemCalls = {
     if (address === '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2') return 18; // WETH
     if (address === '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48') return 6;  // USDC
     if (address === '0x0123456789012345678901234567890123456789') return 18; // Custom
+    if (address === '0xffffffffffffffffffffffffffffffffffffffff') {
+      throw new Error('Contract call failed');
+    }
     return 18; // Default
   },
 };

@@ -47,11 +47,11 @@ describe('TokenResolutionService', () => {
   });
 
   beforeEach(async () => {
-    // Use in-memory SQLite database for tests
+    // Use PostgreSQL test database
     prisma = new PrismaClient({
       datasources: {
         db: {
-          url: 'file:./test-tokenresolution.db'
+          url: 'postgresql://duncan:dev123@localhost:5432/duncan_test'
         }
       }
     });
@@ -59,12 +59,26 @@ describe('TokenResolutionService', () => {
     service = new TokenResolutionService(prisma);
     
     // Reset database state
+    await prisma.$executeRaw`DELETE FROM positions`;
+    await prisma.$executeRaw`DELETE FROM pools`;
+    await prisma.$executeRaw`DELETE FROM token_references`;
     await prisma.$executeRaw`DELETE FROM user_tokens`;
     await prisma.$executeRaw`DELETE FROM tokens`;
+    await prisma.$executeRaw`DELETE FROM users`;
+
+    // Create test user for foreign key constraints
+    await prisma.user.create({
+      data: {
+        id: testUserId,
+        email: 'test@example.com',
+        name: 'Test User',
+        password: 'test123'
+      }
+    });
     
     // Seed test data
     await prisma.token.createMany({
-      data: [mockTokens.WETH, mockTokens.USDC]
+      data: [mockTokens.WETH_ETHEREUM, mockTokens.USDC_ETHEREUM]
     });
   });
 
@@ -77,7 +91,7 @@ describe('TokenResolutionService', () => {
     it('should return global token if verified', async () => {
       const result = await service.resolveToken(
         'ethereum',
-        mockTokens.WETH.address,
+        mockTokens.WETH_ETHEREUM.address,
         testUserId
       );
 
@@ -195,7 +209,7 @@ describe('TokenResolutionService', () => {
     });
 
     it('should handle address normalization correctly', async () => {
-      const upperCaseAddress = mockTokens.WETH.address.toUpperCase();
+      const upperCaseAddress = mockTokens.WETH_ETHEREUM.address.toUpperCase();
       
       const result = await service.resolveToken(
         'ethereum',
@@ -203,7 +217,7 @@ describe('TokenResolutionService', () => {
         testUserId
       );
 
-      expect(result.address).toBe(mockTokens.WETH.address.toLowerCase());
+      expect(result.address).toBe(mockTokens.WETH_ETHEREUM.address.toLowerCase());
     });
 
     it('should throw error for invalid address format', async () => {
@@ -214,7 +228,7 @@ describe('TokenResolutionService', () => {
 
     it('should throw error for unsupported chain', async () => {
       await expect(
-        service.resolveToken('unsupported-chain', mockTokens.WETH.address, testUserId)
+        service.resolveToken('unsupported-chain', mockTokens.WETH_ETHEREUM.address, testUserId)
       ).rejects.toThrow('Unsupported chain');
     });
   });
@@ -222,8 +236,8 @@ describe('TokenResolutionService', () => {
   describe('resolveTokens', () => {
     it('should resolve multiple tokens efficiently', async () => {
       const tokens = [
-        { chain: 'ethereum', address: mockTokens.WETH.address },
-        { chain: 'ethereum', address: mockTokens.USDC.address },
+        { chain: 'ethereum', address: mockTokens.WETH_ETHEREUM.address },
+        { chain: 'ethereum', address: mockTokens.USDC_ETHEREUM.address },
       ];
 
       const results = await service.resolveTokens(tokens, testUserId);
@@ -321,13 +335,35 @@ describe('TokenResolutionService', () => {
         data: mockUserTokens.CUSTOM_TOKEN
       });
 
+      // Create TokenReferences first
+      const token0Ref = await prisma.tokenReference.create({
+        data: {
+          tokenType: 'user',
+          userTokenId: token.id,
+          chain: 'ethereum',
+          address: token.address,
+          symbol: token.symbol,
+        },
+      });
+      const token1Ref = await prisma.tokenReference.create({
+        data: {
+          tokenType: 'global',
+          globalTokenId: mockTokens.USDC_ETHEREUM.id,
+          chain: 'ethereum',
+          address: mockTokens.USDC_ETHEREUM.address,
+          symbol: 'USDC',
+        },
+      });
+
       // Create a pool that uses this token
       await prisma.pool.create({
         data: {
           chain: 'ethereum',
           poolAddress: '0x1234567890123456789012345678901234567890',
+          token0RefId: token0Ref.id,
+          token1RefId: token1Ref.id,
           token0Address: token.address,
-          token1Address: mockTokens.USDC.address,
+          token1Address: mockTokens.USDC_ETHEREUM.address,
           fee: 3000,
           tickSpacing: 60,
           ownerId: testUserId,
@@ -371,13 +407,15 @@ describe('TokenResolutionService', () => {
 
   describe('enrichUserTokens', () => {
     it('should upgrade custom tokens to global when they become available', async () => {
-      // Add a placeholder token for DAI
-      const daiAddress = '0x6B175474E89094C44Da98b954EedeAC495271d0F';
+      // Add a placeholder token for a known address that will be found by Alchemy (WETH)
+      const wethAddress = mockTokens.WETH_ETHEREUM.address;
       await prisma.userToken.create({
         data: {
           ...mockUserTokens.PLACEHOLDER_TOKEN,
-          address: daiAddress,
-          source: 'placeholder'
+          address: wethAddress,
+          source: 'placeholder',
+          symbol: 'UNKNOWN',
+          name: 'Unknown Token'
         }
       });
 
@@ -385,12 +423,12 @@ describe('TokenResolutionService', () => {
 
       expect(enrichedCount).toBe(1);
 
-      // Verify token was moved to global
+      // Verify token was moved to global (should already exist from seed data)
       const globalToken = await prisma.token.findUnique({
         where: {
           chain_address: {
             chain: 'ethereum',
-            address: daiAddress
+            address: wethAddress
           }
         }
       });
@@ -402,7 +440,7 @@ describe('TokenResolutionService', () => {
       const userToken = await prisma.userToken.findFirst({
         where: {
           userId: testUserId,
-          address: daiAddress
+          address: wethAddress
         }
       });
 
