@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { PoolService } from '@/services/uniswap/poolService';
-import { PrismaClient } from '@prisma/client';
+import { getPositionService } from '@/services/positions';
 import { z } from 'zod';
 
 // Query parameters validation
@@ -11,15 +10,19 @@ const GetPositionsSchema = z.object({
   chain: z.string().optional(),
   limit: z.coerce.number().min(1).max(100).default(20),
   offset: z.coerce.number().min(0).default(0),
+  sortBy: z.enum(['createdAt', 'currentValue', 'pnl', 'pnlPercent']).optional().default('createdAt'),
+  sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 
 /**
- * GET /api/positions - Get user's positions
+ * GET /api/positions - Get user's positions with PnL calculations
  * Query parameters:
- * - status?: 'active' | 'closed' | 'archived' - Filter by status
- * - chain?: string - Filter by blockchain
+ * - status?: 'active' | 'closed' | 'archived' - Filter by status (default: active)
+ * - chain?: string - Filter by blockchain (ethereum, arbitrum, base)
  * - limit?: number - Limit results (1-100, default 20)
  * - offset?: number - Offset for pagination (default 0)
+ * - sortBy?: 'createdAt' | 'currentValue' | 'pnl' | 'pnlPercent' - Sort field
+ * - sortOrder?: 'asc' | 'desc' - Sort order (default: desc)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -33,137 +36,82 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const queryParams = {
-      status: searchParams.get('status'),
-      chain: searchParams.get('chain'),
-      limit: searchParams.get('limit'),
-      offset: searchParams.get('offset'),
+      status: searchParams.get('status') || 'active', // Default to active
+      chain: searchParams.get('chain') || undefined,
+      limit: searchParams.get('limit') || undefined,
+      offset: searchParams.get('offset') || undefined,
+      sortBy: searchParams.get('sortBy') || undefined,
+      sortOrder: searchParams.get('sortOrder') || undefined,
     };
 
     // Validate query parameters
     const validatedParams = GetPositionsSchema.parse(queryParams);
 
-    const prisma = new PrismaClient();
-    const poolService = new PoolService();
+    // Get Position Service instance
+    const positionService = getPositionService();
 
-    try {
-      // Build where clause
-      const where: any = {
-        userId: session.user.id,
-      };
+    // Fetch positions with PnL calculations
+    const result = await positionService.getPositionsWithPnL({
+      userId: session.user.id,
+      status: validatedParams.status,
+      chain: validatedParams.chain || undefined,
+      limit: validatedParams.limit,
+      offset: validatedParams.offset,
+      sortBy: validatedParams.sortBy,
+      sortOrder: validatedParams.sortOrder,
+    });
 
-      if (validatedParams.status) {
-        where.status = validatedParams.status;
-      }
+    // Calculate additional pagination info
+    const nextOffset = result.hasMore ? validatedParams.offset + validatedParams.limit : null;
 
-      if (validatedParams.chain) {
-        where.pool = {
-          chain: validatedParams.chain
-        };
-      }
-
-      // Get positions with pool and token data
-      const positions = await prisma.position.findMany({
-        where,
-        include: {
-          pool: {
-            include: {
-              token0: true,
-              token1: true
-            }
-          }
-        },
-        orderBy: [
-          { status: 'asc' }, // Active first
-          { createdAt: 'desc' } // Newest first
-        ],
-        take: validatedParams.limit,
-        skip: validatedParams.offset
-      });
-
-      // Get total count for pagination
-      const totalCount = await prisma.position.count({ where });
-
-      // Enrich positions with token information for custom tokens
-      const enrichedPositions = await Promise.all(
-        positions.map(async (position) => {
-          let enrichedPosition = position;
-
-          // If pool has custom tokens (ownerId set), get full token info
-          if (position.pool.ownerId) {
-            const poolWithTokens = await poolService.getPoolById(
-              position.poolId,
-              session.user.id
-            );
-
-            if (poolWithTokens) {
-              enrichedPosition = {
-                ...position,
-                pool: {
-                  ...position.pool,
-                  token0Info: poolWithTokens.token0Info,
-                  token1Info: poolWithTokens.token1Info,
-                  feePercentage: (position.pool.fee / 10000).toFixed(2) + '%'
-                }
-              };
-            }
-          } else {
-            // Add fee percentage for global pools too
-            enrichedPosition = {
-              ...position,
-              pool: {
-                ...position.pool,
-                feePercentage: (position.pool.fee / 10000).toFixed(2) + '%'
-              }
-            };
-          }
-
-          return enrichedPosition;
-        })
-      );
-
-      // Calculate pagination info
-      const hasMore = validatedParams.offset + validatedParams.limit < totalCount;
-      const nextOffset = hasMore ? validatedParams.offset + validatedParams.limit : null;
-
-      return NextResponse.json({
-        positions: enrichedPositions,
+    return NextResponse.json({
+      success: true,
+      data: {
+        positions: result.positions,
         pagination: {
-          total: totalCount,
+          total: result.total,
           limit: validatedParams.limit,
           offset: validatedParams.offset,
-          hasMore,
+          hasMore: result.hasMore,
           nextOffset
-        },
-        summary: {
-          active: await prisma.position.count({
-            where: { userId: session.user.id, status: 'active' }
-          }),
-          closed: await prisma.position.count({
-            where: { userId: session.user.id, status: 'closed' }
-          }),
-          archived: await prisma.position.count({
-            where: { userId: session.user.id, status: 'archived' }
-          })
         }
-      });
-
-    } finally {
-      await poolService.disconnect();
-      await prisma.$disconnect();
-    }
+      },
+      meta: {
+        requestedAt: new Date().toISOString(),
+        filters: {
+          status: validatedParams.status,
+          chain: validatedParams.chain || null,
+          sortBy: validatedParams.sortBy,
+          sortOrder: validatedParams.sortOrder
+        },
+        dataQuality: {
+          subgraphPositions: result.positions.filter(p => p.initialSource === 'subgraph').length,
+          snapshotPositions: result.positions.filter(p => p.initialSource === 'snapshot').length,
+          upgradedPositions: result.positions.filter(p => p.dataUpdated).length
+        }
+      }
+    });
 
   } catch (error) {
-    console.error('Error fetching positions:', error);
+    console.error('Error fetching positions with PnL:', error);
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid query parameters', details: error.errors },
+        { 
+          success: false,
+          error: 'Invalid query parameters', 
+          details: error.errors 
+        },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        success: false,
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

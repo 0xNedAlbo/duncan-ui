@@ -27,6 +27,7 @@ export interface ParsedNFTPosition {
   tokensOwed0: string;
   tokensOwed1: string;
   isActive: boolean;
+  owner?: string; // NFT owner address
 }
 
 export async function fetchNFTPosition(
@@ -108,6 +109,78 @@ export async function fetchNFTPosition(
     
     throw new Error(`Failed to fetch NFT position: ${error}`);
   }
+}
+
+export async function fetchNFTOwner(
+  chainName: string,
+  nftId: string
+): Promise<string> {
+  const chainId = getChainId(chainName);
+  const contractAddress = NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[chainId];
+  
+  if (!contractAddress) {
+    throw new Error(`NonfungiblePositionManager not deployed on chain ${chainName}`);
+  }
+
+  const chainConfig = CHAIN_CONFIG[chainId as keyof typeof CHAIN_CONFIG];
+  if (!chainConfig) {
+    throw new Error(`Unsupported chain: ${chainName}`);
+  }
+
+  // Create public client for the specific chain
+  const publicClient = createPublicClient({
+    chain: chainConfig.chain,
+    transport: http(),
+  });
+
+  try {
+    // Call the ownerOf() function on the NFT contract
+    const owner = await publicClient.readContract({
+      address: contractAddress,
+      abi: [
+        {
+          name: 'ownerOf',
+          type: 'function',
+          stateMutability: 'view',
+          inputs: [{ name: 'tokenId', type: 'uint256' }],
+          outputs: [{ name: '', type: 'address' }],
+        },
+      ],
+      functionName: 'ownerOf',
+      args: [BigInt(nftId)],
+    }) as string;
+
+    return owner;
+  } catch (error) {
+    console.error('Error fetching NFT owner:', error);
+    
+    if (error instanceof Error) {
+      if (error.message.includes('execution reverted')) {
+        throw new Error(`NFT with ID ${nftId} does not exist on ${chainName}`);
+      }
+      if (error.message.includes('network')) {
+        throw new Error(`Network error while fetching owner from ${chainName}`);
+      }
+    }
+    
+    throw new Error(`Failed to fetch NFT owner: ${error}`);
+  }
+}
+
+export async function fetchNFTPositionWithOwner(
+  chainName: string,
+  nftId: string
+): Promise<ParsedNFTPosition> {
+  // Fetch position data and owner in parallel
+  const [positionData, owner] = await Promise.all([
+    fetchNFTPosition(chainName, nftId),
+    fetchNFTOwner(chainName, nftId),
+  ]);
+
+  return {
+    ...positionData,
+    owner,
+  };
 }
 
 export async function validateNFTExists(

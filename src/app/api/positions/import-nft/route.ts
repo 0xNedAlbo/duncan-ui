@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { fetchNFTPosition } from '@/services/uniswap/nftPosition';
+import { fetchNFTPositionWithOwner } from '@/services/uniswap/nftPosition';
 import { PoolService } from '@/services/uniswap/poolService';
 import { PrismaClient } from '@prisma/client';
 
@@ -70,8 +70,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
       }, { status: 400 });
     }
 
-    // 1. Fetch NFT position data from blockchain
-    const nftPositionData = await fetchNFTPosition(chain.toLowerCase(), nftId);
+    // 1. Fetch NFT position data with owner from blockchain
+    const nftPositionData = await fetchNFTPositionWithOwner(chain.toLowerCase(), nftId);
     
     if (!nftPositionData.isActive) {
       return NextResponse.json({
@@ -120,6 +120,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
           liquidity: nftPositionData.liquidity,
           importType: 'nft',
           nftId: nftPositionData.nftId,
+          owner: nftPositionData.owner, // Store NFT owner address
           status: 'active'
         },
         include: {

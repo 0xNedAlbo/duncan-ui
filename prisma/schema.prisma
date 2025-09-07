@@ -72,11 +72,11 @@ model VerificationToken {
   @@map("verificationtokens")
 }
 
-// Token Model - NUR verifizierte Tokens von Alchemy (global)
+// Token Model - ONLY verified tokens from Alchemy (global)
 model Token {
   id            String   @id @default(cuid())
   
-  // Chain & Address (unique zusammen)
+  // Chain & Address (unique together)
   chain         String   // "ethereum", "arbitrum", "base"
   address       String
   
@@ -87,10 +87,10 @@ model Token {
   
   // Alchemy Metadata
   logoUrl       String?
-  verified      Boolean  @default(true)   // Immer true für globale Tokens
+  verified      Boolean  @default(true)   // Always true for global tokens
   
   // Metadata Caching
-  lastUpdatedAt DateTime?  // Wann zuletzt von Alchemy aktualisiert
+  lastUpdatedAt DateTime?  // When last updated from Alchemy
   
   // Relations
   poolsAsToken0 Pool[]   @relation("Token0")
@@ -105,7 +105,7 @@ model Token {
   @@map("tokens")
 }
 
-// UserToken Model - User-spezifische Custom Tokens
+// UserToken Model - User-specific Custom Tokens
 model UserToken {
   id            String   @id @default(cuid())
   userId        String
@@ -126,9 +126,9 @@ model UserToken {
   addedAt       DateTime @default(now())
   lastUsedAt    DateTime @updatedAt
   
-  // User kann eigene Labels vergeben
-  userLabel     String?  // z.B. "My Test Token"
-  notes         String?  // User Notizen
+  // User can assign custom labels
+  userLabel     String?  // e.g. "My Test Token"
+  notes         String?  // User notes
   
   // Timestamps
   createdAt     DateTime @default(now())
@@ -140,21 +140,21 @@ model UserToken {
   @@map("user_tokens")
 }
 
-// Pool Model - zentrale Pool-Daten mit flexiblen Token References
+// Pool Model - central Pool data with flexible Token references
 model Pool {
   id            String   @id @default(cuid())
   
-  // Chain & Address (unique zusammen)
+  // Chain & Address (unique together)
   chain         String   // "ethereum", "arbitrum", "base"
   poolAddress   String
   
-  // Flexible Token Relations (kann null sein wenn custom token)
+  // Flexible Token Relations (can be null for custom tokens)
   token0Id      String?
   token0        Token?   @relation("Token0", fields: [token0Id], references: [id])
   token1Id      String?
   token1        Token?   @relation("Token1", fields: [token1Id], references: [id])
   
-  // Token Addresses (immer gesetzt für custom tokens)
+  // Token Addresses (always set for custom tokens)
   token0Address String
   token1Address String
   
@@ -170,7 +170,7 @@ model Pool {
   volume24h     String?
   apr           Float?
   
-  // Pool Owner (für custom tokens)
+  // Pool Owner (for custom tokens)
   ownerId       String?
   owner         User?    @relation("PoolOwner", fields: [ownerId], references: [id])
   
@@ -204,18 +204,31 @@ model Position {
   tickUpper     Int
   liquidity     String   // BigInt as String
   
+  // Token Configuration (für PnL-Berechnung)
+  token0IsQuote Boolean  // true wenn Token0 = Quote Asset, false wenn Token1 = Quote Asset
+  
+  // Owner Information
+  owner         String?  // Wallet address of position owner
+  
   // Import Metadata
   importType    String   // "manual", "wallet", "nft"
   nftId         String?  // For NFT imports
-  walletAddress String?  // For wallet imports
   
   // Position State
   status        String   @default("active") // "active", "closed", "archived"
+  
+  // Initial Value Tracking (minimal - 5 fields)
+  initialValue        String?   // Wert in Quote Asset bei Erstellung
+  initialToken0Amount String?   // Token0 Menge bei Erstellung  
+  initialToken1Amount String?   // Token1 Menge bei Erstellung
+  initialTimestamp    DateTime? // Wann die Position erstellt wurde
+  initialSource       String?   // "subgraph" oder "snapshot"
   
   // Timestamps
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
   @@index([userId, status])
+  @@index([owner])
   @@map("positions")
 }

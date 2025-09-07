@@ -94,10 +94,12 @@ model Position {
   tickUpper     Int
   liquidity     String   // BigInt as String
   
+  // Owner Information
+  owner         String?  // Wallet address of position owner
+  
   // Import Metadata
   importType    String   // "manual", "wallet", "nft"
   nftId         String?  // For NFT imports
-  walletAddress String?  // For wallet imports
   
   // Position State
   status        String   @default("active") // "active", "closed", "archived"
@@ -107,6 +109,7 @@ model Position {
   updatedAt     DateTime @updatedAt
   
   @@index([userId, status])
+  @@index([owner])
   @@map("positions")
 }
 
@@ -565,13 +568,14 @@ src/components/positions/
 10. ✅ **Token API Routes** → CRUD Operations für Tokens (ABGESCHLOSSEN)
 11. ✅ **Pool Service** → Pool-Daten von Uniswap mit User-Scoped Tokens (ABGESCHLOSSEN)
 12. ✅ **Pool API Security** → Position-centric Architecture mit Rate Limiting (ABGESCHLOSSEN)
+12.5. ✅ **Owner-Feld Implementation** → Position Owner tracking mit NFT Owner integration (ABGESCHLOSSEN)
 13. 🔄 **Position List** → Mit echten Daten aus DB (NÄCHSTER SCHRITT)
 14. 🔄 **Manual Creation** → Token-Auswahl und Pool-Konfiguration
 15. 🔄 **Wallet Import** → Subgraph Integration
 16. 🔄 **Background Jobs** → Pool-Statistiken Updates
 17. 🔄 **Polish** → Error Handling, Loading States, Performance
 
-## ✅ AKTUELLE IMPLEMENTATION (Stand: Pool Service + Security Architecture Komplett)
+## ✅ AKTUELLE IMPLEMENTATION (Stand: Owner-Feld Integration Komplett)
 
 ### Database & Schema
 - **✅ Prisma Schema** mit Token, Pool & Position Models
@@ -842,11 +846,11 @@ export const mockTokens = {
 ```
 
 ### Aktuelle Test Coverage
-- **83 Unit Tests** insgesamt (von ursprünglich 51)
+- **95+ Unit Tests** insgesamt (erweitert um Owner-Feld Tests)
 - **AlchemyTokenService**: 20 Tests ✅
 - **TokenService**: 31 Tests ✅
-- **NFTPositionService**: 32 Tests ✅ (NEU hinzugefügt)
-- **Alle Tests**: 100% Pass Rate
+- **NFTPositionService**: 39 Tests ✅ (7 neue Owner-Tests hinzugefügt)
+- **Alle Core Tests**: 100% Pass Rate für Services
 
 ### Testing Best Practices
 - Mocking Alchemy API (keine echten API Calls)
@@ -855,6 +859,60 @@ export const mockTokens = {
 - Parallel Test Execution
 - After-Hooks für Cleanup
 - Coverage Goal: 80%+ ✅ (erreicht)
+
+## 🆕 UPDATE: Owner-Feld Implementation (September 2024)
+
+### ✅ Implementierte Änderungen
+
+1. **Datenbank Schema Update**:
+   - `walletAddress` → `owner` umbenannt in Position Model
+   - Index auf `owner` Feld hinzugefügt für Performance
+   - Schema via `prisma db push` aktualisiert
+
+2. **NFT Position Service erweitert**:
+   ```typescript
+   // Neue Funktionen hinzugefügt:
+   export async function fetchNFTOwner(chainName: string, nftId: string): Promise<string>
+   export async function fetchNFTPositionWithOwner(chainName: string, nftId: string): Promise<ParsedNFTPosition>
+   
+   // Interface erweitert:
+   export interface ParsedNFTPosition {
+     // ... existing fields
+     owner?: string; // NFT owner address
+   }
+   ```
+
+3. **API Routes aktualisiert**:
+   - **NFT Import API**: Verwendet `fetchNFTPositionWithOwner()` für Owner-Tracking
+   - **Position GET API**: Includes `owner` Feld in Response
+   - Parallel Contract Calls für bessere Performance
+
+4. **Testing erweitert**:
+   - 7 neue Unit Tests für Owner-Funktionen
+   - Tests für `fetchNFTOwner()`, `fetchNFTPositionWithOwner()` 
+   - Error Handling für nicht-existente NFTs und Network-Fehler
+   - Multi-Chain Testing (Ethereum, Arbitrum, Base)
+
+### 🎯 Vorteile der Owner-Feld Implementation
+
+1. **NFT Position Verifizierung**: Zeigt tatsächlichen Besitzer der Position
+2. **Wallet Import Vorbereitung**: Filtere nur Positionen des verbundenen Wallets
+3. **Multi-Wallet Management**: Unterstützung für zukünftige Features
+4. **Ownership Validation**: Prüfung ob User berechtigt ist, Position zu verwalten
+
+### 📊 Technische Details
+
+- **Contract Integration**: `ownerOf()` Funktion des NonfungiblePositionManager
+- **Performance**: Parallele Contract Calls (Position + Owner gleichzeitig)
+- **Error Handling**: Robuste Behandlung von nicht-existenten NFTs
+- **Type Safety**: Vollständig typisierte Interfaces und API Responses
+
+### 🔄 Nächste Schritte
+
+Das `owner` Feld ist jetzt bereit für:
+- Position List Implementation mit Owner-Anzeige
+- Wallet-basierte Position Filtering  
+- Access Control für Position Management
 
 ## Offene Fragen / Zu klären
 

@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchNFTPosition, validateNFTExists, type ParsedNFTPosition } from './nftPosition';
+import { 
+  fetchNFTPosition, 
+  fetchNFTOwner, 
+  fetchNFTPositionWithOwner, 
+  validateNFTExists, 
+  type ParsedNFTPosition 
+} from './nftPosition';
 import { 
   mockNFTPositions, 
   mockViemContractData, 
@@ -394,6 +400,145 @@ describe('NFTPositionService', () => {
       expect(ethereumResult.chainName).toBe('ethereum');
       expect(arbitrumResult.chainName).toBe('arbitrum');
       expect(mockPublicClient.readContract).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('fetchNFTOwner', () => {
+    describe('successful owner fetching', () => {
+      it('should fetch NFT owner address', async () => {
+        const ownerAddress = '0x742d35Cc6523C0532925a3b8D7C9482A4FfAe8F8';
+        mockPublicClient.readContract.mockResolvedValue(ownerAddress);
+
+        const owner = await fetchNFTOwner('ethereum', '12345');
+
+        expect(owner).toBe(ownerAddress);
+        expect(mockPublicClient.readContract).toHaveBeenCalledWith({
+          address: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
+          abi: [
+            {
+              name: 'ownerOf',
+              type: 'function',
+              stateMutability: 'view',
+              inputs: [{ name: 'tokenId', type: 'uint256' }],
+              outputs: [{ name: '', type: 'address' }],
+            },
+          ],
+          functionName: 'ownerOf',
+          args: [BigInt('12345')],
+        });
+      });
+
+      it('should handle different chains correctly', async () => {
+        const ownerAddress = '0x742d35Cc6523C0532925a3b8D7C9482A4FfAe8F8';
+        
+        // Test Ethereum
+        mockPublicClient.readContract.mockResolvedValueOnce(ownerAddress);
+        const ethereumOwner = await fetchNFTOwner('ethereum', '12345');
+        expect(ethereumOwner).toBe(ownerAddress);
+
+        // Test Arbitrum (same address)
+        mockPublicClient.readContract.mockResolvedValueOnce(ownerAddress);
+        const arbitrumOwner = await fetchNFTOwner('arbitrum', '54321');
+        expect(arbitrumOwner).toBe(ownerAddress);
+
+        // Test Base (different address)
+        mockPublicClient.readContract.mockResolvedValueOnce(ownerAddress);
+        const baseOwner = await fetchNFTOwner('base', '98765');
+        expect(baseOwner).toBe(ownerAddress);
+      });
+    });
+
+    describe('error handling', () => {
+      it('should throw error for non-existent NFT', async () => {
+        mockPublicClient.readContract.mockRejectedValue(
+          new Error('execution reverted: ERC721: owner query for nonexistent token')
+        );
+
+        await expect(fetchNFTOwner('ethereum', '999999')).rejects.toThrow(
+          'NFT with ID 999999 does not exist on ethereum'
+        );
+      });
+
+      it('should throw error for unsupported chain', async () => {
+        await expect(fetchNFTOwner('polygon', '12345')).rejects.toThrow(
+          'Unsupported chain: polygon'
+        );
+      });
+
+      it('should handle network errors', async () => {
+        mockPublicClient.readContract.mockRejectedValue(
+          new Error('network request failed')
+        );
+
+        await expect(fetchNFTOwner('ethereum', '12345')).rejects.toThrow(
+          'Network error while fetching owner from ethereum'
+        );
+      });
+    });
+  });
+
+  describe('fetchNFTPositionWithOwner', () => {
+    it('should fetch position data and owner in parallel', async () => {
+      const expectedPosition = mockNFTPositions.ACTIVE_WETH_USDC_ETHEREUM;
+      const contractData = mockViemContractData[expectedPosition.nftId];
+      const ownerAddress = '0x742d35Cc6523C0532925a3b8D7C9482A4FfAe8F8';
+
+      // Mock both position and owner calls
+      mockPublicClient.readContract
+        .mockResolvedValueOnce(contractData)      // positions() call
+        .mockResolvedValueOnce(ownerAddress);     // ownerOf() call
+
+      const result = await fetchNFTPositionWithOwner('ethereum', '12345');
+
+      expect(result).toEqual({
+        ...expectedPosition,
+        owner: ownerAddress,
+      });
+
+      // Verify both functions were called
+      expect(mockPublicClient.readContract).toHaveBeenCalledTimes(2);
+      
+      // Check positions() call
+      expect(mockPublicClient.readContract).toHaveBeenNthCalledWith(1, {
+        address: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
+        abi: expect.any(Array),
+        functionName: 'positions',
+        args: [BigInt('12345')],
+      });
+
+      // Check ownerOf() call
+      expect(mockPublicClient.readContract).toHaveBeenNthCalledWith(2, {
+        address: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
+        abi: [
+          {
+            name: 'ownerOf',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [{ name: 'tokenId', type: 'uint256' }],
+            outputs: [{ name: '', type: 'address' }],
+          },
+        ],
+        functionName: 'ownerOf',
+        args: [BigInt('12345')],
+      });
+    });
+
+    it('should handle errors from either call', async () => {
+      // Test position fetch error
+      mockPublicClient.readContract
+        .mockRejectedValueOnce(new Error('execution reverted'))
+        .mockResolvedValue('0x742d35Cc6523C0532925a3b8D7C9482A4FfAe8F8');
+
+      await expect(fetchNFTPositionWithOwner('ethereum', '999999')).rejects.toThrow();
+
+      // Reset and test owner fetch error
+      mockPublicClient.readContract.mockClear();
+      const contractData = mockViemContractData['12345'];
+      mockPublicClient.readContract
+        .mockResolvedValueOnce(contractData)
+        .mockRejectedValueOnce(new Error('execution reverted'));
+
+      await expect(fetchNFTPositionWithOwner('ethereum', '12345')).rejects.toThrow();
     });
   });
 });

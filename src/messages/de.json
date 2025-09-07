@@ -89,6 +89,50 @@
         "placeholder": "z.B. 123456",
         "import": "Position importieren"
       }
+    },
+    "positions": {
+      "refresh": "Position aktualisieren",
+      "showDetails": "Details zeigen",
+      "hideDetails": "Details verstecken",
+      "currentValue": "Aktueller Wert",
+      "initialValue": "Initialer Wert",
+      "pnl": "PnL",
+      "liquidity": "Liquidität",
+      "tickLower": "Untergrenze Tick",
+      "tickUpper": "Obergrenze Tick",
+      "lastUpdated": "Zuletzt aktualisiert",
+      "dataUpgraded": "Daten von Snapshot auf exakte historische Werte aktualisiert",
+      "rangeStatus": {
+        "inRange": "In Range",
+        "outOfRange": "Out of Range",
+        "unknown": "Unbekannt"
+      },
+      "dataQuality": {
+        "exact": "Exakter PnL",
+        "estimated": "PnL seit Import",
+        "subgraph": "Subgraph",
+        "snapshot": "Snapshot"
+      },
+      "filters": {
+        "active": "Aktive Positionen",
+        "closed": "Geschlossene Positionen",
+        "archived": "Archivierte Positionen",
+        "allChains": "Alle Chains",
+        "sortBy": {
+          "createdAt": "Erstellungsdatum",
+          "currentValue": "Aktueller Wert",
+          "pnl": "PnL Betrag",
+          "pnlPercent": "PnL Prozent"
+        }
+      },
+      "empty": {
+        "title": "Keine Positionen gefunden",
+        "activeDescription": "Startet mit dem Import eurer ersten Uniswap V3 Position",
+        "otherDescription": "Keine {status} Positionen vorhanden"
+      },
+      "loadMore": "Mehr laden ({count} verbleibend)",
+      "showing": "Zeige {current} von {total} Positionen",
+      "upgraded": "{count} auf exakte Daten aktualisiert"
     }
   },
   "auth": {

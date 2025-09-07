@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { PoolService } from '@/services/uniswap/poolService';
-import { PrismaClient } from '@prisma/client';
+import { getPositionService } from '@/services/positions';
+import { prisma } from '@/lib/prisma';
 
 interface RouteParams {
   params: {
@@ -14,13 +14,13 @@ interface RouteParams {
 const refreshCache = new Map<string, number>();
 
 /**
- * POST /api/positions/[id]/refresh - Refresh position data
+ * POST /api/positions/[id]/refresh - Refresh position with PnL data
  * 
  * This endpoint:
  * 1. Verifies the user owns the position
  * 2. Rate limits to prevent abuse (1 refresh per minute per position)
- * 3. Updates the pool state from blockchain
- * 4. Returns updated position with current pool data
+ * 3. Updates pool state and refreshes Initial Value from Subgraph if available
+ * 4. Returns updated position with current PnL calculations
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
@@ -41,25 +41,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const prisma = new PrismaClient();
-    const poolService = new PoolService();
-
     try {
-      // 1. Verify position ownership and get position data
+      // 1. Verify position ownership
       const position = await prisma.position.findFirst({
         where: {
           id: positionId,
-          userId: session.user.id,
-          status: 'active'
+          userId: session.user.id
         },
-        include: {
-          pool: {
-            include: {
-              token0: true,
-              token1: true
-            }
-          }
-        }
+        select: { userId: true, updatedAt: true }
       });
 
       if (!position) {
@@ -88,23 +77,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      // 3. Update pool state from blockchain
-      await poolService.updatePoolState(position.poolId);
+      // 3. Refresh position with Position Service (includes Pool + Initial Value updates)
+      const positionService = getPositionService();
+      const refreshedPosition = await positionService.refreshPosition(positionId);
 
-      // 4. Fetch updated position with fresh pool data
-      const updatedPosition = await prisma.position.findFirst({
-        where: { id: positionId },
-        include: {
-          pool: {
-            include: {
-              token0: true,
-              token1: true
-            }
-          }
-        }
-      });
-
-      // 5. Set rate limit cache
+      // 4. Set rate limit cache
       refreshCache.set(cacheKey, now);
 
       // Clean up old cache entries (older than 1 hour)
@@ -115,36 +92,26 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         }
       }
 
-      // 6. Get token information if pool uses custom tokens
-      let enrichedPosition = updatedPosition;
-      if (position.pool.ownerId) {
-        // Pool has custom tokens, get full token info
-        const poolWithTokens = await poolService.getPoolById(position.poolId, session.user.id);
-        if (poolWithTokens) {
-          enrichedPosition = {
-            ...updatedPosition!,
-            pool: {
-              ...updatedPosition!.pool,
-              token0Info: poolWithTokens.token0Info,
-              token1Info: poolWithTokens.token1Info
-            }
-          };
-        }
-      }
-
       return NextResponse.json({
-        position: enrichedPosition,
-        refreshed: true,
-        lastUpdated: new Date(),
-        poolState: {
-          currentPrice: updatedPosition?.pool.currentPrice,
-          currentTick: updatedPosition?.pool.currentTick,
-          sqrtPriceX96: updatedPosition?.pool.sqrtPriceX96
+        success: true,
+        data: {
+          position: refreshedPosition,
+          refreshedAt: new Date().toISOString()
+        },
+        meta: {
+          upgraded: refreshedPosition.dataUpdated || false,
+          dataSource: refreshedPosition.initialSource,
+          confidence: refreshedPosition.confidence,
+          pnlData: {
+            currentValue: refreshedPosition.currentValue,
+            initialValue: refreshedPosition.initialValue,
+            pnl: refreshedPosition.pnl,
+            pnlPercent: refreshedPosition.pnlPercent
+          }
         }
       });
 
     } finally {
-      await poolService.disconnect();
       await prisma.$disconnect();
     }
 
@@ -153,13 +120,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     
     if (error instanceof Error) {
       return NextResponse.json(
-        { error: error.message },
+        { 
+          success: false,
+          error: error.message 
+        },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        success: false,
+        error: 'Internal server error' 
+      },
       { status: 500 }
     );
   }
