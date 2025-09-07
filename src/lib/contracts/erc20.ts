@@ -46,7 +46,7 @@ export interface TokenMetadata {
  * Validates if an address is a proper Ethereum address format
  */
 export function isValidEthereumAddress(address: string): boolean {
-  return /^0x[a-fA-F0-9]{40}$/.test(address);
+  return /^0x[a-fA-F0-9]{40}$/i.test(address);
 }
 
 /**

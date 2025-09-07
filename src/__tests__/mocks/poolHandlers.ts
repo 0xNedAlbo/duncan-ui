@@ -36,6 +36,13 @@ export const mockViemCalls = {
       if (fee === 500) return mockFactoryResponses.WETH_USDC_500;
     }
     
+    // Custom token with USDC
+    if (key.includes('0123456789012345678901234567890123456789') && 
+        key.includes('a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48') && 
+        fee === 3000) {
+      return '0x1234567890123456789012345678901234567890';
+    }
+    
     // Return zero address for non-existent pools
     return mockFactoryResponses.NON_EXISTENT;
   },
@@ -43,6 +50,17 @@ export const mockViemCalls = {
   // Mock Pool.slot0() calls
   mockSlot0: (poolAddress: string) => {
     if (poolAddress === mockFactoryResponses.WETH_USDC_3000) {
+      return [
+        BigInt('3543191142285914205922034323214'), // sqrtPriceX96
+        202500,  // tick
+        1,       // observationIndex
+        1,       // observationCardinality
+        1,       // observationCardinalityNext
+        0,       // feeProtocol
+        true,    // unlocked
+      ];
+    }
+    if (poolAddress === '0x1234567890123456789012345678901234567890') {
       return [
         BigInt('3543191142285914205922034323214'), // sqrtPriceX96
         202500,  // tick
@@ -62,6 +80,9 @@ export const mockViemCalls = {
     if (poolAddress === mockFactoryResponses.WETH_USDC_3000) {
       return BigInt('12345678901234567890');
     }
+    if (poolAddress === '0x1234567890123456789012345678901234567890') {
+      return BigInt('12345678901234567890');
+    }
     
     throw new Error('Pool not found');
   },
@@ -69,7 +90,10 @@ export const mockViemCalls = {
   // Mock Pool.token0() calls
   mockToken0: (poolAddress: string): string => {
     if (poolAddress === mockFactoryResponses.WETH_USDC_3000) {
-      return '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'; // WETH
+      return '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'; // USDC (lower address)
+    }
+    if (poolAddress === '0x1234567890123456789012345678901234567890') {
+      return '0x0123456789012345678901234567890123456789'; // Custom token (lower)
     }
     
     throw new Error('Pool not found');
@@ -78,7 +102,10 @@ export const mockViemCalls = {
   // Mock Pool.token1() calls  
   mockToken1: (poolAddress: string): string => {
     if (poolAddress === mockFactoryResponses.WETH_USDC_3000) {
-      return '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'; // USDC
+      return '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'; // WETH (higher address)
+    }
+    if (poolAddress === '0x1234567890123456789012345678901234567890') {
+      return '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'; // USDC (higher)
     }
     
     throw new Error('Pool not found');
@@ -89,6 +116,9 @@ export const mockViemCalls = {
     if (poolAddress === mockFactoryResponses.WETH_USDC_3000) {
       return 3000;
     }
+    if (poolAddress === '0x1234567890123456789012345678901234567890') {
+      return 3000;
+    }
     
     throw new Error('Pool not found');
   },
@@ -96,6 +126,9 @@ export const mockViemCalls = {
   // Mock Pool.tickSpacing() calls
   mockTickSpacing: (poolAddress: string): number => {
     if (poolAddress === mockFactoryResponses.WETH_USDC_3000) {
+      return 60;
+    }
+    if (poolAddress === '0x1234567890123456789012345678901234567890') {
       return 60;
     }
     

@@ -386,16 +386,18 @@ export class PoolService {
             );
 
             // Get token decimals for price calculation
+            // Use pool owner for context, or skip resolution for custom tokens without owner
+            const resolveUserId = pool.ownerId || "";
             const [token0Info, token1Info] = await Promise.all([
                 this.tokenResolver.resolveToken(
                     pool.chain,
                     pool.token0Address,
-                    ""
-                ), // Empty userId for global lookup
+                    resolveUserId
+                ),
                 this.tokenResolver.resolveToken(
                     pool.chain,
                     pool.token1Address,
-                    ""
+                    resolveUserId
                 ),
             ]);
 

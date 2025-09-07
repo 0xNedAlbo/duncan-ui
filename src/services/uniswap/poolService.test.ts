@@ -117,35 +117,6 @@ describe("PoolService", () => {
 
     describe("findOrCreatePool", () => {
         it("should return existing pool if found", async () => {
-            // Create TokenReferences first
-            const token0Ref = await prisma.tokenReference.create({
-                data: {
-                    tokenType: "global",
-                    globalTokenId: mockTokens.WETH_ETHEREUM.id,
-                    chain: "ethereum",
-                    address: mockTokens.WETH_ETHEREUM.address,
-                    symbol: "WETH",
-                },
-            });
-            const token1Ref = await prisma.tokenReference.create({
-                data: {
-                    tokenType: "global",
-                    globalTokenId: mockTokens.USDC_ETHEREUM.id,
-                    chain: "ethereum",
-                    address: mockTokens.USDC_ETHEREUM.address,
-                    symbol: "USDC",
-                },
-            });
-
-            // Create existing pool with TokenReferences
-            const existingPool = await prisma.pool.create({
-                data: {
-                    ...mockPools.WETH_USDC_3000,
-                    token0RefId: token0Ref.id,
-                    token1RefId: token1Ref.id,
-                },
-            });
-
             const result = await service.findOrCreatePool(
                 "ethereum",
                 mockTokens.WETH_ETHEREUM.address,
@@ -154,10 +125,19 @@ describe("PoolService", () => {
                 testUserId
             );
 
-            expect(result.id).toBe(existingPool.id);
+            // Call again to test finding existing pool
+            const result2 = await service.findOrCreatePool(
+                "ethereum",
+                mockTokens.WETH_ETHEREUM.address,
+                mockTokens.USDC_ETHEREUM.address,
+                3000,
+                testUserId
+            );
+
+            expect(result.id).toBe(result2.id);
             expect(result.fee).toBe(3000);
-            expect(result.token0Data.symbol).toBe("WETH");
-            expect(result.token1Data.symbol).toBe("USDC");
+            expect(result.token0Data.symbol).toBe("USDC");
+            expect(result.token1Data.symbol).toBe("WETH");
         });
 
         it("should create new pool if not found", async () => {
@@ -194,12 +174,12 @@ describe("PoolService", () => {
                 testUserId
             );
 
-            // Should still result in WETH as token0 (lower address)
+            // Should still result in USDC as token0 (lower address)
             expect(result.token0Address.toLowerCase()).toBe(
-                mockTokens.WETH_ETHEREUM.address.toLowerCase()
+                mockTokens.USDC_ETHEREUM.address.toLowerCase()
             );
             expect(result.token1Address.toLowerCase()).toBe(
-                mockTokens.USDC_ETHEREUM.address.toLowerCase()
+                mockTokens.WETH_ETHEREUM.address.toLowerCase()
             );
         });
 
@@ -322,13 +302,13 @@ describe("PoolService", () => {
                 data: [
                     {
                         ...mockPools.WETH_USDC_3000,
-                        token0RefId: wethRef.id,
-                        token1RefId: usdcRef.id,
+                        token0RefId: usdcRef.id, // USDC has lower address
+                        token1RefId: wethRef.id,
                     },
                     {
                         ...mockPools.WETH_USDC_500,
-                        token0RefId: wethRef.id,
-                        token1RefId: usdcRef.id,
+                        token0RefId: usdcRef.id, // USDC has lower address
+                        token1RefId: wethRef.id,
                     },
                 ],
             });
@@ -342,8 +322,8 @@ describe("PoolService", () => {
             );
 
             expect(results).toHaveLength(2);
-            expect(results.map((r) => r.fee).sort()).toEqual([500, 3000]);
-            expect(results[0].token0Data.symbol).toBe("WETH");
+            expect(results.map((r) => r.fee)).toEqual([500, 3000]);
+            expect(results[0].token0Data.symbol).toBe("USDC");
         });
 
         it("should handle reversed token order", async () => {
@@ -355,7 +335,7 @@ describe("PoolService", () => {
             );
 
             expect(results).toHaveLength(2); // Should find both pools
-            expect(results.map((r) => r.fee).sort()).toEqual([500, 3000]);
+            expect(results.map((r) => r.fee)).toEqual([500, 3000]);
         });
 
         it("should return empty array for non-existent token pair", async () => {
@@ -371,12 +351,45 @@ describe("PoolService", () => {
 
     describe("searchPools", () => {
         beforeEach(async () => {
-            // Create test pools
+            // Create TokenReferences first
+            const wethRef = await prisma.tokenReference.create({
+                data: {
+                    tokenType: "global",
+                    globalTokenId: mockTokens.WETH_ETHEREUM.id,
+                    chain: "ethereum",
+                    address: mockTokens.WETH_ETHEREUM.address,
+                    symbol: "WETH",
+                },
+            });
+            const usdcRef = await prisma.tokenReference.create({
+                data: {
+                    tokenType: "global",
+                    globalTokenId: mockTokens.USDC_ETHEREUM.id,
+                    chain: "ethereum",
+                    address: mockTokens.USDC_ETHEREUM.address,
+                    symbol: "USDC",
+                },
+            });
+
+            // Create test pools with TokenReference IDs
             await prisma.pool.createMany({
                 data: [
-                    mockPools.WETH_USDC_3000,
-                    mockPools.WETH_USDC_500,
-                    { ...mockPools.CUSTOM_TOKEN_POOL, ownerId: testUserId },
+                    {
+                        ...mockPools.WETH_USDC_3000,
+                        token0RefId: usdcRef.id, // USDC has lower address
+                        token1RefId: wethRef.id,
+                    },
+                    {
+                        ...mockPools.WETH_USDC_500,
+                        token0RefId: usdcRef.id, // USDC has lower address
+                        token1RefId: wethRef.id,
+                    },
+                    { 
+                        ...mockPools.CUSTOM_TOKEN_POOL, 
+                        ownerId: testUserId,
+                        token0RefId: wethRef.id, // Temporary, will be fixed later
+                        token1RefId: usdcRef.id,
+                    },
                 ],
             });
         });
@@ -399,8 +412,8 @@ describe("PoolService", () => {
             expect(
                 results.every(
                     (r) =>
-                        r.token0Address === mockTokens.WETH_ETHEREUM.address ||
-                        r.token1Address === mockTokens.WETH_ETHEREUM.address
+                        r.token0Address.toLowerCase() === mockTokens.WETH_ETHEREUM.address.toLowerCase() ||
+                        r.token1Address.toLowerCase() === mockTokens.WETH_ETHEREUM.address.toLowerCase()
                 )
             ).toBe(true);
         });
@@ -435,9 +448,31 @@ describe("PoolService", () => {
 
     describe("updatePoolState", () => {
         it("should update pool state from blockchain", async () => {
+            // Create TokenReferences first
+            const wethRef = await prisma.tokenReference.create({
+                data: {
+                    tokenType: "global",
+                    globalTokenId: mockTokens.WETH_ETHEREUM.id,
+                    chain: "ethereum",
+                    address: mockTokens.WETH_ETHEREUM.address,
+                    symbol: "WETH",
+                },
+            });
+            const usdcRef = await prisma.tokenReference.create({
+                data: {
+                    tokenType: "global",
+                    globalTokenId: mockTokens.USDC_ETHEREUM.id,
+                    chain: "ethereum",
+                    address: mockTokens.USDC_ETHEREUM.address,
+                    symbol: "USDC",
+                },
+            });
+
             const pool = await prisma.pool.create({
                 data: {
                     ...mockPools.WETH_USDC_3000,
+                    token0RefId: usdcRef.id, // USDC has lower address
+                    token1RefId: wethRef.id,
                     currentPrice: null,
                     currentTick: null,
                 },
@@ -475,7 +510,7 @@ describe("PoolService", () => {
             );
 
             expect(result.token0Address).toBe(
-                mockTokens.WETH_ETHEREUM.address.toLowerCase()
+                mockTokens.USDC_ETHEREUM.address.toLowerCase()
             );
         });
 
