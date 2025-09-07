@@ -165,7 +165,67 @@ export class PositionService {
                     `Error calculating PnL for position ${position.id}:`,
                     error
                 );
-                // Skip positions with errors
+                
+                // Create fallback position data instead of skipping
+                const { token0Data, token1Data } = this.getUnifiedTokenData(position.pool);
+                const fallbackPosition: PositionWithPnL = {
+                    // Basic Position Data
+                    id: position.id,
+                    nftId: position.nftId || undefined,
+                    liquidity: position.liquidity,
+                    tickLower: position.tickLower,
+                    tickUpper: position.tickUpper,
+                    owner: position.owner || undefined,
+                    importType: position.importType,
+                    status: position.status,
+                    createdAt: position.createdAt,
+
+                    // Pool & Token Data
+                    pool: {
+                        id: position.pool.id,
+                        chain: position.pool.chain,
+                        poolAddress: position.pool.poolAddress,
+                        fee: position.pool.fee,
+                        currentPrice: position.pool.currentPrice || undefined,
+                        token0: {
+                            id: token0Data.id,
+                            symbol: token0Data.symbol,
+                            name: token0Data.name,
+                            decimals: token0Data.decimals,
+                            logoUrl: token0Data.logoUrl,
+                        },
+                        token1: {
+                            id: token1Data.id,
+                            symbol: token1Data.symbol,
+                            name: token1Data.name,
+                            decimals: token1Data.decimals,
+                            logoUrl: token1Data.logoUrl,
+                        },
+                    },
+
+                    // Quote Token Configuration
+                    token0IsQuote: position.token0IsQuote,
+                    tokenPair: `${position.token0IsQuote ? token1Data.symbol : token0Data.symbol}/${position.token0IsQuote ? token0Data.symbol : token1Data.symbol}`,
+                    baseSymbol: position.token0IsQuote ? token1Data.symbol : token0Data.symbol,
+                    quoteSymbol: position.token0IsQuote ? token0Data.symbol : token1Data.symbol,
+
+                    // PnL Data - Error fallbacks
+                    initialValue: "0",
+                    currentValue: "0", 
+                    pnl: "0",
+                    pnlPercent: 0,
+                    initialSource: "snapshot" as const,
+                    confidence: "estimated" as const,
+
+                    // Range Status
+                    rangeStatus: "unknown" as const,
+
+                    // Meta
+                    lastUpdated: new Date(),
+                    dataUpdated: false
+                };
+                
+                positionsWithPnL.push(fallbackPosition);
             }
         }
 
