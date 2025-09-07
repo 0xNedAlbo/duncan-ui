@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { TokenResolutionService } from '@/services/tokens/tokenResolutionService';
 import { TokenService } from '@/services/tokens/tokenService';
 import { PrismaClient } from '@prisma/client';
 import { getSession } from '@/lib/auth';
 
 // Allow test injection of prisma client
 const prisma = globalThis.__testPrisma || new PrismaClient();
+const tokenResolutionService = new TokenResolutionService(prisma);
 const tokenService = new TokenService(prisma);
 
 export async function GET(request: NextRequest) {
   // Check authentication
   const session = await getSession();
-  if (!session) {
+  if (!session?.user?.id) {
     return NextResponse.json(
       { error: 'Unauthorized - Please sign in' },
       { status: 401 }
@@ -38,21 +40,71 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Search tokens
-    const tokens = await tokenService.searchTokens({
+    // Search tokens - combine global and user tokens
+    const results = [];
+    
+    if (!verifiedOnly) {
+      // Get user's custom tokens first
+      const userTokens = await tokenResolutionService.getUserTokens(session.user.id, chain || undefined);
+      
+      // Filter user tokens by query
+      const filteredUserTokens = userTokens.filter(token => {
+        if (!query) return true;
+        const searchTerm = query.toLowerCase();
+        return (
+          token.symbol.toLowerCase().includes(searchTerm) ||
+          token.name.toLowerCase().includes(searchTerm) ||
+          token.address.toLowerCase().includes(searchTerm)
+        );
+      });
+
+      // Convert to TokenInfo format
+      results.push(...filteredUserTokens.map(token => ({
+        id: token.id,
+        chain: token.chain,
+        address: token.address,
+        symbol: token.symbol,
+        name: token.name,
+        decimals: token.decimals,
+        logoUrl: token.logoUrl,
+        isGlobal: false,
+        isVerified: false,
+        userLabel: token.userLabel,
+        notes: token.notes,
+      })));
+    }
+
+    // Get global verified tokens
+    const globalTokens = await tokenService.searchTokens({
       chain: chain || undefined,
       query: query || undefined,
       limit,
       offset,
-      verifiedOnly,
+      verifiedOnly: true, // Only global verified tokens
     });
 
+    // Convert to TokenInfo format
+    results.push(...globalTokens.map(token => ({
+      id: token.id,
+      chain: token.chain,
+      address: token.address,
+      symbol: token.symbol,
+      name: token.name,
+      decimals: token.decimals,
+      logoUrl: token.logoUrl,
+      isGlobal: true,
+      isVerified: true,
+    })));
+
+    // Apply pagination to combined results
+    const paginatedResults = results.slice(offset, offset + limit);
+
     return NextResponse.json({
-      tokens,
+      tokens: paginatedResults,
       pagination: {
         limit,
         offset,
-        total: tokens.length, // Note: This is just the current page size, not total count
+        total: results.length,
       },
     });
   } catch (error) {

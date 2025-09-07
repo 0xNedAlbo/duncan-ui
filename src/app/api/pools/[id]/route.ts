@@ -3,16 +3,16 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { PoolService } from '@/services/uniswap/poolService';
 
-interface RouteParams {
-  params: {
+interface RouteContext {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 /**
  * GET /api/pools/[id] - Get pool by ID
  */
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, context: RouteContext) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -22,6 +22,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    const params = await context.params;
     const { id } = params;
     
     if (!id || typeof id !== 'string') {

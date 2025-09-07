@@ -7,7 +7,7 @@ export type SettingsState = {
   locale: SupportedLocale
   
   // Actions
-  setLocale: (locale: SupportedLocale) => void
+  setLocale: (_newLocale: SupportedLocale) => void
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -18,7 +18,7 @@ export const useSettingsStore = create<SettingsState>()(
         locale: 'en-US',
 
         // Actions
-        setLocale: (locale) => set({ locale })
+        setLocale: (_newLocale) => set({ locale: _newLocale })
       }),
       { 
         name: 'duncan-settings',

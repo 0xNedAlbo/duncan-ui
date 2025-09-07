@@ -2,22 +2,25 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST, GET } from './route';
 import { mockTokens } from '@/__tests__/fixtures/tokens';
+import { TokenResolutionService } from '@/services/tokens/tokenResolutionService';
 
-// Mock TokenService
-const mockTokenService = {
-  createTokensFromAddresses: vi.fn(),
-  getTokensByAddresses: vi.fn(),
+// Mock TokenResolutionService - using a simpler approach
+vi.mock('@/services/tokens/tokenResolutionService');
+
+// Mock session
+const mockSession = {
+  user: {
+    id: 'test-user-id',
+  },
 };
 
-vi.mock('@/services/tokens/tokenService', () => ({
-  TokenService: vi.fn(() => mockTokenService),
+vi.mock('@/lib/auth', () => ({
+  getSession: vi.fn(() => Promise.resolve(mockSession)),
 }));
 
 // Mock PrismaClient
-const mockPrismaClient = {};
-
 vi.mock('@prisma/client', () => ({
-  PrismaClient: vi.fn(() => mockPrismaClient),
+  PrismaClient: vi.fn(() => ({})),
 }));
 
 describe('/api/tokens/batch', () => {
@@ -40,9 +43,12 @@ describe('/api/tokens/batch', () => {
       });
     };
 
-    it('should successfully create tokens from addresses', async () => {
-      const mockTokensArray = [mockTokens.WETH_ETHEREUM, mockTokens.USDC_ETHEREUM];
-      mockTokenService.createTokensFromAddresses.mockResolvedValue(mockTokensArray);
+    it('should successfully resolve tokens from addresses', async () => {
+      const mockTokensArray = [
+        { ...mockTokens.WETH_ETHEREUM, isGlobal: true, isVerified: true },
+        { ...mockTokens.USDC_ETHEREUM, isGlobal: true, isVerified: true }
+      ];
+      mockResolveTokens.mockResolvedValue(mockTokensArray);
 
       const request = createRequest({
         chain: 'ethereum',
@@ -56,15 +62,18 @@ describe('/api/tokens/batch', () => {
       expect(data.tokens).toEqual(mockTokensArray);
       expect(data.count).toBe(2);
       
-      expect(mockTokenService.createTokensFromAddresses).toHaveBeenCalledWith(
-        'ethereum',
-        ['0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48']
+      expect(mockResolveTokens).toHaveBeenCalledWith(
+        [
+          { chain: 'ethereum', address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' },
+          { chain: 'ethereum', address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' }
+        ],
+        'test-user-id'
       );
     });
 
     it('should handle single token address', async () => {
-      const mockTokensArray = [mockTokens.WETH_ETHEREUM];
-      mockTokenService.createTokensFromAddresses.mockResolvedValue(mockTokensArray);
+      const mockTokensArray = [{ ...mockTokens.WETH_ETHEREUM, isGlobal: true, isVerified: true }];
+      mockResolveTokens.mockResolvedValue(mockTokensArray);
 
       const request = createRequest({
         chain: 'ethereum',
@@ -90,7 +99,7 @@ describe('/api/tokens/batch', () => {
 
       expect(response.status).toBe(200);
       expect(data.tokens).toEqual([]);
-      expect(mockTokenService.createTokensFromAddresses).not.toHaveBeenCalled();
+      expect(mockResolveTokens).not.toHaveBeenCalled();
     });
 
     it('should return 400 when chain is missing', async () => {
@@ -103,7 +112,7 @@ describe('/api/tokens/batch', () => {
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Missing required parameters: chain and addresses (array)');
-      expect(mockTokenService.createTokensFromAddresses).not.toHaveBeenCalled();
+      expect(mockResolveTokens).not.toHaveBeenCalled();
     });
 
     it('should return 400 when addresses is missing', async () => {
@@ -157,13 +166,13 @@ describe('/api/tokens/batch', () => {
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Maximum 100 addresses allowed per batch request');
-      expect(mockTokenService.createTokensFromAddresses).not.toHaveBeenCalled();
+      expect(mockResolveTokens).not.toHaveBeenCalled();
     });
 
     it('should handle exactly 100 addresses', async () => {
       const addresses = Array.from({ length: 100 }, (_, i) => `0x${'0'.repeat(38)}${i.toString().padStart(2, '0')}`);
-      const mockTokensArray = addresses.map(() => mockTokens.WETH_ETHEREUM);
-      mockTokenService.createTokensFromAddresses.mockResolvedValue(mockTokensArray);
+      const mockTokensArray = addresses.map(() => ({ ...mockTokens.WETH_ETHEREUM, isGlobal: true, isVerified: true }));
+      mockResolveTokens.mockResolvedValue(mockTokensArray);
 
       const request = createRequest({
         chain: 'ethereum',
@@ -175,11 +184,14 @@ describe('/api/tokens/batch', () => {
 
       expect(response.status).toBe(200);
       expect(data.count).toBe(100);
-      expect(mockTokenService.createTokensFromAddresses).toHaveBeenCalledWith('ethereum', addresses);
+      expect(mockResolveTokens).toHaveBeenCalledWith(
+        addresses.map(address => ({ chain: 'ethereum', address })), 
+        'test-user-id'
+      );
     });
 
-    it('should handle TokenService validation errors', async () => {
-      mockTokenService.createTokensFromAddresses.mockRejectedValue(
+    it('should handle TokenResolutionService validation errors', async () => {
+      mockResolveTokens.mockRejectedValue(
         new Error('Invalid chain: unsupported')
       );
 
@@ -212,8 +224,8 @@ describe('/api/tokens/batch', () => {
       expect(data.error).toBe('Unsupported chain: polygon');
     });
 
-    it('should handle generic TokenService errors', async () => {
-      mockTokenService.createTokensFromAddresses.mockRejectedValue(
+    it('should handle generic TokenResolutionService errors', async () => {
+      mockResolveTokens.mockRejectedValue(
         new Error('Database connection failed')
       );
 
@@ -230,7 +242,7 @@ describe('/api/tokens/batch', () => {
     });
 
     it('should handle non-Error exceptions', async () => {
-      mockTokenService.createTokensFromAddresses.mockRejectedValue('String error');
+      mockResolveTokens.mockRejectedValue('String error');
 
       const request = createRequest({
         chain: 'ethereum',
@@ -299,9 +311,12 @@ describe('/api/tokens/batch', () => {
       });
     };
 
-    it('should successfully get tokens by addresses', async () => {
-      const mockTokensArray = [mockTokens.WETH_ETHEREUM, mockTokens.USDC_ETHEREUM];
-      mockTokenService.getTokensByAddresses.mockResolvedValue(mockTokensArray);
+    it('should successfully resolve tokens by addresses', async () => {
+      const mockTokensArray = [
+        { ...mockTokens.WETH_ETHEREUM, isGlobal: true, isVerified: true },
+        { ...mockTokens.USDC_ETHEREUM, isGlobal: true, isVerified: true }
+      ];
+      mockResolveTokens.mockResolvedValue(mockTokensArray);
 
       const request = createRequest({
         chain: 'ethereum',
@@ -315,15 +330,18 @@ describe('/api/tokens/batch', () => {
       expect(data.tokens).toEqual(mockTokensArray);
       expect(data.count).toBe(2);
       
-      expect(mockTokenService.getTokensByAddresses).toHaveBeenCalledWith(
-        'ethereum',
-        ['0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48']
+      expect(mockResolveTokens).toHaveBeenCalledWith(
+        [
+          { chain: 'ethereum', address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' },
+          { chain: 'ethereum', address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' }
+        ],
+        'test-user-id'
       );
     });
 
     it('should handle single address', async () => {
-      const mockTokensArray = [mockTokens.WETH_ETHEREUM];
-      mockTokenService.getTokensByAddresses.mockResolvedValue(mockTokensArray);
+      const mockTokensArray = [{ ...mockTokens.WETH_ETHEREUM, isGlobal: true, isVerified: true }];
+      mockResolveTokens.mockResolvedValue(mockTokensArray);
 
       const request = createRequest({
         chain: 'ethereum',
@@ -340,7 +358,7 @@ describe('/api/tokens/batch', () => {
 
     it('should handle addresses with spaces and empty strings', async () => {
       const mockTokensArray = [mockTokens.WETH_ETHEREUM];
-      mockTokenService.getTokensByAddresses.mockResolvedValue(mockTokensArray);
+      mockResolveTokens.mockResolvedValue(mockTokensArray);
 
       const request = createRequest({
         chain: 'ethereum',
@@ -351,7 +369,7 @@ describe('/api/tokens/batch', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(mockTokenService.getTokensByAddresses).toHaveBeenCalledWith(
+      expect(mockResolveTokens).toHaveBeenCalledWith(
         'ethereum',
         ['0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48']
       );
@@ -368,7 +386,7 @@ describe('/api/tokens/batch', () => {
 
       expect(response.status).toBe(200);
       expect(data.tokens).toEqual([]);
-      expect(mockTokenService.getTokensByAddresses).not.toHaveBeenCalled();
+      expect(mockResolveTokens).not.toHaveBeenCalled();
     });
 
     it('should handle addresses with only commas and spaces', async () => {
@@ -382,7 +400,7 @@ describe('/api/tokens/batch', () => {
 
       expect(response.status).toBe(200);
       expect(data.tokens).toEqual([]);
-      expect(mockTokenService.getTokensByAddresses).not.toHaveBeenCalled();
+      expect(mockResolveTokens).not.toHaveBeenCalled();
     });
 
     it('should return 400 when chain is missing', async () => {
@@ -395,7 +413,7 @@ describe('/api/tokens/batch', () => {
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Missing required parameters: chain and addresses');
-      expect(mockTokenService.getTokensByAddresses).not.toHaveBeenCalled();
+      expect(mockResolveTokens).not.toHaveBeenCalled();
     });
 
     it('should return 400 when addresses parameter is missing', async () => {
@@ -423,14 +441,14 @@ describe('/api/tokens/batch', () => {
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Maximum 100 addresses allowed per batch request');
-      expect(mockTokenService.getTokensByAddresses).not.toHaveBeenCalled();
+      expect(mockResolveTokens).not.toHaveBeenCalled();
     });
 
     it('should handle exactly 100 addresses', async () => {
       const addresses = Array.from({ length: 100 }, (_, i) => `0x${'0'.repeat(38)}${i.toString().padStart(2, '0')}`);
       const addressesParam = addresses.join(',');
       const mockTokensArray = addresses.map(() => mockTokens.WETH_ETHEREUM);
-      mockTokenService.getTokensByAddresses.mockResolvedValue(mockTokensArray);
+      mockResolveTokens.mockResolvedValue(mockTokensArray);
 
       const request = createRequest({
         chain: 'ethereum',
@@ -442,11 +460,11 @@ describe('/api/tokens/batch', () => {
 
       expect(response.status).toBe(200);
       expect(data.count).toBe(100);
-      expect(mockTokenService.getTokensByAddresses).toHaveBeenCalledWith('ethereum', addresses);
+      expect(mockResolveTokens).toHaveBeenCalledWith('ethereum', addresses);
     });
 
     it('should handle TokenService validation errors', async () => {
-      mockTokenService.getTokensByAddresses.mockRejectedValue(
+      mockResolveTokens.mockRejectedValue(
         new Error('Invalid chain: unsupported')
       );
 
@@ -463,7 +481,7 @@ describe('/api/tokens/batch', () => {
     });
 
     it('should handle generic TokenService errors', async () => {
-      mockTokenService.getTokensByAddresses.mockRejectedValue(
+      mockResolveTokens.mockRejectedValue(
         new Error('Database connection failed')
       );
 
@@ -480,7 +498,7 @@ describe('/api/tokens/batch', () => {
     });
 
     it('should handle non-Error exceptions in GET', async () => {
-      mockTokenService.getTokensByAddresses.mockRejectedValue('String error');
+      mockResolveTokens.mockRejectedValue('String error');
 
       const request = createRequest({
         chain: 'ethereum',

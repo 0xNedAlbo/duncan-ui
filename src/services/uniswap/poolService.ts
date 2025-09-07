@@ -300,7 +300,6 @@ export class PoolService {
             includeUserPools = false,
         } = options;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const where: any = {};
 
         if (chain) {
@@ -544,7 +543,6 @@ export class PoolService {
                         abi: UNISWAP_V3_POOL_ABI,
                         functionName: "tickSpacing",
                     }),
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 ])) as [any, bigint, string, string, number, number];
 
             return {

@@ -4,10 +4,10 @@ import { authOptions } from '@/lib/auth';
 import { TokenResolutionService } from '@/services/tokens/tokenResolutionService';
 import { z } from 'zod';
 
-interface RouteParams {
-  params: {
+interface RouteContext {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 const UpdateUserTokenSchema = z.object({
@@ -19,7 +19,7 @@ const UpdateUserTokenSchema = z.object({
  * PUT /api/user-tokens/[id] - Update user token (label, notes)
  * Body: { userLabel?, notes? }
  */
-export async function PUT(request: NextRequest, { params }: RouteParams) {
+export async function PUT(request: NextRequest, context: RouteContext) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -29,6 +29,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    const params = await context.params;
     const { id } = params;
     
     if (!id || typeof id !== 'string') {
@@ -77,7 +78,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 /**
  * DELETE /api/user-tokens/[id] - Remove user token
  */
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -87,6 +88,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    const params = await context.params;
     const { id } = params;
     
     if (!id || typeof id !== 'string') {

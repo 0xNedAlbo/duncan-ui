@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TokenService } from '@/services/tokens/tokenService';
+import { TokenResolutionService } from '@/services/tokens/tokenResolutionService';
 import { PrismaClient } from '@prisma/client';
 import { getSession } from '@/lib/auth';
 
 // Allow test injection of prisma client
 const prisma = globalThis.__testPrisma || new PrismaClient();
-const tokenService = new TokenService(prisma);
+const tokenResolutionService = new TokenResolutionService(prisma);
 
 export async function POST(request: NextRequest) {
   // Check authentication
   const session = await getSession();
-  if (!session) {
+  if (!session?.user?.id) {
     return NextResponse.json(
       { error: 'Unauthorized - Please sign in' },
       { status: 401 }
@@ -48,8 +48,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create tokens from addresses (will fetch from Alchemy if needed)
-    const tokens = await tokenService.createTokensFromAddresses(chain, addresses);
+    // Resolve tokens for user (will create if needed)
+    const tokenRequests = addresses.map(address => ({ chain, address }));
+    const tokens = await tokenResolutionService.resolveTokens(tokenRequests, session.user.id);
 
     return NextResponse.json({
       tokens,
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   // Check authentication
   const session = await getSession();
-  if (!session) {
+  if (!session?.user?.id) {
     return NextResponse.json(
       { error: 'Unauthorized - Please sign in' },
       { status: 401 }
@@ -112,8 +113,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get existing tokens (won't create new ones)
-    const tokens = await tokenService.getTokensByAddresses(chain, addresses);
+    // Resolve tokens for user (similar to POST, but via GET)
+    const tokenRequests = addresses.map(address => ({ chain, address }));
+    const tokens = await tokenResolutionService.resolveTokens(tokenRequests, session.user.id);
 
     return NextResponse.json({
       tokens,

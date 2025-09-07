@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TokenService } from '@/services/tokens/tokenService';
+import { TokenResolutionService } from '@/services/tokens/tokenResolutionService';
 import { PrismaClient } from '@prisma/client';
 import { getSession } from '@/lib/auth';
 
 // Allow test injection of prisma client
 const prisma = globalThis.__testPrisma || new PrismaClient();
-const tokenService = new TokenService(prisma);
+const tokenResolutionService = new TokenResolutionService(prisma);
 
 export async function GET(request: NextRequest) {
   // Check authentication
   const session = await getSession();
-  if (!session) {
+  if (!session?.user?.id) {
     return NextResponse.json(
       { error: 'Unauthorized - Please sign in' },
       { status: 401 }
@@ -30,15 +30,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get token
-    const token = await tokenService.getToken(chain, address);
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Token not found' },
-        { status: 404 }
-      );
-    }
+    // Resolve token for user
+    const token = await tokenResolutionService.resolveToken(chain, address, session.user.id);
 
     return NextResponse.json({ token });
   } catch (error) {
@@ -64,7 +57,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   // Check authentication
   const session = await getSession();
-  if (!session) {
+  if (!session?.user?.id) {
     return NextResponse.json(
       { error: 'Unauthorized - Please sign in' },
       { status: 401 }
@@ -73,25 +66,26 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { chain, address, symbol, name, decimals, logoUrl, verified } = body;
+    const { chain, address, symbol, name, decimals, logoUrl, userLabel, notes } = body;
 
     // Input validation
-    if (!chain || !address) {
+    if (!chain || !address || !symbol || !name || decimals === undefined) {
       return NextResponse.json(
-        { error: 'Missing required parameters: chain and address' },
+        { error: 'Missing required parameters: chain, address, symbol, name, and decimals' },
         { status: 400 }
       );
     }
 
-    // Create or update token
-    const token = await tokenService.upsertToken({
+    // Add custom token for user
+    const token = await tokenResolutionService.addCustomToken(session.user.id, {
       chain,
       address,
       symbol,
       name,
       decimals,
       logoUrl,
-      verified,
+      userLabel,
+      notes,
     });
 
     return NextResponse.json({ token }, { status: 201 });

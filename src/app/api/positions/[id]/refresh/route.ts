@@ -4,10 +4,10 @@ import { authOptions } from '@/lib/auth';
 import { getPositionService } from '@/services/positions';
 import { prisma } from '@/lib/prisma';
 
-interface RouteParams {
-  params: {
+interface RouteContext {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 // Simple in-memory cache for rate limiting
@@ -22,7 +22,7 @@ const refreshCache = new Map<string, number>();
  * 3. Updates pool state and refreshes Initial Value from Subgraph if available
  * 4. Returns updated position with current PnL calculations
  */
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -32,6 +32,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    const params = await context.params;
     const { id: positionId } = params;
     
     if (!positionId || typeof positionId !== 'string') {
