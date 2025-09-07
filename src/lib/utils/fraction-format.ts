@@ -150,7 +150,7 @@ function toSubscript(n: number): string {
  *  - "Zero-skip" notation for tiny values: 0.₍7₎1234… (or 0.(7)1234… if useSubscript=false)
  */
 export function formatFractionHuman(
-    fr: Fraction<bigint, bigint>,
+    fr: Fraction<bigint>,
     opts?: FormatOpts
 ): string {
     const {
@@ -226,8 +226,8 @@ export function formatHumanWithDecimals(
  *  - No rounding; ellipsis "…" if truncated by maxFracDigits.
  */
 export function formatFractionRangeHuman(
-    a: Fraction<bigint, bigint>,
-    b: Fraction<bigint, bigint>,
+    a: Fraction<bigint>,
+    b: Fraction<bigint>,
     opts?: FormatOpts
 ): string {
     const o = { ...FORMAT_PRESET_EN, ...opts };
@@ -287,7 +287,7 @@ export function formatFractionRangeHuman(
 }
 
 export function formatFractionAsPreciseString(
-    fr: Fraction<bigint, bigint>,
+    fr: Fraction<bigint>,
     opts?: FormatOpts
 ): string {
     return ((fr.num * 10n ** 18n) / fr.den / 10n ** 18n).toString();
