@@ -295,7 +295,8 @@ export class EventPnlService {
                     baseTokenDecimals
                 );
             } else if (pool.currentPrice) {
-                currentPrice = BigInt(Math.floor(parseFloat(pool.currentPrice) * (10 ** baseTokenDecimals)));
+                // pool.currentPrice is already a BigInt string in the correct format
+                currentPrice = BigInt(pool.currentPrice);
                 // Would need to calculate tick from price - for now use 0
                 currentTick = 0;
             } else {

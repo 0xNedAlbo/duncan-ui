@@ -212,7 +212,7 @@ model Pool {
   
   // Current State (updated periodically)
   currentTick   Int?
-  currentPrice  String?  // As decimal string
+  currentPrice  String?  // BigInt as string (token1 per token0 in smallest unit)
   sqrtPriceX96  String?  // Uniswap V3 price format
   tvl           String?
   volume24h     String?

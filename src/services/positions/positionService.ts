@@ -60,17 +60,17 @@ export interface PositionWithPnL {
 
     // Enhanced PnL breakdown (when events available)
     pnlBreakdown?: {
-        assetValueChange: string;   // Change in position value (excluding fees)
-        collectedFees: string;      // Historical fees collected
-        unclaimedFees: string;      // Current unclaimed fees
-        realizedPnL: string;        // PnL from withdrawn amounts + fees
-        unrealizedPnL: string;      // PnL from current holdings
+        assetValueChange: string; // Change in position value (excluding fees)
+        collectedFees: string; // Historical fees collected
+        unclaimedFees: string; // Current unclaimed fees
+        realizedPnL: string; // PnL from withdrawn amounts + fees
+        unrealizedPnL: string; // PnL from current holdings
     };
 
     // Event metadata
     eventCount?: number;
     lastEventSync?: Date;
-    pnlMethod?: 'event-based' | 'snapshot';
+    pnlMethod?: "event-based" | "snapshot";
 
     // Range Status
     rangeStatus: "in-range" | "out-of-range" | "unknown";
@@ -174,24 +174,19 @@ export class PositionService {
 
         for (const position of positions) {
             try {
-                console.log(`🔄 Calculating PnL for position ${position.id}`);
                 const pnlData = await this.calculatePositionPnL(position.id);
-                console.log(`✅ PnL Data for ${position.id}:`, {
-                    initialValue: pnlData.initialValue,
-                    currentValue: pnlData.currentValue,
-                    pnl: pnlData.pnl,
-                    pnlPercent: pnlData.pnlPercent
-                });
                 positionsWithPnL.push(pnlData);
             } catch (error) {
                 console.error(
                     `❌ Error calculating PnL for position ${position.id}:`,
                     error.message
                 );
-                console.error('Stack:', error.stack);
-                
+                console.error("Stack:", error.stack);
+
                 // Create fallback position data instead of skipping
-                const { token0Data, token1Data } = this.getUnifiedTokenData(position.pool);
+                const { token0Data, token1Data } = this.getUnifiedTokenData(
+                    position.pool
+                );
                 const fallbackPosition: PositionWithPnL = {
                     // Basic Position Data
                     id: position.id,
@@ -229,13 +224,25 @@ export class PositionService {
 
                     // Quote Token Configuration
                     token0IsQuote: position.token0IsQuote,
-                    tokenPair: `${position.token0IsQuote ? token1Data.symbol : token0Data.symbol}/${position.token0IsQuote ? token0Data.symbol : token1Data.symbol}`,
-                    baseSymbol: position.token0IsQuote ? token1Data.symbol : token0Data.symbol,
-                    quoteSymbol: position.token0IsQuote ? token0Data.symbol : token1Data.symbol,
+                    tokenPair: `${
+                        position.token0IsQuote
+                            ? token1Data.symbol
+                            : token0Data.symbol
+                    }/${
+                        position.token0IsQuote
+                            ? token0Data.symbol
+                            : token1Data.symbol
+                    }`,
+                    baseSymbol: position.token0IsQuote
+                        ? token1Data.symbol
+                        : token0Data.symbol,
+                    quoteSymbol: position.token0IsQuote
+                        ? token0Data.symbol
+                        : token1Data.symbol,
 
                     // PnL Data - Error fallbacks
                     initialValue: "0",
-                    currentValue: "0", 
+                    currentValue: "0",
                     pnl: "0",
                     pnlPercent: 0,
                     initialSource: "snapshot" as const,
@@ -246,9 +253,9 @@ export class PositionService {
 
                     // Meta
                     lastUpdated: new Date(),
-                    dataUpdated: false
+                    dataUpdated: false,
                 };
-                
+
                 positionsWithPnL.push(fallbackPosition);
             }
         }
@@ -277,32 +284,40 @@ export class PositionService {
     async calculatePositionPnL(positionId: string): Promise<PositionWithPnL> {
         // Check if we have events for this position
         const eventCount = await prisma.positionEvent.count({
-            where: { positionId }
+            where: { positionId },
         });
 
         // If we have events, use event-based calculation
         if (eventCount > 0) {
             try {
-                console.log(`📊 Using event-based PnL calculation (${eventCount} events)`);
+                console.log(
+                    `📊 Using event-based PnL calculation (${eventCount} events)`
+                );
                 return await this.calculateEventBasedPnL(positionId);
             } catch (eventError) {
-                console.warn(`⚠️ Event-based PnL failed, falling back to legacy calculation:`, eventError.message);
+                console.warn(
+                    `⚠️ Event-based PnL failed, falling back to legacy calculation:`,
+                    eventError.message
+                );
                 // Fall through to legacy calculation
             }
         }
 
-        console.log(`📊 Using legacy PnL calculation (snapshot method)`);
         return await this.calculateLegacyPnL(positionId);
     }
 
     /**
      * Event-based PnL calculation with comprehensive breakdown
      */
-    private async calculateEventBasedPnL(positionId: string): Promise<PositionWithPnL> {
+    private async calculateEventBasedPnL(
+        positionId: string
+    ): Promise<PositionWithPnL> {
         // Get event-based PnL calculation
         const { getEventPnlService } = await import("./eventPnlService");
         const eventPnlService = getEventPnlService();
-        const eventPnL = await eventPnlService.calculateEventBasedPnL(positionId);
+        const eventPnL = await eventPnlService.calculateEventBasedPnL(
+            positionId
+        );
 
         // Get position data for UI
         const position = await prisma.position.findUnique({
@@ -331,7 +346,9 @@ export class PositionService {
             throw new Error(`Position ${positionId} not found`);
         }
 
-        const { token0Data, token1Data } = this.getUnifiedTokenData(position.pool);
+        const { token0Data, token1Data } = this.getUnifiedTokenData(
+            position.pool
+        );
         const quoteConfig = determineQuoteToken(
             token0Data.symbol,
             token0Data.address,
@@ -398,31 +415,35 @@ export class PositionService {
 
             // Enhanced PnL breakdown (event-specific)
             pnlBreakdown: {
-                assetValueChange: (BigInt(eventPnL.currentValue) - BigInt(eventPnL.costBasis)).toString(),
+                assetValueChange: (
+                    BigInt(eventPnL.currentValue) - BigInt(eventPnL.costBasis)
+                ).toString(),
                 collectedFees: eventPnL.totalFeesCollected,
                 unclaimedFees: eventPnL.unclaimedFees,
                 realizedPnL: eventPnL.realizedPnL,
-                unrealizedPnL: eventPnL.unrealizedPnL
+                unrealizedPnL: eventPnL.unrealizedPnL,
             },
 
             // Event metadata
             eventCount: eventPnL.eventCount,
             lastEventSync: eventPnL.lastEventDate,
-            pnlMethod: 'event-based',
+            pnlMethod: "event-based",
 
             // Range Status
             rangeStatus,
 
             // Meta
             lastUpdated: new Date(),
-            dataUpdated: true // Events were synced
+            dataUpdated: true, // Events were synced
         };
     }
 
     /**
      * Legacy PnL calculation (original method)
      */
-    private async calculateLegacyPnL(positionId: string): Promise<PositionWithPnL> {
+    private async calculateLegacyPnL(
+        positionId: string
+    ): Promise<PositionWithPnL> {
         // 1. Position und Initial Value laden
         const [position, initialValue] = await Promise.all([
             prisma.position.findUnique({
@@ -480,11 +501,14 @@ export class PositionService {
 
         // 4. Aktuellen Wert berechnen
         let currentValue: string;
-        
+
         try {
             currentValue = await this.calculateCurrentValue(position);
-        } catch (error) {
-            console.warn(`Using initialValue as currentValue for position ${positionId}:`, error.message);
+        } catch (error: any) {
+            console.warn(
+                `Using initialValue as currentValue for position ${positionId}:`,
+                error.message
+            );
             // Fallback: verwende initialValue als currentValue wenn Berechnung fehlschlägt
             currentValue = initialValue.value;
         }
@@ -493,11 +517,12 @@ export class PositionService {
         const currentValueBigInt = BigInt(currentValue);
         const initialValueBigInt = BigInt(initialValue.value);
         const pnlBigInt = currentValueBigInt - initialValueBigInt;
-        
+
         // Calculate percentage with proper precision
-        const pnlPercent = initialValueBigInt > 0n 
-            ? Number((pnlBigInt * 10000n) / initialValueBigInt) / 100 // 2 decimal precision
-            : 0;
+        const pnlPercent =
+            initialValueBigInt > 0n
+                ? Number((pnlBigInt * 10000n) / initialValueBigInt) / 100 // 2 decimal precision
+                : 0;
 
         // 6. Range Status bestimmen
         const rangeStatus = this.determineRangeStatus(position);
@@ -556,7 +581,7 @@ export class PositionService {
             confidence: initialValue.confidence,
 
             // Legacy method indicator
-            pnlMethod: 'snapshot',
+            pnlMethod: "snapshot",
 
             // Range Status
             rangeStatus,
@@ -577,7 +602,9 @@ export class PositionService {
 
         // Benötigte Pool-Daten überprüfen
         if (!pool.currentTick && !pool.currentPrice) {
-            throw new Error(`Pool ${pool.poolAddress} has no current price data`);
+            throw new Error(
+                `Pool ${pool.poolAddress} has no current price data`
+            );
         }
 
         // Extract unified token data
@@ -597,9 +624,15 @@ export class PositionService {
         );
 
         // Determine base and quote token addresses and decimals
-        const baseTokenAddress = quoteConfig.token0IsQuote ? token1Address : token0Address;
-        const quoteTokenAddress = quoteConfig.token0IsQuote ? token0Address : token1Address;
-        const baseTokenDecimals = quoteConfig.token0IsQuote ? token1Data.decimals : token0Data.decimals;
+        const baseTokenAddress = quoteConfig.token0IsQuote
+            ? token1Address
+            : token0Address;
+        const quoteTokenAddress = quoteConfig.token0IsQuote
+            ? token0Address
+            : token1Address;
+        const baseTokenDecimals = quoteConfig.token0IsQuote
+            ? token1Data.decimals
+            : token0Data.decimals;
 
         // Current Tick bestimmen
         let currentTick: number;
@@ -615,8 +648,8 @@ export class PositionService {
                 baseTokenDecimals
             );
         } else if (pool.currentPrice) {
-            // Preis parsen und Tick berechnen
-            currentPrice = BigInt(Math.floor(parseFloat(pool.currentPrice) * (10 ** baseTokenDecimals)));
+            // pool.currentPrice is already a BigInt string in the correct format
+            currentPrice = BigInt(pool.currentPrice);
             currentTick = priceToTick(
                 currentPrice,
                 pool.tickSpacing,
@@ -629,7 +662,8 @@ export class PositionService {
         }
 
         // Base Token ist token0 oder token1?
-        const baseIsToken0 = baseTokenAddress.toLowerCase() === token0Address.toLowerCase();
+        const baseIsToken0 =
+            baseTokenAddress.toLowerCase() === token0Address.toLowerCase();
 
         // Position Value berechnen
         const positionValue = calculatePositionValue(
@@ -670,9 +704,10 @@ export class PositionService {
     /**
      * Helper für Order By Clause
      */
-    private buildOrderBy(sortBy: string, sortOrder: 'asc' | 'desc') {
-        const order = sortOrder === 'desc' ? Prisma.SortOrder.desc : Prisma.SortOrder.asc;
-        
+    private buildOrderBy(sortBy: string, sortOrder: "asc" | "desc") {
+        const order =
+            sortOrder === "desc" ? Prisma.SortOrder.desc : Prisma.SortOrder.asc;
+
         switch (sortBy) {
             case "createdAt":
                 return { createdAt: order };
@@ -689,13 +724,13 @@ export class PositionService {
      */
     async refreshPosition(positionId: string): Promise<PositionWithPnL> {
         console.log(`🔄 Refreshing position ${positionId}...`);
-        
+
         // 1. Get position to find associated pool
         const position = await prisma.position.findUnique({
             where: { id: positionId },
-            select: { poolId: true, lastEventSync: true }
+            select: { poolId: true, lastEventSync: true },
         });
-        
+
         if (!position) {
             throw new Error(`Position ${positionId} not found`);
         }
@@ -715,23 +750,28 @@ export class PositionService {
             console.log(`🎯 Syncing position events...`);
             const { getEventSyncService } = await import("./eventSyncService");
             const eventSyncService = getEventSyncService();
-            
+
             try {
-                const syncResult = await eventSyncService.syncPositionEvents(positionId);
+                const syncResult = await eventSyncService.syncPositionEvents(
+                    positionId
+                );
                 console.log(`✅ Event sync completed:`, {
                     eventsAdded: syncResult.eventsAdded,
                     eventsUpdated: syncResult.eventsUpdated,
                     duration: `${syncResult.syncDuration}ms`,
-                    errors: syncResult.errors.length
+                    errors: syncResult.errors.length,
                 });
-                
+
                 // Log errors if any
                 if (syncResult.errors.length > 0) {
                     console.warn(`⚠️ Event sync errors:`, syncResult.errors);
                 }
             } catch (eventSyncError) {
                 // Don't fail the refresh if event sync fails - log and continue
-                console.warn(`⚠️ Event sync failed for position ${positionId}:`, eventSyncError.message);
+                console.warn(
+                    `⚠️ Event sync failed for position ${positionId}:`,
+                    eventSyncError.message
+                );
                 console.warn(`Continuing with legacy PnL calculation...`);
             }
 
@@ -742,11 +782,14 @@ export class PositionService {
             // 5. Calculate PnL (now with event-based calculation if available)
             console.log(`💰 Calculating PnL...`);
             const result = await this.calculatePositionPnL(positionId);
-            
+
             console.log(`✅ Position refresh completed for ${positionId}`);
             return result;
         } catch (error) {
-            console.error(`❌ Position refresh failed for ${positionId}:`, error.message);
+            console.error(
+                `❌ Position refresh failed for ${positionId}:`,
+                error.message
+            );
             throw error;
         }
     }

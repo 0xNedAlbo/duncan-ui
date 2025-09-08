@@ -436,7 +436,7 @@ export class PoolService {
                 where: { id: poolId },
                 data: {
                     currentTick: poolState.tick,
-                    currentPrice,
+                    currentPrice: currentPrice.toString(),
                     sqrtPriceX96: poolState.sqrtPriceX96.toString(),
                     updatedAt: new Date(),
                 },
