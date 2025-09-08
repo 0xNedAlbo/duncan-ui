@@ -151,82 +151,37 @@ function MiniPnLCurveComponent({
                 onMouseMove={handleMouseMove}
                 onMouseLeave={() => setHoveredPoint(null)}
             >
-                {/* Background zones */}
+                {/* PnL-based fill areas */}
                 <defs>
-                    <linearGradient
-                        id="lossZone"
-                        x1="0%"
-                        y1="0%"
-                        x2="100%"
-                        y2="0%"
-                    >
-                        <stop offset="0%" stopColor="rgba(239, 68, 68, 0.1)" />
-                        <stop
-                            offset="100%"
-                            stopColor="rgba(239, 68, 68, 0.05)"
-                        />
-                    </linearGradient>
-                    <linearGradient
-                        id="profitZone"
-                        x1="0%"
-                        y1="0%"
-                        x2="100%"
-                        y2="0%"
-                    >
-                        <stop offset="0%" stopColor="rgba(34, 197, 94, 0.05)" />
-                        <stop
-                            offset="100%"
-                            stopColor="rgba(34, 197, 94, 0.1)"
-                        />
-                    </linearGradient>
-                    <linearGradient
-                        id="plateauZone"
-                        x1="0%"
-                        y1="0%"
-                        x2="100%"
-                        y2="0%"
-                    >
-                        <stop
-                            offset="0%"
-                            stopColor="rgba(245, 158, 11, 0.05)"
-                        />
-                        <stop
-                            offset="100%"
-                            stopColor="rgba(245, 158, 11, 0.1)"
-                        />
-                    </linearGradient>
+                    {/* Clip path for positive PnL area */}
+                    <clipPath id={`positivePnLClip-${position.id}`}>
+                        <rect x="0" y="0" width={width} height={zeroLineY} />
+                    </clipPath>
+                    {/* Clip path for negative PnL area */}
+                    <clipPath id={`negativePnLClip-${position.id}`}>
+                        <rect x="0" y={zeroLineY} width={width} height={height - zeroLineY} />
+                    </clipPath>
                 </defs>
 
-                {/* Zone backgrounds */}
-                {lowerBoundaryX > 0 && (
-                    <rect
-                        x={0}
-                        y={0}
-                        width={lowerBoundaryX}
-                        height={height}
-                        fill="url(#lossZone)"
+                {/* Positive PnL area (green fill above zero line) */}
+                {zeroLineY >= 0 && zeroLineY <= height && (
+                    <path
+                        d={`${pathData} L ${width} ${zeroLineY} L 0 ${zeroLineY} Z`}
+                        fill="rgba(34, 197, 94, 0.3)"
+                        clipPath={`url(#positivePnLClip-${position.id})`}
                     />
                 )}
 
-                <rect
-                    x={lowerBoundaryX}
-                    y={0}
-                    width={upperBoundaryX - lowerBoundaryX}
-                    height={height}
-                    fill="url(#profitZone)"
-                />
-
-                {upperBoundaryX < width && (
-                    <rect
-                        x={upperBoundaryX}
-                        y={0}
-                        width={width - upperBoundaryX}
-                        height={height}
-                        fill="url(#plateauZone)"
+                {/* Negative PnL area (red fill below zero line) */}
+                {zeroLineY >= 0 && zeroLineY <= height && (
+                    <path
+                        d={`${pathData} L ${width} ${zeroLineY} L 0 ${zeroLineY} Z`}
+                        fill="rgba(239, 68, 68, 0.3)"
+                        clipPath={`url(#negativePnLClip-${position.id})`}
                     />
                 )}
 
-                {/* Zero line */}
+                {/* Zero line (solid) */}
                 {zeroLineY >= 0 && zeroLineY <= height && (
                     <line
                         x1={0}
@@ -234,9 +189,8 @@ function MiniPnLCurveComponent({
                         x2={width}
                         y2={zeroLineY}
                         stroke="#64748b"
-                        strokeWidth={1}
-                        strokeDasharray="2 2"
-                        opacity={0.6}
+                        strokeWidth={2}
+                        opacity={0.8}
                     />
                 )}
 
