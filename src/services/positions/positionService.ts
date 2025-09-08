@@ -28,6 +28,9 @@ export interface PositionWithPnL {
         poolAddress: string;
         fee: number;
         currentPrice?: string;
+        currentTick?: number;
+        token0Address: string;
+        token1Address: string;
         token0: {
             id: string;
             symbol: string;
@@ -206,6 +209,9 @@ export class PositionService {
                         poolAddress: position.pool.poolAddress,
                         fee: position.pool.fee,
                         currentPrice: position.pool.currentPrice || undefined,
+                        currentTick: position.pool.currentTick || undefined,
+                        token0Address: position.pool.token0Address || "0x0",
+                        token1Address: position.pool.token1Address || "0x0",
                         token0: {
                             id: token0Data.id,
                             symbol: token0Data.symbol,
@@ -379,6 +385,9 @@ export class PositionService {
                 poolAddress: position.pool.poolAddress,
                 fee: position.pool.fee,
                 currentPrice: position.pool.currentPrice || undefined,
+                currentTick: position.pool.currentTick ?? undefined,
+                token0Address: position.pool.token0Address ?? "0x0",
+                token1Address: position.pool.token1Address ?? "0x0",
                 token0: {
                     id: token0Data.id,
                     symbol: token0Data.symbol,
@@ -546,6 +555,9 @@ export class PositionService {
                 poolAddress: position.pool.poolAddress,
                 fee: position.pool.fee,
                 currentPrice: position.pool.currentPrice || undefined,
+                currentTick: position.pool.currentTick ?? undefined,
+                token0Address: position.pool.token0Address ?? "0x0",
+                token1Address: position.pool.token1Address ?? "0x0",
                 token0: {
                     id: token0Data.id,
                     symbol: token0Data.symbol,

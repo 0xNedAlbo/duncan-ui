@@ -122,6 +122,7 @@ function MiniPnLCurveComponent({
 
         const rect = event.currentTarget.getBoundingClientRect();
         const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
 
         // Find closest point
         let closestIndex = 0;
@@ -137,7 +138,8 @@ function MiniPnLCurveComponent({
         });
 
         setHoveredPoint(points[closestIndex]);
-        setMousePosition({ x: event.clientX, y: event.clientY });
+        // Use relative coordinates for absolute positioning within the container
+        setMousePosition({ x: mouseX, y: mouseY });
     };
 
     return (
@@ -294,7 +296,7 @@ function MiniPnLCurveComponent({
             {/* Tooltip */}
             {showTooltip && hoveredPoint && (
                 <div
-                    className="fixed z-50 bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs shadow-xl pointer-events-none"
+                    className="absolute z-50 bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs shadow-xl pointer-events-none"
                     style={{
                         left: mousePosition.x + 10,
                         top: mousePosition.y - 40,

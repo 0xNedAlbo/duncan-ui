@@ -48,12 +48,21 @@ describe('Uniswap V3 Price Utilities', () => {
 
   describe('tickToPrice', () => {
     it('should convert tick to reasonable price', () => {
-      const tick = 202500; // Around current WETH/USDC level
-      const result = tickToPrice(tick, WETH, USDC, 18);
+      // Real Arbitrum WETH/USDC data (tick -192593, ~4327 USDC per WETH)
+      const WETH_ARBITRUM = "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1";
+      const USDC_ARBITRUM = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"; 
+      const realTick = -192593;
+      
+      const result = tickToPrice(realTick, WETH_ARBITRUM, USDC_ARBITRUM, 18);
 
-      // Should be positive and in reasonable range (1000-3000 USDC per WETH)
-      expect(result > 1000000000n).toBe(true); // > 1000 USDC
-      expect(result < 3000000000n).toBe(true); // < 3000 USDC
+      // Should be positive and in reasonable range (4000-5000 USDC per WETH)
+      expect(result > 4000000000n).toBe(true); // > 4000 USDC (scaled by 10^6)
+      expect(result < 5000000000n).toBe(true); // < 5000 USDC (scaled by 10^6)
+      
+      // Should be close to expected value (~4327 USDC per WETH)
+      const humanReadable = Number(result) / Math.pow(10, 6);
+      expect(humanReadable).toBeGreaterThan(4300);
+      expect(humanReadable).toBeLessThan(4350);
     });
 
     it('should handle different decimal configurations', () => {
@@ -81,24 +90,30 @@ describe('Uniswap V3 Price Utilities', () => {
 
   describe('priceToTick', () => {
     it('should convert price to valid tick with proper spacing', () => {
-      const price = 1650000000n; // 1650 USDC per WETH
-      const result = priceToTick(price, 60, WETH, USDC, 18);
+      // Real Arbitrum addresses and realistic current price
+      const WETH_ARBITRUM = "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1";
+      const USDC_ARBITRUM = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
+      const price = 4327480000n; // 4327.48 USDC per WETH (scaled by 10^6)
+      
+      const result = priceToTick(price, 60, WETH_ARBITRUM, USDC_ARBITRUM, 18);
 
       // Should be aligned to tick spacing
-      expect(result % 60).toBe(0);
+      expect(result % 60 === 0).toBe(true);
       
-      // Should be in reasonable range
-      expect(result > 200000).toBe(true);
-      expect(result < 205000).toBe(true);
+      // Should be in reasonable range around -192593 (current real tick)
+      expect(result > -195000).toBe(true);
+      expect(result < -190000).toBe(true);
     });
 
     it('should work with different tick spacings', () => {
-      const price = 1650000000n;
+      const WETH_ARBITRUM = "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1";
+      const USDC_ARBITRUM = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
+      const price = 4327480000n; // 4327.48 USDC per WETH
       const spacings = [1, 10, 60, 200];
       
       spacings.forEach(spacing => {
-        const result = priceToTick(price, spacing, WETH, USDC, 18);
-        expect(result % spacing).toBe(0);
+        const result = priceToTick(price, spacing, WETH_ARBITRUM, USDC_ARBITRUM, 18);
+        expect(result % spacing === 0).toBe(true);
       });
     });
   });

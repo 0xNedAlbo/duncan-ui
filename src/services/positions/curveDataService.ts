@@ -35,10 +35,28 @@ export class CurveDataService {
      * Extract position parameters for curve calculation
      */
     extractPositionParams(position: PositionWithPnL): PositionParams {
+        // DEBUG: Log real position data to identify the issue
+        console.log("🔍 CurveDataService DEBUG - Real position data:");
+        console.log("- Position ID:", position.id);
+        console.log("- token0IsQuote:", position.token0IsQuote);
+        console.log("- pool.currentPrice:", position.pool.currentPrice);
+        console.log("- pool.token0:", { id: position.pool.token0.id, symbol: position.pool.token0.symbol, decimals: position.pool.token0.decimals });
+        console.log("- pool.token1:", { id: position.pool.token1.id, symbol: position.pool.token1.symbol, decimals: position.pool.token1.decimals });
+        console.log("- pool.token0Address:", position.pool.token0Address);
+        console.log("- pool.token1Address:", position.pool.token1Address);
+        console.log("- Full pool object keys:", Object.keys(position.pool));
+        console.log("- tickLower:", position.tickLower);
+        console.log("- tickUpper:", position.tickUpper);
+        console.log("- pool.currentTick:", position.pool.currentTick);
+        
         const baseIsToken0 = !position.token0IsQuote;
         const baseDecimals = baseIsToken0 ? position.pool.token0.decimals : position.pool.token1.decimals;
         const quoteDecimals = position.token0IsQuote ? position.pool.token0.decimals : position.pool.token1.decimals;
         const tickSpacing = this.getTickSpacing(position.pool.fee);
+        
+        console.log("- baseIsToken0:", baseIsToken0);
+        console.log("- baseDecimals:", baseDecimals);
+        console.log("- quoteDecimals:", quoteDecimals);
         
         // Parse current price from string to bigint
         // Note: position.pool.currentPrice is already in the correct base/quote format from positionService
@@ -47,10 +65,13 @@ export class CurveDataService {
             if (position.pool.currentPrice && position.pool.currentPrice !== "0") {
                 // Use the pre-calculated price from positionService (already in base/quote format with correct decimals)
                 currentPrice = BigInt(position.pool.currentPrice);
+                console.log("- Using pool.currentPrice:", currentPrice.toString());
             } else {
+                console.log("❌ pool.currentPrice is missing or '0':", position.pool.currentPrice);
                 throw new Error("No current price available");
             }
         } catch {
+            console.log("⚠️ Fallback: calculating price from tick range");
             // Fallback: calculate middle price from ticks using proper utilities
             const baseTokenAddress = baseIsToken0 ? position.pool.token0.id : position.pool.token1.id;
             const quoteTokenAddress = baseIsToken0 ? position.pool.token1.id : position.pool.token0.id;
@@ -76,13 +97,14 @@ export class CurveDataService {
             currentTick = Math.floor((position.tickLower + position.tickUpper) / 2);
         }
 
-        return {
+        const result = {
             liquidity: BigInt(position.liquidity),
             tickLower: position.tickLower,
             tickUpper: position.tickUpper,
             currentTick,
-            token0Address: position.pool.token0.id || "0x0",
-            token1Address: position.pool.token1.id || "0x0", 
+            // Use blockchain addresses from pool, not database IDs from token
+            token0Address: position.pool.token0Address,
+            token1Address: position.pool.token1Address, 
             baseDecimals,
             quoteDecimals,
             baseIsToken0,
@@ -90,6 +112,14 @@ export class CurveDataService {
             currentPrice,
             tickSpacing
         };
+        
+        console.log("- Final currentPrice (raw):", result.currentPrice.toString());
+        console.log("- Final currentPrice (human):", (Number(result.currentPrice) / Math.pow(10, quoteDecimals)).toFixed(2));
+        console.log("- Final token0Address:", result.token0Address);
+        console.log("- Final token1Address:", result.token1Address);
+        console.log("🔍 END DEBUG\n");
+        
+        return result;
     }
 
     /**
@@ -147,7 +177,7 @@ export class CurveDataService {
             });
             
             // Track important indices
-            const currentPriceNumber = Number(params.currentPrice) / Math.pow(10, params.baseDecimals); // currentPrice from positionService is scaled by baseDecimals
+            const currentPriceNumber = Number(params.currentPrice) / Math.pow(10, params.quoteDecimals); // currentPrice from positionService is scaled by quoteDecimals (token1 per token0)
             const lowerPriceNumber = Number(lowerPrice) / Math.pow(10, params.quoteDecimals);
             const upperPriceNumber = Number(upperPrice) / Math.pow(10, params.quoteDecimals);
             
@@ -183,7 +213,7 @@ export class CurveDataService {
             },
             lowerPrice: Number(lowerPrice) / Math.pow(10, params.quoteDecimals),
             upperPrice: Number(upperPrice) / Math.pow(10, params.quoteDecimals),
-            currentPrice: Number(params.currentPrice) / Math.pow(10, params.baseDecimals) // currentPrice from positionService is scaled by baseDecimals
+            currentPrice: Number(params.currentPrice) / Math.pow(10, params.quoteDecimals) // currentPrice from positionService is scaled by quoteDecimals (token1 per token0)
         };
     }
 
