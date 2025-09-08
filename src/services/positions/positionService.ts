@@ -431,6 +431,11 @@ export class PositionService {
             pool.chain
         );
 
+        // Determine base and quote token addresses and decimals
+        const baseTokenAddress = quoteConfig.token0IsQuote ? token1Address : token0Address;
+        const quoteTokenAddress = quoteConfig.token0IsQuote ? token0Address : token1Address;
+        const baseTokenDecimals = quoteConfig.token0IsQuote ? token1Data.decimals : token0Data.decimals;
+
         // Current Tick bestimmen
         let currentTick: number;
         let currentPrice: bigint;
@@ -440,26 +445,26 @@ export class PositionService {
             // Preis aus Tick berechnen
             currentPrice = tickToPrice(
                 currentTick,
-                quoteConfig.baseTokenAddress,
-                quoteConfig.quoteTokenAddress,
-                quoteConfig.baseTokenDecimals
+                baseTokenAddress,
+                quoteTokenAddress,
+                baseTokenDecimals
             );
         } else if (pool.currentPrice) {
             // Preis parsen und Tick berechnen
-            currentPrice = BigInt(Math.floor(parseFloat(pool.currentPrice) * (10 ** quoteConfig.baseTokenDecimals)));
+            currentPrice = BigInt(Math.floor(parseFloat(pool.currentPrice) * (10 ** baseTokenDecimals)));
             currentTick = priceToTick(
                 currentPrice,
                 pool.tickSpacing,
-                quoteConfig.baseTokenAddress,
-                quoteConfig.quoteTokenAddress,
-                quoteConfig.baseTokenDecimals
+                baseTokenAddress,
+                quoteTokenAddress,
+                baseTokenDecimals
             );
         } else {
             throw new Error("No price data available");
         }
 
         // Base Token ist token0 oder token1?
-        const baseIsToken0 = quoteConfig.baseTokenAddress.toLowerCase() === token0Address.toLowerCase();
+        const baseIsToken0 = baseTokenAddress.toLowerCase() === token0Address.toLowerCase();
 
         // Position Value berechnen
         const positionValue = calculatePositionValue(
@@ -469,7 +474,7 @@ export class PositionService {
             tickUpper,
             currentPrice,
             baseIsToken0,
-            quoteConfig.baseTokenDecimals
+            baseTokenDecimals
         );
 
         // Return as BigInt-compatible string in smallest unit (no decimals)
@@ -518,13 +523,29 @@ export class PositionService {
      * Refresht Position-Daten (Pool + Initial Value)
      */
     async refreshPosition(positionId: string): Promise<PositionWithPnL> {
-        // 1. Pool-Daten refreshen (wenn Pool Service existiert)
-        // TODO: Integrate with Pool Service
+        // 1. Get position to find associated pool
+        const position = await prisma.position.findUnique({
+            where: { id: positionId },
+            select: { poolId: true }
+        });
+        
+        if (!position) {
+            throw new Error(`Position ${positionId} not found`);
+        }
 
-        // 2. Initial Value updaten
+        // 2. Update pool state from blockchain
+        const { PoolService } = await import("../uniswap/poolService");
+        const poolService = new PoolService();
+        try {
+            await poolService.updatePoolState(position.poolId);
+        } finally {
+            await poolService.disconnect();
+        }
+
+        // 3. Initial Value updaten
         await this.initialValueService.getOrUpdateInitialValue(positionId);
 
-        // 3. Neue PnL berechnen
+        // 4. Neue PnL berechnen
         return await this.calculatePositionPnL(positionId);
     }
 

@@ -119,13 +119,39 @@ export class PoolService {
         });
 
         if (existingPool) {
+            // Update pool state to ensure current price data
+            await this.updatePoolState(existingPool.id);
+            
+            // Fetch updated pool with current state
+            const updatedPool = await this.prisma.pool.findUnique({
+                where: { id: existingPool.id },
+                include: {
+                    token0Ref: {
+                        include: {
+                            globalToken: true,
+                            userToken: true,
+                        },
+                    },
+                    token1Ref: {
+                        include: {
+                            globalToken: true,
+                            userToken: true,
+                        },
+                    },
+                },
+            });
+            
+            if (!updatedPool) {
+                throw new Error(`Pool ${existingPool.id} not found after update`);
+            }
+            
             return {
-                ...existingPool,
+                ...updatedPool,
                 token0Data: this.tokenRefService.getUnifiedTokenData(
-                    existingPool.token0Ref
+                    updatedPool.token0Ref
                 ),
                 token1Data: this.tokenRefService.getUnifiedTokenData(
-                    existingPool.token1Ref
+                    updatedPool.token1Ref
                 ),
             };
         }
