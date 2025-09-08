@@ -7,6 +7,7 @@ import { useTranslations } from "@/i18n/client";
 import { formatPercent } from "@/lib/utils/formatters";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import type { PositionWithPnL } from "@/services/positions/positionService";
+import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy";
 
 interface PositionCardProps {
     position: PositionWithPnL;
@@ -201,7 +202,7 @@ export function PositionCard({
                             )}
                         </div>
                     </div>
-                    {/* Current Value & PnL */}
+                    {/* Current Value, Mini Curve & PnL */}
                     <div className="flex items-start gap-6 ml-6">
                         <div className="text-right">
                             <div className="text-xs text-slate-400 mb-0.5">
@@ -215,6 +216,18 @@ export function PositionCard({
                                 {position.quoteSymbol}
                             </div>
                         </div>
+                        
+                        {/* Mini PnL Curve */}
+                        <div className="flex items-center">
+                            <MiniPnLCurveLazy 
+                                position={position}
+                                width={120}
+                                height={60}
+                                showTooltip={true}
+                                className="rounded border border-slate-700/30 bg-slate-800/20"
+                            />
+                        </div>
+                        
                         <div className="text-right">
                             <div className="text-xs text-slate-400 mb-0.5">
                                 {t("dashboard.positions.pnl")}

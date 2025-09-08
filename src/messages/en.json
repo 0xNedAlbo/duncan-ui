@@ -41,6 +41,23 @@
     "range": "Range Boundaries",
     "assetPair": "Asset Pair"
   },
+  "miniPnlCurve": {
+    "tooltip": {
+      "currentPrice": "Current Price",
+      "pnlAtPrice": "PnL at Price",
+      "phase": "Phase",
+      "belowRange": "Below Range",
+      "inRange": "In Range",
+      "aboveRange": "Above Range"
+    },
+    "loading": "Loading curve...",
+    "error": "Unable to load curve",
+    "phases": {
+      "below": "below range",
+      "in-range": "in range",
+      "above": "above range"
+    }
+  },
   "status": {
     "selectedChain": "Selected Chain",
     "currentPosition": "Current Position",
