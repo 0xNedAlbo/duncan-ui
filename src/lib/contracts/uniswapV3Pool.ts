@@ -76,49 +76,7 @@ export interface PoolState {
   tickSpacing: number;
 }
 
-/**
- * Convert sqrtPriceX96 to BigInt price
- * Price = (sqrtPriceX96 / 2^96)^2
- * Returns price as BigInt in smallest unit (token1 per token0)
- */
-export function sqrtPriceX96ToPrice(
-  sqrtPriceX96: bigint,
-  decimals0: number,
-  decimals1: number
-): bigint {
-  // Validate inputs
-  if (typeof decimals0 !== 'number' || typeof decimals1 !== 'number' || isNaN(decimals0) || isNaN(decimals1)) {
-    throw new Error(`Invalid decimals: decimals0=${decimals0} (${typeof decimals0}), decimals1=${decimals1} (${typeof decimals1})`);
-  }
-  
-  // Use BigInt arithmetic to avoid precision loss
-  // sqrtPriceX96 = sqrt(price) * 2^96
-  // price = (sqrtPriceX96)^2 / 2^192
-  
-  // Calculate price^2 using BigInt to avoid precision loss
-  const sqrtPriceSquared = sqrtPriceX96 * sqrtPriceX96;
-  
-  // 2^192 as BigInt
-  const Q192 = 2n ** 192n;
-  
-  // Calculate raw price: sqrtPriceSquared / 2^192
-  // Then adjust for decimals: price * 10^(decimals1) / 10^(decimals0)
-  // Combined: sqrtPriceSquared * 10^(decimals1) / (2^192 * 10^(decimals0))
-  
-  const decimalDifference = decimals1 - decimals0;
-  
-  // Handle positive and negative decimal differences
-  let price: bigint;
-  if (decimalDifference >= 0) {
-    const decimalAdjustment = 10n ** BigInt(decimalDifference);
-    price = (sqrtPriceSquared * decimalAdjustment) / Q192;
-  } else {
-    const decimalAdjustment = 10n ** BigInt(-decimalDifference);
-    price = sqrtPriceSquared / (Q192 * decimalAdjustment);
-  }
-  
-  return price;
-}
+// sqrtPriceX96ToPrice function removed - now using shared implementation from utils/uniswap-v3/price.ts
 
 /**
  * Determine which token should be token0 (lower address)

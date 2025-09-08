@@ -6,8 +6,8 @@ import {
   priceToTick,
   priceToClosestUsableTick,
   tickToSqrtRatioX96,
-  sqrtRatioX96ToToken0Price,
-  sqrtRatioX96ToToken1Price,
+  sqrtRatioX96ToToken1PerToken0,
+  sqrtRatioX96ToToken0PerToken1,
 } from '../price';
 
 describe('Uniswap V3 Price Utilities', () => {
@@ -153,26 +153,186 @@ describe('Uniswap V3 Price Utilities', () => {
     });
   });
 
-  describe('sqrtRatioX96ToToken0Price & sqrtRatioX96ToToken1Price', () => {
-    it('should convert sqrtRatio to token prices', () => {
-      const tick = 202500;
-      const sqrtRatio = tickToSqrtRatioX96(tick);
+  // Test fixtures for precise price calculations
+  const fixtures = {
+    wbtcWeth: {
+      sqrtPriceX96: JSBI.BigInt("40396383607147620851397090925881670"),
+      token0: {
+        symbol: 'WBTC',
+        decimals: 8,
+      },
+      token1: {
+        symbol: 'WETH', 
+        decimals: 18,
+      },
+      expected: {
+        token1PerToken0: "25997154058158642121", // ~25.997 WETH per WBTC
+        token0PerToken1: "3846574", // ~0.03846574 WBTC per WETH
+      }
+    },
+    wethUsdc: {
+      sqrtPriceX96: JSBI.BigInt("5211915345268226134615181"),
+      token0: {
+        symbol: 'WETH',
+        decimals: 18,
+      },
+      token1: {
+        symbol: 'USDC',
+        decimals: 6,
+      },
+      expected: {
+        token1PerToken0: "4327484675", // ~4327.48 USDC per WETH
+        token0PerToken1: "231081118708235", // ~0.0002310811 WETH per USDC
+      }
+    }
+  };
+
+  describe('sqrtRatioX96ToToken1PerToken0', () => {
+    it('should calculate correct WETH per WBTC', () => {
+      const { sqrtPriceX96, token0, expected } = fixtures.wbtcWeth;
       
-      const token0Price = sqrtRatioX96ToToken0Price(sqrtRatio, 6, 18); // USDC per WETH
-      const token1Price = sqrtRatioX96ToToken1Price(sqrtRatio, 6, 18); // WETH per USDC
+      const result = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, token0.decimals);
       
-      // token1Price should be positive, token0Price might be 0 due to precision issues with high prices
-      expect(token1Price > 0n).toBe(true);
-      expect(typeof token0Price).toBe('bigint'); // May be 0 due to precision
+      expect(result.toString()).toBe(expected.token1PerToken0);
+    });
+
+    it('should calculate correct USDC per WETH', () => {
+      const { sqrtPriceX96, token0, expected } = fixtures.wethUsdc;
+      
+      const result = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, token0.decimals);
+      
+      expect(result.toString()).toBe(expected.token1PerToken0);
+    });
+
+    it('should produce reasonable human-readable values for WBTC/WETH', () => {
+      const { sqrtPriceX96, token0, token1 } = fixtures.wbtcWeth;
+      
+      const result = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, token0.decimals);
+      const humanReadable = Number(result) / Math.pow(10, token1.decimals);
+      
+      // Should be around 25-26 WETH per WBTC
+      expect(humanReadable).toBeGreaterThan(25);
+      expect(humanReadable).toBeLessThan(27);
+    });
+
+    it('should produce reasonable human-readable values for WETH/USDC', () => {
+      const { sqrtPriceX96, token0, token1 } = fixtures.wethUsdc;
+      
+      const result = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, token0.decimals);
+      const humanReadable = Number(result) / Math.pow(10, token1.decimals);
+      
+      // Should be around 4000-5000 USDC per WETH
+      expect(humanReadable).toBeGreaterThan(4000);
+      expect(humanReadable).toBeLessThan(5000);
+    });
+  });
+
+  describe('sqrtRatioX96ToToken0PerToken1', () => {
+    it('should calculate correct WBTC per WETH', () => {
+      const { sqrtPriceX96, token1, expected } = fixtures.wbtcWeth;
+      
+      const result = sqrtRatioX96ToToken0PerToken1(sqrtPriceX96, token1.decimals);
+      
+      expect(result.toString()).toBe(expected.token0PerToken1);
+    });
+
+    it('should calculate correct WETH per USDC', () => {
+      const { sqrtPriceX96, token1, expected } = fixtures.wethUsdc;
+      
+      const result = sqrtRatioX96ToToken0PerToken1(sqrtPriceX96, token1.decimals);
+      
+      expect(result.toString()).toBe(expected.token0PerToken1);
+    });
+
+    it('should produce reasonable human-readable values for WBTC/WETH', () => {
+      const { sqrtPriceX96, token0, token1 } = fixtures.wbtcWeth;
+      
+      const result = sqrtRatioX96ToToken0PerToken1(sqrtPriceX96, token1.decimals);
+      const humanReadable = Number(result) / Math.pow(10, token0.decimals);
+      
+      // Should be around 0.035-0.045 WBTC per WETH
+      expect(humanReadable).toBeGreaterThan(0.035);
+      expect(humanReadable).toBeLessThan(0.045);
+    });
+
+    it('should produce reasonable human-readable values for WETH/USDC', () => {
+      const { sqrtPriceX96, token0, token1 } = fixtures.wethUsdc;
+      
+      const result = sqrtRatioX96ToToken0PerToken1(sqrtPriceX96, token1.decimals);
+      const humanReadable = Number(result) / Math.pow(10, token0.decimals);
+      
+      // Should be around 0.0002-0.0003 WETH per USDC
+      expect(humanReadable).toBeGreaterThan(0.0002);
+      expect(humanReadable).toBeLessThan(0.0003);
+    });
+  });
+
+  describe('Reciprocal relationships', () => {
+    it('should maintain reciprocal relationship for WBTC/WETH', () => {
+      const { sqrtPriceX96, token0, token1 } = fixtures.wbtcWeth;
+      
+      const token1PerToken0 = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, token0.decimals);
+      const token0PerToken1 = sqrtRatioX96ToToken0PerToken1(sqrtPriceX96, token1.decimals);
+      
+      const humanToken1PerToken0 = Number(token1PerToken0) / Math.pow(10, token1.decimals);
+      const humanToken0PerToken1 = Number(token0PerToken1) / Math.pow(10, token0.decimals);
+      
+      const reciprocal = 1 / humanToken1PerToken0;
+      
+      // Should be approximately equal (within 0.1% tolerance due to precision)
+      expect(Math.abs(reciprocal - humanToken0PerToken1) / humanToken0PerToken1).toBeLessThan(0.001);
+    });
+
+    it('should maintain reciprocal relationship for WETH/USDC', () => {
+      const { sqrtPriceX96, token0, token1 } = fixtures.wethUsdc;
+      
+      const token1PerToken0 = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, token0.decimals);
+      const token0PerToken1 = sqrtRatioX96ToToken0PerToken1(sqrtPriceX96, token1.decimals);
+      
+      const humanToken1PerToken0 = Number(token1PerToken0) / Math.pow(10, token1.decimals);
+      const humanToken0PerToken1 = Number(token0PerToken1) / Math.pow(10, token0.decimals);
+      
+      const reciprocal = 1 / humanToken1PerToken0;
+      
+      // Should be approximately equal (within 0.1% tolerance due to precision)
+      expect(Math.abs(reciprocal - humanToken0PerToken1) / humanToken0PerToken1).toBeLessThan(0.001);
+    });
+  });
+
+  describe('Edge cases and input validation', () => {
+    it('should handle very small sqrtRatioX96 values', () => {
+      const smallSqrt = JSBI.BigInt("1000000000000000000"); // Very small value
+      
+      expect(() => {
+        sqrtRatioX96ToToken1PerToken0(smallSqrt, 18);
+      }).not.toThrow();
+      
+      expect(() => {
+        sqrtRatioX96ToToken0PerToken1(smallSqrt, 6);
+      }).not.toThrow();
     });
 
     it('should handle different decimal configurations', () => {
-      const tick = -73000; // More reasonable tick for WBTC/WETH
-      const sqrtRatio = tickToSqrtRatioX96(tick);
+      const { sqrtPriceX96 } = fixtures.wbtcWeth; // Use WBTC/WETH instead as it has larger sqrtPriceX96
       
-      const result = sqrtRatioX96ToToken0Price(sqrtRatio, 8, 18); // WBTC/WETH price
-      expect(typeof result).toBe('bigint');
-      // For very negative ticks, this might also have precision issues
+      // Test with various decimal combinations
+      const result6Decimals = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, 6);
+      const result8Decimals = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, 8);
+      const result18Decimals = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, 18);
+      
+      expect(result6Decimals > 0n).toBe(true);
+      expect(result8Decimals > 0n).toBe(true);
+      expect(result18Decimals > 0n).toBe(true);
+    });
+
+    it('should accept both JSBI and bigint inputs', () => {
+      const { expected } = fixtures.wbtcWeth;
+      
+      // Test with JSBI input
+      const jsbiInput = JSBI.BigInt("40396383607147620851397090925881670");
+      const resultFromJSBI = sqrtRatioX96ToToken1PerToken0(jsbiInput, 8);
+      
+      expect(resultFromJSBI.toString()).toBe(expected.token1PerToken0);
     });
   });
 

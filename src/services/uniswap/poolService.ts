@@ -17,8 +17,8 @@ import {
     UNISWAP_V3_POOL_ABI,
     PoolState,
     sortTokens,
-    sqrtPriceX96ToPrice,
 } from "@/lib/contracts/uniswapV3Pool";
+import { sqrtToPrice0In1 } from "@/lib/utils/uniswap-v3/price";
 import { normalizeAddress } from "@/lib/contracts/erc20";
 
 // Chain configuration for viem clients
@@ -426,9 +426,8 @@ export class PoolService {
                 ),
             ]);
 
-            const currentPrice = sqrtPriceX96ToPrice(
+            const currentPrice = sqrtToPrice0In1(
                 poolState.sqrtPriceX96,
-                token0Info.decimals,
                 token1Info.decimals
             );
 

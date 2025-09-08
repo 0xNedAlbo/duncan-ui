@@ -1,4 +1,8 @@
-import { encodeSqrtRatioX96, nearestUsableTick, TickMath } from "@uniswap/v3-sdk";
+import {
+    encodeSqrtRatioX96,
+    nearestUsableTick,
+    TickMath,
+} from "@uniswap/v3-sdk";
 import JSBI from "jsbi";
 import { Q192 } from "./constants";
 
@@ -10,7 +14,7 @@ import { Q192 } from "./constants";
 /**
  * Convert price to sqrtRatioX96 format
  * @param baseTokenAddress Address of base token
- * @param quoteTokenAddress Address of quote token  
+ * @param quoteTokenAddress Address of quote token
  * @param baseTokenDecimals Decimals of base token
  * @param price Price as quote per base (in quote token decimals)
  */
@@ -29,7 +33,7 @@ export function priceToSqrtRatioX96(
 
     let amount0: bigint;
     let amount1: bigint;
-    
+
     if (baseIsToken0) {
         // base = token0, quote = token1
         // price = token1 per token0
@@ -59,20 +63,15 @@ export function tickToPrice(
     quoteTokenAddress: string,
     baseTokenDecimals: number
 ): bigint {
-    // Determine token0/token1 ordering
+    const sqrtRatio = tickToSqrtRatioX96(tick);
     const baseIsToken0 = BigInt(baseTokenAddress) < BigInt(quoteTokenAddress);
 
-    const s = BigInt(TickMath.getSqrtRatioAtTick(tick).toString()); // Q96
-    const sqrtP2 = s * s; // Q192
-
     if (baseIsToken0) {
-        // quote = token1, base = token0 → scale by base decimals
-        const scale = 10n ** BigInt(baseTokenDecimals);
-        return (sqrtP2 * scale) / Q192; // token1 per 1 token0, in token1 units
+        // base = token0, quote = token1 → want price of token0 in token1 units
+        return sqrtRatioX96ToToken1PerToken0(sqrtRatio, baseTokenDecimals);
     } else {
-        // quote = token0, base = token1 → reciprocal path
-        const scale = 10n ** BigInt(baseTokenDecimals);
-        return (Q192 * scale) / sqrtP2; // token0 per 1 token1, in token0 units
+        // base = token1, quote = token0 → want price of token1 in token0 units
+        return sqrtRatioX96ToToken0PerToken1(sqrtRatio, baseTokenDecimals);
     }
 }
 
@@ -154,52 +153,22 @@ export function tickToSqrtRatioX96(tick: number): JSBI {
     return TickMath.getSqrtRatioAtTick(tick);
 }
 
-/**
- * Get price of token0 in token1 units from sqrtRatioX96
- * @param sqrtRatioX96 The sqrt price ratio
- * @param token0Decimals Decimals of token0
- * @param token1Decimals Decimals of token1
- * @returns Price as bigint in token1 decimals
- */
-export function sqrtRatioX96ToToken0Price(
+export function sqrtRatioX96ToToken1PerToken0(
     sqrtRatioX96: JSBI,
-    token0Decimals: number,
-    token1Decimals: number
+    token0Decimals: number
 ): bigint {
-    const sqrtP2 = BigInt(sqrtRatioX96.toString()) ** 2n; // Q192-scaled
-    const dec0 = BigInt(token0Decimals);
-    const dec1 = BigInt(token1Decimals);
-
-    if (dec0 >= dec1) {
-        const pow = 10n ** (dec0 - dec1);
-        return (sqrtP2 * pow) / Q192;
-    } else {
-        const pow = 10n ** (dec1 - dec0);
-        return sqrtP2 / (Q192 * pow);
-    }
+    const sqrt = BigInt(sqrtRatioX96.toString());
+    const sqrtP2 = sqrt * sqrt; // Q192-scaled
+    const scale0 = 10n ** BigInt(token0Decimals);
+    return (sqrtP2 * scale0) / Q192;
 }
 
-/**
- * Get price of token1 in token0 units from sqrtRatioX96  
- * @param sqrtRatioX96 The sqrt price ratio
- * @param token0Decimals Decimals of token0
- * @param token1Decimals Decimals of token1
- * @returns Price as bigint in token0 decimals
- */
-export function sqrtRatioX96ToToken1Price(
+export function sqrtRatioX96ToToken0PerToken1(
     sqrtRatioX96: JSBI,
-    token0Decimals: number,
     token1Decimals: number
 ): bigint {
-    const sqrtP2 = BigInt(sqrtRatioX96.toString()) ** 2n; // Q192-scaled
-    const dec0 = BigInt(token0Decimals);
-    const dec1 = BigInt(token1Decimals);
-
-    if (dec1 >= dec0) {
-        const pow = 10n ** (dec1 - dec0);
-        return (Q192 * pow) / sqrtP2;
-    } else {
-        const pow = 10n ** (dec0 - dec1);
-        return Q192 / (sqrtP2 * pow);
-    }
+    const sqrt = BigInt(sqrtRatioX96.toString());
+    const sqrtP2 = sqrt * sqrt; // Q192-scaled
+    const scale1 = 10n ** BigInt(token1Decimals);
+    return (Q192 * scale1) / sqrtP2;
 }
