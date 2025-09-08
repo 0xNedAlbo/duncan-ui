@@ -93,8 +93,6 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - **Comprehensive Risk Dashboard**
   - Maximum loss scenarios
   - Expected APR calculations
-  - Historical probability metrics
-  - Time-based profitability projections
 
 - **LLM Position Descriptions**
   - Human-readable position explanations
@@ -102,7 +100,6 @@ This asymmetry is what most LP providers don't understand. The visualization mak
   - Strategic insights
 
 **Technical Requirements:**
-- Mobile-first responsive design
 - Real-time data integration (Subgraph + APIs)
 - Historical fee/volume data analysis
 - Precise tick-based calculations
@@ -165,7 +162,6 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - ✅ Settings system with language selection and persistent storage
 - ✅ PnL curve visualization design (SVG mockups with correct mathematical form)
 - ✅ Conditional wallet connection UX (connect-to-use pattern)
-- ✅ Hydration-safe Web3 integration
 - ✅ **Interactive PnL curve component with full Uniswap V3 math**
 - ✅ **Three-phase risk visualization with profit/loss color coding**
 - ✅ **WETH/USDC example position with realistic calculations**
@@ -280,6 +276,11 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - Component-based architecture with clear separation of concerns
 - Translation keys organized by feature area
 - Comprehensive error handling for Web3 interactions
+- Consistent use of BigInt values or corresponding string representation throuhout all layers - database, services, API
+- Convert BigInt to human readable formats only when displaying values to the user
+- Never use float values for storing token amounts, token prices, position values, pnl, historical values with respect to tokens
+- Use English only for documentation and comments
+
 
 **Precision & BigInt Handling Rule:**
 - **Always store token amounts, prices, and position values as whole numbers in smallest unit**
@@ -300,6 +301,11 @@ This asymmetry is what most LP providers don't understand. The visualization mak
   - APIs pass through BigInt strings without conversion
 - **Rationale:** Prevents precision loss, maintains compatibility with smart contract values, enables exact BigInt calculations throughout entire system
 
+
+**Additional Coding Guidelines for Claude:**
+- use formatFractionHuman() or other functions from fraction-formats.ts when displaying bigint values
+- use scripts/api-debug.ts when testing API behaviour because it contains proper authentication
+
 ## Success Metrics
 
 **User Understanding:** Can users instantly recognize the three-phase risk structure?
@@ -307,9 +313,3 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 **Risk Awareness:** Do users understand their actual downside exposure?
 **Educational Impact:** Does the tool improve overall DeFi risk literacy?
 
----
-
-*This document represents the foundational concept for DUNCAN v1 as developed through collaborative planning sessions. The focus remains on creating an intuitive, educational, and powerful risk management tool for the DeFi community.*
-- formatFractionHuman() Funktion aus src/lib/utils/fraction-format.ts verwenden, wenn Tokenmengen oder Preise angezeigt werden sollen.
-- Verwende das Script scripts/api-debug.ts immer dann, wenn du die API testen musst.
-- kannst du das bitte in die CLAUDE.md als Regel aufnehmen fürs spätere code. ich möchte, dass die zahlen erst bei der anzeige umgewandelt werden. in allen datenstrukturen nehmen wir ganze Zahlen - also bigint wo es möglich ist und string repräsentationen wenn das nicht geht.
