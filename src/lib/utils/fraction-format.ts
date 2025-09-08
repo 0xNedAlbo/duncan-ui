@@ -234,6 +234,52 @@ export function formatHumanWithDecimals(
     );
 }
 
+export function formatCompactValue(
+    value: bigint,
+    decimals?: number,
+    opts?: FormatOpts
+): string {
+    // Handle zero case
+    if (value === 0n) {
+        return "0";
+    }
+
+    // Get the full formatted string first
+    const fullFormatted = formatHumanWithDecimals(value, decimals, opts);
+    
+    // Check if the absolute value is >= 1 by comparing to the denominator
+    const denominator = 10n ** BigInt(decimals || 18);
+    const absValue = value < 0n ? -value : value;
+    const isGreaterOrEqualToOne = absValue >= denominator;
+    
+    // If less than 1, return full precision
+    if (!isGreaterOrEqualToOne) {
+        return fullFormatted;
+    }
+    
+    // For values >= 1, truncate to max 2 decimal places
+    const decimalSep = opts?.decimalSep ?? FORMAT_PRESET_EN.decimalSep;
+    const parts = fullFormatted.split(decimalSep);
+    
+    // If no decimal part, return as-is
+    if (parts.length === 1) {
+        return fullFormatted;
+    }
+    
+    // Truncate decimal part to 2 digits (no rounding, just truncation)
+    const truncatedDecimal = parts[1].substring(0, 2);
+    
+    // Remove trailing zeros from the decimal part
+    const cleanDecimal = truncatedDecimal.replace(/0+$/, '');
+    
+    // If decimal part is empty after cleaning, return just the integer part
+    if (cleanDecimal === '') {
+        return parts[0];
+    }
+    
+    return parts[0] + decimalSep + cleanDecimal;
+}
+
 /**
  * Formats a range A..B with emphasis on the differing tail for tiny values.
  * Behavior:

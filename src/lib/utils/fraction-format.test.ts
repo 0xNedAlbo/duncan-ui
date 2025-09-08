@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   formatFractionHuman,
   formatHumanWithDecimals,
+  formatCompactValue,
   formatFractionRangeHuman,
   formatFractionAsPreciseString,
   formatIntegerGrouped,
@@ -64,6 +65,91 @@ describe('fraction-format utilities', () => {
       };
       
       expect(formatHumanWithDecimals(1234567123456n, 6, germanOpts)).toBe('1.234.567,123456');
+    });
+  });
+
+  describe('formatCompactValue', () => {
+    it('should return "0" for zero value', () => {
+      expect(formatCompactValue(0n, 6)).toBe('0');
+      expect(formatCompactValue(0n, 18)).toBe('0');
+    });
+
+    it('should truncate values >= 1 to max 2 decimal places', () => {
+      // 69153.795098 USDC -> 69153.79 USDC (truncated, not rounded)
+      expect(formatCompactValue(69153795098n, 6)).toBe('69,153.79');
+      
+      // 1234.567890 USDC -> 1234.56 USDC
+      expect(formatCompactValue(1234567890n, 6)).toBe('1,234.56');
+      
+      // 100.000000 USDC -> 100 USDC (no decimal needed)
+      expect(formatCompactValue(100000000n, 6)).toBe('100');
+      
+      // 1.5 ETH -> 1.5 ETH
+      expect(formatCompactValue(1500000000000000000n, 18)).toBe('1.5');
+      
+      // 1.123456789012345678 ETH -> 1.12 ETH
+      expect(formatCompactValue(1123456789012345678n, 18)).toBe('1.12');
+    });
+
+    it('should keep full precision for values < 1', () => {
+      // 0.5 USDC -> 0.5 USDC (unchanged)
+      expect(formatCompactValue(500000n, 6)).toBe('0.5');
+      
+      // 0.123456 USDC -> 0.123456 USDC (unchanged)
+      expect(formatCompactValue(123456n, 6)).toBe('0.123456');
+      
+      // 0.000001 USDC (1 unit) -> uses Unicode subscript ₅ (unchanged)
+      expect(formatCompactValue(1n, 6)).toBe('0.₍₅₎1');
+      
+      // 0.1 ETH -> 0.1 ETH (unchanged)
+      expect(formatCompactValue(100000000000000000n, 18)).toBe('0.1');
+    });
+
+    it('should work with German formatting', () => {
+      const germanOpts: FormatOpts = {
+        groupSep: '.',
+        decimalSep: ',',
+        useSubscript: true,
+      };
+      
+      // Value >= 1: truncate to 2 decimals
+      expect(formatCompactValue(1234567123456n, 6, germanOpts)).toBe('1.234.567,12');
+      
+      // Value < 1: keep full precision
+      expect(formatCompactValue(123456n, 6, germanOpts)).toBe('0,123456');
+    });
+
+    it('should handle edge cases around 1', () => {
+      // Exactly 1 USDC -> 1 (no decimal)
+      expect(formatCompactValue(1000000n, 6)).toBe('1');
+      
+      // Just under 1 USDC -> keep full precision
+      expect(formatCompactValue(999999n, 6)).toBe('0.999999');
+      
+      // Just over 1 USDC -> truncate to 2 decimals
+      expect(formatCompactValue(1000001n, 6)).toBe('1');
+    });
+
+    it('should remove trailing zeros from truncated decimals', () => {
+      // 1234.100000 USDC -> 1234.1 USDC (remove trailing zero)
+      expect(formatCompactValue(1234100000n, 6)).toBe('1,234.1');
+      
+      // 1234.000000 USDC -> 1234 USDC (no decimal needed)
+      expect(formatCompactValue(1234000000n, 6)).toBe('1,234');
+    });
+
+    it('should handle negative values correctly', () => {
+      // -409.199022 USDC -> -409.19 USDC (truncated, not rounded)
+      expect(formatCompactValue(-409199022n, 6)).toBe('-409.19');
+      
+      // -1234.567890 USDC -> -1234.56 USDC
+      expect(formatCompactValue(-1234567890n, 6)).toBe('-1,234.56');
+      
+      // -0.5 USDC -> -0.5 USDC (unchanged, keeps full precision)
+      expect(formatCompactValue(-500000n, 6)).toBe('-0.5');
+      
+      // -0.123456 USDC -> -0.123456 USDC (unchanged, keeps full precision)
+      expect(formatCompactValue(-123456n, 6)).toBe('-0.123456');
     });
   });
 
