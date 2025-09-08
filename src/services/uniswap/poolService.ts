@@ -18,8 +18,9 @@ import {
     PoolState,
     sortTokens,
 } from "@/lib/contracts/uniswapV3Pool";
-import { sqrtToPrice0In1 } from "@/lib/utils/uniswap-v3/price";
+import { sqrtRatioX96ToToken1PerToken0 } from "@/lib/utils/uniswap-v3/price";
 import { normalizeAddress } from "@/lib/contracts/erc20";
+import JSBI from "jsbi";
 
 // Chain configuration for viem clients
 const CHAIN_CONFIG = {
@@ -413,7 +414,7 @@ export class PoolService {
             // Get token decimals for price calculation
             // Use pool owner for context, or skip resolution for custom tokens without owner
             const resolveUserId = pool.ownerId || "";
-            const [token0Info, token1Info] = await Promise.all([
+            const [token0Info] = await Promise.all([
                 this.tokenResolver.resolveToken(
                     pool.chain,
                     pool.token0Address,
@@ -426,9 +427,12 @@ export class PoolService {
                 ),
             ]);
 
-            const currentPrice = sqrtToPrice0In1(
-                poolState.sqrtPriceX96,
-                token1Info.decimals
+            // Calculate token0 price in token1 units (e.g., WETH price in USDC)
+            // sqrtRatioX96 represents sqrt(token1/token0) * 2^96
+            // We want price of token0 in token1 units, so we use sqrtRatioX96ToToken1PerToken0
+            const currentPrice = sqrtRatioX96ToToken1PerToken0(
+                JSBI.BigInt(poolState.sqrtPriceX96.toString()),
+                token0Info.decimals
             );
 
             await this.prisma.pool.update({

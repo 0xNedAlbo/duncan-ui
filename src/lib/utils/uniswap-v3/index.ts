@@ -23,8 +23,8 @@ export {
   priceToTick,
   priceToClosestUsableTick,
   tickToSqrtRatioX96,
-  sqrtToPrice0In1,
-  sqrtToPrice1In0,
+  sqrtRatioX96ToToken1PerToken0,
+  sqrtRatioX96ToToken0PerToken1,
 } from "./price";
 
 export {
