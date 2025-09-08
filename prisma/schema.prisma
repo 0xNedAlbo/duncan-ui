@@ -272,6 +272,12 @@ model Position {
   initialTimestamp    DateTime? // Wann die Position erstellt wurde
   initialSource       String?   // "subgraph" oder "snapshot"
   
+  // Event Ledger Tracking
+  events              PositionEvent[]
+  lastEventSync       DateTime?
+  totalEventsCount    Int     @default(0)
+  totalFeesCollected  String  @default("0") // BigInt: Sum of all COLLECT events in quote token
+  
   // Timestamps
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -279,4 +285,50 @@ model Position {
   @@index([userId, status])
   @@index([owner])
   @@map("positions")
+}
+
+// Position Event Model - Event-driven position tracking
+model PositionEvent {
+  id              String   @id @default(cuid())
+  
+  // Relations
+  positionId      String
+  position        Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  
+  // Event Type & Identity
+  eventType       String   // "CREATE", "INCREASE", "DECREASE", "COLLECT", "CLOSE"
+  timestamp       DateTime
+  blockNumber     Int
+  transactionHash String
+  
+  // Liquidity Changes
+  liquidityDelta  String   // BigInt as String: +/- liquidity change
+  
+  // Token Amount Changes (BigInt as String)
+  token0Delta     String   // Amount of token0 added/removed
+  token1Delta     String   // Amount of token1 added/removed
+  
+  // Fee Collection (COLLECT events only)
+  collectedFee0   String?  // BigInt: fee collected in token0
+  collectedFee1   String?  // BigInt: fee collected in token1
+  
+  // Historical Pricing at Event Time
+  poolPrice       String   // BigInt: token0/token1 price at event time
+  tick            Int      // Pool tick at event time
+  
+  // Valuations in Quote Token (BigInt as String, smallest unit)
+  valueInQuote    String   // Total position value change in quote token
+  feeValueInQuote String?  // Fee value in quote token (for COLLECT events)
+  
+  // Metadata
+  source          String   // "subgraph", "onchain", "manual"
+  confidence      String   // "exact", "estimated"
+  createdAt       DateTime @default(now())
+  
+  // Indexes for performance
+  @@index([positionId, timestamp])
+  @@index([positionId, eventType])
+  @@index([transactionHash]) // For deduplication
+  @@unique([transactionHash, positionId, eventType]) // Prevent duplicates
+  @@map("position_events")
 }

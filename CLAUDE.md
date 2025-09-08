@@ -193,6 +193,15 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - ✅ **Advanced Position List Component with Data Quality Metrics**
 - ✅ **Dashboard Integration with Position Management Features**
 - ✅ **Comprehensive Internationalization (32+ new translation keys)**
+- ✅ **Event-Based PnL Calculation System with Fee Tracking and Historical Pricing**
+
+**Latest Major Feature: Event-Based PnL System ✅**
+The position management system now includes sophisticated event-driven PnL calculation that tracks all position lifecycle events (creation, increases, decreases, fee collections) with historical pricing for accurate profit/loss analysis. This provides users with:
+- **Accurate Fee Tracking:** Both collected and unclaimed fees properly attributed to PnL
+- **Realized vs Unrealized PnL:** Clear separation based on actual transactions  
+- **Historical Cost Basis:** Entry prices from actual blockchain transaction data
+- **Comprehensive Breakdown:** Asset value changes, fee income, and total performance metrics
+- **Seamless Integration:** Works with existing refresh mechanism, falls back gracefully
 
 **Phase 1 Status: PRODUCTION READY ✅**
 

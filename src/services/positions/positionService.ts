@@ -58,6 +58,20 @@ export interface PositionWithPnL {
     initialSource: "subgraph" | "snapshot";
     confidence: "exact" | "estimated";
 
+    // Enhanced PnL breakdown (when events available)
+    pnlBreakdown?: {
+        assetValueChange: string;   // Change in position value (excluding fees)
+        collectedFees: string;      // Historical fees collected
+        unclaimedFees: string;      // Current unclaimed fees
+        realizedPnL: string;        // PnL from withdrawn amounts + fees
+        unrealizedPnL: string;      // PnL from current holdings
+    };
+
+    // Event metadata
+    eventCount?: number;
+    lastEventSync?: Date;
+    pnlMethod?: 'event-based' | 'snapshot';
+
     // Range Status
     rangeStatus: "in-range" | "out-of-range" | "unknown";
 
@@ -258,9 +272,157 @@ export class PositionService {
     }
 
     /**
-     * Berechnet PnL für eine einzelne Position
+     * Berechnet PnL für eine einzelne Position (mit Event-basierter Berechnung falls verfügbar)
      */
     async calculatePositionPnL(positionId: string): Promise<PositionWithPnL> {
+        // Check if we have events for this position
+        const eventCount = await prisma.positionEvent.count({
+            where: { positionId }
+        });
+
+        // If we have events, use event-based calculation
+        if (eventCount > 0) {
+            try {
+                console.log(`📊 Using event-based PnL calculation (${eventCount} events)`);
+                return await this.calculateEventBasedPnL(positionId);
+            } catch (eventError) {
+                console.warn(`⚠️ Event-based PnL failed, falling back to legacy calculation:`, eventError.message);
+                // Fall through to legacy calculation
+            }
+        }
+
+        console.log(`📊 Using legacy PnL calculation (snapshot method)`);
+        return await this.calculateLegacyPnL(positionId);
+    }
+
+    /**
+     * Event-based PnL calculation with comprehensive breakdown
+     */
+    private async calculateEventBasedPnL(positionId: string): Promise<PositionWithPnL> {
+        // Get event-based PnL calculation
+        const { getEventPnlService } = await import("./eventPnlService");
+        const eventPnlService = getEventPnlService();
+        const eventPnL = await eventPnlService.calculateEventBasedPnL(positionId);
+
+        // Get position data for UI
+        const position = await prisma.position.findUnique({
+            where: { id: positionId },
+            include: {
+                pool: {
+                    include: {
+                        token0Ref: {
+                            include: {
+                                globalToken: true,
+                                userToken: true,
+                            },
+                        },
+                        token1Ref: {
+                            include: {
+                                globalToken: true,
+                                userToken: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (!position) {
+            throw new Error(`Position ${positionId} not found`);
+        }
+
+        const { token0Data, token1Data } = this.getUnifiedTokenData(position.pool);
+        const quoteConfig = determineQuoteToken(
+            token0Data.symbol,
+            token0Data.address,
+            token1Data.symbol,
+            token1Data.address,
+            position.pool.chain
+        );
+
+        // Determine range status
+        const rangeStatus = this.determineRangeStatus(position);
+
+        return {
+            // Basic Data
+            id: position.id,
+            nftId: position.nftId || undefined,
+            liquidity: position.liquidity,
+            tickLower: position.tickLower,
+            tickUpper: position.tickUpper,
+            owner: position.owner || undefined,
+            importType: position.importType,
+            status: position.status,
+            createdAt: position.createdAt,
+
+            // Pool & Token Data
+            pool: {
+                id: position.pool.id,
+                chain: position.pool.chain,
+                poolAddress: position.pool.poolAddress,
+                fee: position.pool.fee,
+                currentPrice: position.pool.currentPrice || undefined,
+                token0: {
+                    id: token0Data.id,
+                    symbol: token0Data.symbol,
+                    name: token0Data.name,
+                    decimals: token0Data.decimals,
+                    logoUrl: token0Data.logoUrl || undefined,
+                },
+                token1: {
+                    id: token1Data.id,
+                    symbol: token1Data.symbol,
+                    name: token1Data.name,
+                    decimals: token1Data.decimals,
+                    logoUrl: token1Data.logoUrl || undefined,
+                },
+            },
+
+            // Quote Token Configuration
+            token0IsQuote: quoteConfig.token0IsQuote,
+            tokenPair: formatTokenPair(
+                token0Data.symbol,
+                token1Data.symbol,
+                quoteConfig.token0IsQuote
+            ),
+            baseSymbol: quoteConfig.baseSymbol,
+            quoteSymbol: quoteConfig.quoteSymbol,
+
+            // Event-based PnL Data
+            initialValue: eventPnL.totalInvested,
+            currentValue: eventPnL.currentValue,
+            pnl: eventPnL.totalPnL,
+            pnlPercent: eventPnL.roi,
+            initialSource: "subgraph", // Events come from subgraph
+            confidence: eventPnL.confidence,
+
+            // Enhanced PnL breakdown (event-specific)
+            pnlBreakdown: {
+                assetValueChange: (BigInt(eventPnL.currentValue) - BigInt(eventPnL.costBasis)).toString(),
+                collectedFees: eventPnL.totalFeesCollected,
+                unclaimedFees: eventPnL.unclaimedFees,
+                realizedPnL: eventPnL.realizedPnL,
+                unrealizedPnL: eventPnL.unrealizedPnL
+            },
+
+            // Event metadata
+            eventCount: eventPnL.eventCount,
+            lastEventSync: eventPnL.lastEventDate,
+            pnlMethod: 'event-based',
+
+            // Range Status
+            rangeStatus,
+
+            // Meta
+            lastUpdated: new Date(),
+            dataUpdated: true // Events were synced
+        };
+    }
+
+    /**
+     * Legacy PnL calculation (original method)
+     */
+    private async calculateLegacyPnL(positionId: string): Promise<PositionWithPnL> {
         // 1. Position und Initial Value laden
         const [position, initialValue] = await Promise.all([
             prisma.position.findUnique({
@@ -393,6 +555,9 @@ export class PositionService {
             initialSource: initialValue.source,
             confidence: initialValue.confidence,
 
+            // Legacy method indicator
+            pnlMethod: 'snapshot',
+
             // Range Status
             rangeStatus,
 
@@ -520,33 +685,70 @@ export class PositionService {
     }
 
     /**
-     * Refresht Position-Daten (Pool + Initial Value)
+     * Refresht Position-Daten (Pool + Initial Value + Events)
      */
     async refreshPosition(positionId: string): Promise<PositionWithPnL> {
+        console.log(`🔄 Refreshing position ${positionId}...`);
+        
         // 1. Get position to find associated pool
         const position = await prisma.position.findUnique({
             where: { id: positionId },
-            select: { poolId: true }
+            select: { poolId: true, lastEventSync: true }
         });
         
         if (!position) {
             throw new Error(`Position ${positionId} not found`);
         }
 
-        // 2. Update pool state from blockchain
-        const { PoolService } = await import("../uniswap/poolService");
-        const poolService = new PoolService();
         try {
-            await poolService.updatePoolState(position.poolId);
-        } finally {
-            await poolService.disconnect();
+            // 2. Update pool state from blockchain
+            console.log(`📊 Updating pool state...`);
+            const { PoolService } = await import("../uniswap/poolService");
+            const poolService = new PoolService();
+            try {
+                await poolService.updatePoolState(position.poolId);
+            } finally {
+                await poolService.disconnect();
+            }
+
+            // 3. Sync position events from Subgraph (NEW)
+            console.log(`🎯 Syncing position events...`);
+            const { getEventSyncService } = await import("./eventSyncService");
+            const eventSyncService = getEventSyncService();
+            
+            try {
+                const syncResult = await eventSyncService.syncPositionEvents(positionId);
+                console.log(`✅ Event sync completed:`, {
+                    eventsAdded: syncResult.eventsAdded,
+                    eventsUpdated: syncResult.eventsUpdated,
+                    duration: `${syncResult.syncDuration}ms`,
+                    errors: syncResult.errors.length
+                });
+                
+                // Log errors if any
+                if (syncResult.errors.length > 0) {
+                    console.warn(`⚠️ Event sync errors:`, syncResult.errors);
+                }
+            } catch (eventSyncError) {
+                // Don't fail the refresh if event sync fails - log and continue
+                console.warn(`⚠️ Event sync failed for position ${positionId}:`, eventSyncError.message);
+                console.warn(`Continuing with legacy PnL calculation...`);
+            }
+
+            // 4. Initial Value updaten (fallback for positions without events)
+            console.log(`📈 Updating initial value...`);
+            await this.initialValueService.getOrUpdateInitialValue(positionId);
+
+            // 5. Calculate PnL (now with event-based calculation if available)
+            console.log(`💰 Calculating PnL...`);
+            const result = await this.calculatePositionPnL(positionId);
+            
+            console.log(`✅ Position refresh completed for ${positionId}`);
+            return result;
+        } catch (error) {
+            console.error(`❌ Position refresh failed for ${positionId}:`, error.message);
+            throw error;
         }
-
-        // 3. Initial Value updaten
-        await this.initialValueService.getOrUpdateInitialValue(positionId);
-
-        // 4. Neue PnL berechnen
-        return await this.calculatePositionPnL(positionId);
     }
 
     /**
