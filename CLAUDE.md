@@ -281,6 +281,25 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - Translation keys organized by feature area
 - Comprehensive error handling for Web3 interactions
 
+**Precision & BigInt Handling Rule:**
+- **Always store token amounts, prices, and position values as whole numbers in smallest unit**
+- **Use BigInt where possible, String representation where BigInt is not supported**
+- **API responses must return BigInt-compatible strings, never decimal/float values**
+- **Only convert to decimal/human-readable format at display time in frontend/UI layer**
+- **Maintain BigInt consistency through all layers: Database → Services → APIs → Frontend**
+- Examples:
+  - Store USDC amounts as "1234567" (6 decimals) not "1.234567"
+  - Store WETH amounts as "1000000000000000000" (18 decimals) not "1.0"
+  - Store position values in quote token smallest unit: "69153795098" not "69153.795098"
+  - API responses: `{"initialValue": "69153795098", "currentValue": "69153795098", "pnl": "0"}`
+  - Database fields remain String type but contain BigInt-compatible values
+  - Frontend: Use `formatFractionHuman()` from `src/lib/utils/fraction-format.ts` for display formatting
+- **Service Layer Rules:**
+  - All calculations use BigInt math, no parseFloat() conversions
+  - Services return BigInt strings to APIs
+  - APIs pass through BigInt strings without conversion
+- **Rationale:** Prevents precision loss, maintains compatibility with smart contract values, enables exact BigInt calculations throughout entire system
+
 ## Success Metrics
 
 **User Understanding:** Can users instantly recognize the three-phase risk structure?
@@ -293,3 +312,4 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 *This document represents the foundational concept for DUNCAN v1 as developed through collaborative planning sessions. The focus remains on creating an intuitive, educational, and powerful risk management tool for the DeFi community.*
 - formatFractionHuman() Funktion aus src/lib/utils/fraction-format.ts verwenden, wenn Tokenmengen oder Preise angezeigt werden sollen.
 - Verwende das Script scripts/api-debug.ts immer dann, wenn du die API testen musst.
+- kannst du das bitte in die CLAUDE.md als Regel aufnehmen fürs spätere code. ich möchte, dass die zahlen erst bei der anzeige umgewandelt werden. in allen datenstrukturen nehmen wir ganze Zahlen - also bigint wo es möglich ist und string repräsentationen wenn das nicht geht.

@@ -153,24 +153,86 @@ export class SubgraphService {
 
   /**
    * Parse Subgraph Position zu Initial Value Data
+   * Returns BigInt-compatible strings in smallest unit (no decimals)
    */
   private parseInitialValue(position: SubgraphPosition): InitialValueData {
-    // Berechne Initial Value in Quote Asset
-    // Hier vereinfacht - könnte komplexer werden mit Preisen
-    const token0Value = parseFloat(position.depositedToken0) * parseFloat(position.pool.token0Price);
-    const token1Value = parseFloat(position.depositedToken1) * parseFloat(position.pool.token1Price);
-    const totalValue = token0Value + token1Value;
+    // Get token decimals from subgraph
+    const token0Decimals = parseInt(position.pool.token0.decimals);
+    const token1Decimals = parseInt(position.pool.token1.decimals);
+    
+    // Convert depositedToken amounts to BigInt in smallest unit
+    const token0AmountWei = this.stringToBigInt(position.depositedToken0, token0Decimals);
+    const token1AmountWei = this.stringToBigInt(position.depositedToken1, token1Decimals);
+    
+    // Pool-Preise scaled für Berechnungen
+    const token0PriceScaled = this.stringToBigInt(position.pool.token0Price, 18);
+    const token1PriceScaled = this.stringToBigInt(position.pool.token1Price, 18);
+    
+    // Bestimme Quote Token (meist token1 für WETH/USDC Paare)
+    // Wenn token0Price sehr klein ist, ist token1 wahrscheinlich der Quote Token
+    let totalValueInQuoteWei: bigint;
+    let quoteTokenDecimals: number;
+    
+    if (token0PriceScaled < BigInt(1e15)) { // < 0.001 - token1 ist Quote
+      // token1Price = Base per Quote, verwende für Base-Wert Berechnung
+      const token0ValueInToken1 = (token0AmountWei * token1PriceScaled) / BigInt(10 ** (18 + token0Decimals - token1Decimals));
+      totalValueInQuoteWei = token0ValueInToken1 + token1AmountWei;
+      quoteTokenDecimals = token1Decimals;
+    } else { // token0 ist Quote
+      const token1ValueInToken0 = (token1AmountWei * token0PriceScaled) / BigInt(10 ** (18 + token1Decimals - token0Decimals));
+      totalValueInQuoteWei = token0AmountWei + token1ValueInToken0;
+      quoteTokenDecimals = token0Decimals;
+    }
 
     return {
-      value: totalValue.toString(),
-      token0Amount: position.depositedToken0,
-      token1Amount: position.depositedToken1,
+      // Store values in smallest unit (BigInt-compatible strings)
+      value: totalValueInQuoteWei.toString(),
+      token0Amount: token0AmountWei.toString(),
+      token1Amount: token1AmountWei.toString(),
       timestamp: new Date(parseInt(position.transaction.timestamp) * 1000),
       source: 'subgraph',
       confidence: 'exact',
       transactionHash: position.transaction.id,
       blockNumber: parseInt(position.transaction.blockNumber)
     };
+  }
+
+  /**
+   * Convert decimal string to scaled BigInt
+   */
+  private stringToBigInt(value: string, scale: number): bigint {
+    if (!value || value === '0') return 0n;
+    
+    // Split by decimal point
+    const [integer, decimal = ''] = value.split('.');
+    
+    // Pad or truncate decimal part to scale
+    const paddedDecimal = decimal.padEnd(scale, '0').slice(0, scale);
+    
+    // Combine and convert to BigInt
+    const combined = integer + paddedDecimal;
+    return BigInt(combined);
+  }
+
+  /**
+   * Convert scaled BigInt back to decimal string
+   */
+  private bigIntToString(value: bigint, scale: number): string {
+    if (value === 0n) return '0';
+    
+    const valueStr = value.toString();
+    const divisor = 10 ** scale;
+    
+    if (valueStr.length <= scale) {
+      // Value is less than 1
+      const paddedValue = valueStr.padStart(scale, '0');
+      return '0.' + paddedValue.replace(/0+$/, '') || '0';
+    } else {
+      // Value is greater than 1
+      const integerPart = valueStr.slice(0, -scale);
+      const decimalPart = valueStr.slice(-scale).replace(/0+$/, '');
+      return decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
+    }
   }
 
   /**
@@ -209,7 +271,9 @@ let subgraphServiceInstance: SubgraphService | null = null;
 
 export function getSubgraphService(apiKey?: string): SubgraphService {
   if (!subgraphServiceInstance) {
-    subgraphServiceInstance = new SubgraphService(apiKey);
+    // Load API key from environment if not provided
+    const key = apiKey || process.env.THE_GRAPH_API_KEY;
+    subgraphServiceInstance = new SubgraphService(key);
   }
   return subgraphServiceInstance;
 }

@@ -4,7 +4,8 @@ import { useState } from "react";
 import Image from "next/image";
 import { RefreshCw, TrendingUp, TrendingDown, Clock, Loader2, AlertCircle, CheckCircle2, Copy, ChevronDown } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
-import { formatCurrency, formatPercent, formatLiquidity } from "@/lib/utils/formatters";
+import { formatPercent, formatLiquidity } from "@/lib/utils/formatters";
+import { formatHumanWithDecimals } from "@/lib/utils/fraction-format";
 import type { PositionWithPnL } from "@/services/positions/positionService";
 
 interface PositionCardProps {
@@ -19,6 +20,11 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
   const [copied, setCopied] = useState(false);
   const [token0ImageError, setToken0ImageError] = useState(false);
   const [token1ImageError, setToken1ImageError] = useState(false);
+
+  // Get quote token decimals for proper formatting
+  const quoteTokenDecimals = position.token0IsQuote 
+    ? position.pool.token0.decimals 
+    : position.pool.token1.decimals;
 
 
   // Get PnL color classes
@@ -182,7 +188,7 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
           <div className="text-right">
             <div className="text-xs text-slate-400 mb-0.5">{t("dashboard.positions.currentValue")}</div>
             <div className="text-lg font-semibold text-white">
-              {formatCurrency(position.currentValue)}
+              {formatHumanWithDecimals(BigInt(position.currentValue), quoteTokenDecimals)} {position.quoteSymbol}
             </div>
           </div>
           <div className="text-right">
@@ -193,7 +199,7 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
               {position.pnlPercent > 0 ? <TrendingUp className="w-4 h-4" /> : 
                position.pnlPercent < 0 ? <TrendingDown className="w-4 h-4" /> : null}
               <div className="flex flex-col items-end">
-                <span>{formatCurrency(position.pnl)}</span>
+                <span>{formatHumanWithDecimals(BigInt(position.pnl), quoteTokenDecimals)} {position.quoteSymbol}</span>
                 <span className="text-xs text-slate-400">
                   {formatPercent(position.pnlPercent)}
                 </span>
@@ -243,7 +249,7 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <div className="text-slate-400 mb-1">{t("dashboard.positions.initialValue")}</div>
-              <div className="text-slate-200">{formatCurrency(position.initialValue)}</div>
+              <div className="text-slate-200">{formatHumanWithDecimals(BigInt(position.initialValue), quoteTokenDecimals)} {position.quoteSymbol}</div>
             </div>
             <div>
               <div className="text-slate-400 mb-1">{t("dashboard.positions.liquidity")}</div>

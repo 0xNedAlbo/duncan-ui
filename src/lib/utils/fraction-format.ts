@@ -153,6 +153,11 @@ export function formatFractionHuman(
     fr: Fraction<bigint>,
     opts?: FormatOpts
 ): string {
+    // Handle zero case to avoid "0." output
+    if (fr.num === 0n) {
+        return "0";
+    }
+
     const {
         groupSep,
         decimalSep,
@@ -215,6 +220,11 @@ export function formatHumanWithDecimals(
     decimals?: number,
     opts?: FormatOpts
 ): string {
+    // Handle zero case to avoid "0." output
+    if (value === 0n) {
+        return "0";
+    }
+    
     return formatFractionHuman(
         {
             num: value,

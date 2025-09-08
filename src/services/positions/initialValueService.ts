@@ -13,7 +13,7 @@ export interface InitialValueResult {
 }
 
 export class InitialValueService {
-  private readonly subgraphService = getSubgraphService(process.env.THE_GRAPH_API_KEY);
+  private readonly subgraphService = getSubgraphService();
 
   /**
    * Holt oder aktualisiert Initial Value für eine Position

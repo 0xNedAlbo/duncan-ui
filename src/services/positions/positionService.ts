@@ -299,9 +299,9 @@ export class PositionService {
         // 2. Quote Token bestimmen
         const quoteConfig = determineQuoteToken(
             token0Data.symbol,
-            position.pool.token0Address,
+            token0Data.address,
             token1Data.symbol,
-            position.pool.token1Address,
+            token1Data.address,
             position.pool.chain
         );
 
@@ -327,9 +327,15 @@ export class PositionService {
             currentValue = initialValue.value;
         }
 
-        // 5. PnL berechnen
-        const pnl = parseFloat(currentValue) - parseFloat(initialValue.value);
-        const pnlPercent = (pnl / parseFloat(initialValue.value)) * 100;
+        // 5. PnL berechnen (both values are now BigInt-compatible strings)
+        const currentValueBigInt = BigInt(currentValue);
+        const initialValueBigInt = BigInt(initialValue.value);
+        const pnlBigInt = currentValueBigInt - initialValueBigInt;
+        
+        // Calculate percentage with proper precision
+        const pnlPercent = initialValueBigInt > 0n 
+            ? Number((pnlBigInt * 10000n) / initialValueBigInt) / 100 // 2 decimal precision
+            : 0;
 
         // 6. Range Status bestimmen
         const rangeStatus = this.determineRangeStatus(position);
@@ -379,10 +385,10 @@ export class PositionService {
             baseSymbol: quoteConfig.baseSymbol,
             quoteSymbol: quoteConfig.quoteSymbol,
 
-            // PnL Data
+            // PnL Data - BigInt-compatible strings (smallest unit)
             initialValue: initialValue.value,
             currentValue,
-            pnl: pnl.toFixed(2),
+            pnl: pnlBigInt.toString(),
             pnlPercent: parseFloat(pnlPercent.toFixed(2)),
             initialSource: initialValue.source,
             confidence: initialValue.confidence,
@@ -412,12 +418,16 @@ export class PositionService {
         // Extract unified token data
         const { token0Data, token1Data } = this.getUnifiedTokenData(pool);
 
+        // Token-Adressen aus TokenReferences extrahieren
+        const token0Address = token0Data.address;
+        const token1Address = token1Data.address;
+
         // Quote Token bestimmen
         const quoteConfig = determineQuoteToken(
             token0Data.symbol,
-            pool.token0Address,
+            token0Address,
             token1Data.symbol,
-            pool.token1Address,
+            token1Address,
             pool.chain
         );
 
@@ -449,7 +459,7 @@ export class PositionService {
         }
 
         // Base Token ist token0 oder token1?
-        const baseIsToken0 = quoteConfig.baseTokenAddress.toLowerCase() === pool.token0Address.toLowerCase();
+        const baseIsToken0 = quoteConfig.baseTokenAddress.toLowerCase() === token0Address.toLowerCase();
 
         // Position Value berechnen
         const positionValue = calculatePositionValue(
@@ -462,10 +472,8 @@ export class PositionService {
             quoteConfig.baseTokenDecimals
         );
 
-        // Als Quote-Token decimal string zurückgeben
-        const valueInQuoteDecimals = Number(positionValue) / (10 ** quoteConfig.quoteTokenDecimals);
-        
-        return valueInQuoteDecimals.toFixed(6);
+        // Return as BigInt-compatible string in smallest unit (no decimals)
+        return positionValue.toString();
     }
 
     /**

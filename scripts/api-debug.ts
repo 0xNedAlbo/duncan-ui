@@ -284,10 +284,10 @@ class ApiDebugger {
  * Main execution
  */
 async function main() {
-  const debugger = new ApiDebugger();
+  const apiDebugger = new ApiDebugger();
 
   // Authenticate first
-  const authenticated = await debugger.authenticate();
+  const authenticated = await apiDebugger.authenticate();
   if (!authenticated) {
     console.log('❌ Failed to authenticate. Exiting.');
     process.exit(1);
@@ -299,12 +299,12 @@ async function main() {
   const args = process.argv.slice(2);
   
   if (args.includes('--examples') || args.includes('-e')) {
-    await debugger.runExamples();
+    await apiDebugger.runExamples();
   } else {
-    await debugger.interactive();
+    await apiDebugger.interactive();
     
     // Make debugger available globally for interactive use
-    (global as any).debugger = debugger;
+    (global as any).debugger = apiDebugger;
     
     // Keep process alive for interactive use
     process.stdin.resume();
