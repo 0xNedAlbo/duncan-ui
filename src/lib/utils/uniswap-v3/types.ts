@@ -1,6 +1,5 @@
 import { Token } from "@uniswap/sdk-core";
 import type { Pool as V3Pool } from "@uniswap/v3-sdk";
-import type JSBI from "jsbi";
 
 /**
  * Essential types for Uniswap V3 calculations
@@ -17,21 +16,25 @@ export type FeeTier = (typeof FEE_TIERS)[number];
 
 // Token amounts interface for liquidity calculations
 export interface TokenAmounts {
-  token0Amount: bigint;
-  token1Amount: bigint;
+    token0Amount: bigint;
+    token1Amount: bigint;
 }
 
 // Range status for positions
-export type RangeStatus = 'in-range' | 'out-of-range-below' | 'out-of-range-above' | 'unknown';
+export type RangeStatus =
+    | "in-range"
+    | "out-of-range-below"
+    | "out-of-range-above"
+    | "unknown";
 
 // Position phase for PnL curves
-export type PositionPhase = 'below' | 'in-range' | 'above';
+export type PositionPhase = "below" | "in-range" | "above";
 
 // PnL curve data point
 export interface PnLPoint {
-  price: bigint;
-  positionValue: bigint;
-  pnl: bigint;
-  pnlPercent: number;
-  phase: PositionPhase;
+    price: bigint;
+    positionValue: bigint;
+    pnl: bigint;
+    pnlPercent: number;
+    phase: PositionPhase;
 }
