@@ -3,9 +3,11 @@ import { TokenResolutionService } from '@/services/tokens/tokenResolutionService
 import { PrismaClient } from '@prisma/client';
 import { getSession } from '@/lib/auth';
 
-// Allow test injection of prisma client
-const prisma = globalThis.__testPrisma || new PrismaClient();
-const tokenResolutionService = new TokenResolutionService(prisma);
+// Create service lazily to allow test injection
+function getTokenResolutionService() {
+  const prisma = globalThis.__testPrisma || new PrismaClient();
+  return new TokenResolutionService(prisma);
+}
 
 export async function POST(request: NextRequest) {
   // Check authentication
@@ -18,7 +20,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      return NextResponse.json(
+        { error: 'Invalid JSON format' },
+        { status: 400 }
+      );
+    }
+    
     const { chain, addresses } = body;
 
     // Input validation
@@ -30,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (addresses.length === 0) {
-      return NextResponse.json({ tokens: [] });
+      return NextResponse.json({ tokens: [], count: 0 });
     }
 
     if (addresses.length > 100) {
@@ -50,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     // Resolve tokens for user (will create if needed)
     const tokenRequests = addresses.map(address => ({ chain, address }));
-    const tokens = await tokenResolutionService.resolveTokens(tokenRequests, session.user.id);
+    const tokens = await getTokenResolutionService().resolveTokens(tokenRequests, session.user.id);
 
     return NextResponse.json({
       tokens,
@@ -92,7 +103,7 @@ export async function GET(request: NextRequest) {
     const addressesParam = searchParams.get('addresses');
 
     // Input validation
-    if (!chain || !addressesParam) {
+    if (!chain || addressesParam === null) {
       return NextResponse.json(
         { error: 'Missing required parameters: chain and addresses' },
         { status: 400 }
@@ -103,7 +114,7 @@ export async function GET(request: NextRequest) {
     const addresses = addressesParam.split(',').map(addr => addr.trim()).filter(Boolean);
 
     if (addresses.length === 0) {
-      return NextResponse.json({ tokens: [] });
+      return NextResponse.json({ tokens: [], count: 0 });
     }
 
     if (addresses.length > 100) {
@@ -115,7 +126,7 @@ export async function GET(request: NextRequest) {
 
     // Resolve tokens for user (similar to POST, but via GET)
     const tokenRequests = addresses.map(address => ({ chain, address }));
-    const tokens = await tokenResolutionService.resolveTokens(tokenRequests, session.user.id);
+    const tokens = await getTokenResolutionService().resolveTokens(tokenRequests, session.user.id);
 
     return NextResponse.json({
       tokens,

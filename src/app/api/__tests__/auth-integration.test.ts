@@ -141,7 +141,7 @@ describe('API Authentication Integration', () => {
 
       // Should pass auth check and reach validation error (not 401)
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Missing required parameters: chain and address');
+      expect(data.error).toBe('Missing required parameters: chain, address, symbol, name, and decimals');
     });
 
     it('should proceed to business logic for authenticated GET /api/tokens/search', async () => {

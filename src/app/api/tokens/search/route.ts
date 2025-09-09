@@ -4,14 +4,30 @@ import { TokenService } from '@/services/tokens/tokenService';
 import { PrismaClient } from '@prisma/client';
 import { getSession } from '@/lib/auth';
 
-// Allow test injection of prisma client
-const prisma = globalThis.__testPrisma || new PrismaClient();
-const tokenResolutionService = new TokenResolutionService(prisma);
-const tokenService = new TokenService(prisma);
+// Create services lazily to allow test injection
+function getTokenResolutionService() {
+  const prisma = globalThis.__testPrisma || new PrismaClient();
+  return new TokenResolutionService(prisma);
+}
+
+function getTokenService() {
+  const prisma = globalThis.__testPrisma || new PrismaClient();
+  return new TokenService(prisma);
+}
 
 export async function GET(request: NextRequest) {
-  // Check authentication
-  const session = await getSession();
+  // Handle authentication separately to ensure proper error handling
+  let session;
+  try {
+    session = await getSession();
+  } catch (sessionError) {
+    console.error('Session service error:', sessionError);
+    return NextResponse.json(
+      { error: 'Session service error' },
+      { status: 500 }
+    );
+  }
+
   if (!session?.user?.id) {
     return NextResponse.json(
       { error: 'Unauthorized - Please sign in' },
@@ -45,7 +61,7 @@ export async function GET(request: NextRequest) {
     
     if (!verifiedOnly) {
       // Get user's custom tokens first
-      const userTokens = await tokenResolutionService.getUserTokens(session.user.id, chain || undefined);
+      const userTokens = await getTokenResolutionService().getUserTokens(session.user.id, chain || undefined);
       
       // Filter user tokens by query
       const filteredUserTokens = userTokens.filter(token => {
@@ -68,14 +84,14 @@ export async function GET(request: NextRequest) {
         decimals: token.decimals,
         logoUrl: token.logoUrl,
         isGlobal: false,
-        isVerified: false,
+        verified: false,
         userLabel: token.userLabel,
         notes: token.notes,
       })));
     }
 
     // Get global verified tokens
-    const globalTokens = await tokenService.searchTokens({
+    const globalTokens = await getTokenService().searchTokens({
       chain: chain || undefined,
       query: query || undefined,
       limit,
@@ -93,7 +109,7 @@ export async function GET(request: NextRequest) {
       decimals: token.decimals,
       logoUrl: token.logoUrl,
       isGlobal: true,
-      isVerified: true,
+      verified: true,
     })));
 
     // Apply pagination to combined results

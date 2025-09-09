@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { fetchNFTPositionWithOwner } from '@/services/uniswap/nftPosition';
 import { PoolService } from '@/services/uniswap/poolService';
 import { determineQuoteToken } from '@/services/positions/quoteTokenService';
@@ -32,20 +31,40 @@ export interface NFTImportResponse {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<NFTImportResponse>> {
+  // Handle authentication separately to ensure proper status codes
+  let session;
   try {
-    // Check authentication
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id || typeof session.user.id !== 'string') {
-      console.error('Invalid session:', session);
-      return NextResponse.json({
-        success: false,
-        error: 'Invalid session - Please sign in again',
-      }, { status: 401 });
-    }
+    session = await getSession();
+  } catch (sessionError) {
+    console.error('Session service error:', sessionError);
+    return NextResponse.json({
+      success: false,
+      error: 'Session service error',
+    }, { status: 500 });
+  }
+
+  if (!session?.user?.id || typeof session.user.id !== 'string') {
+    console.error('Invalid session:', session);
+    return NextResponse.json({
+      success: false,
+      error: 'Unauthorized - Please sign in',
+    }, { status: 401 });
+  }
+
+  try {
     
     console.log('Session user ID:', session.user.id);
 
-    const body = await request.json() as NFTImportRequest;
+    let body: NFTImportRequest;
+    try {
+      body = await request.json() as NFTImportRequest;
+    } catch (parseError) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid request format',
+      }, { status: 400 });
+    }
+    
     const { chain, nftId } = body;
 
     // Validate input
@@ -159,6 +178,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
 
       return NextResponse.json({
         success: true,
+        data: nftPositionData,
         position: {
           id: position.id,
           nftId: position.nftId!,
@@ -192,17 +212,23 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
   } catch (error) {
     console.error('NFT import error:', error);
     
-    if (error instanceof Error && error.message.includes('does not exist')) {
-      return NextResponse.json({
-        success: false,
-        error: error.message,
-      }, { status: 404 });
+    if (error instanceof Error) {
+      // Return 404 for network errors, position not found, etc.
+      if (error.message.includes('does not exist') || 
+          error.message.includes('Network error') ||
+          error.message.includes('network request failed') ||
+          error.message.includes('Failed to fetch')) {
+        return NextResponse.json({
+          success: false,
+          error: error.message,
+        }, { status: 404 });
+      }
     }
     
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Internal server error',
-    }, { status: 500 });
+      error: error instanceof Error ? error.message : typeof error === 'string' ? error : 'Internal server error',
+    }, { status: 500 }); // Return 500 for general internal server errors
   }
 }
 
