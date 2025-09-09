@@ -3,12 +3,23 @@ import { NextRequest } from 'next/server';
 import { POST, GET } from './route';
 import { mockNFTPositions } from '@/__tests__/fixtures/nftPositions';
 
+// Mock NextAuth
+vi.mock('next-auth/next', () => ({
+  getServerSession: vi.fn(),
+}));
+
+// Mock auth options
+vi.mock('@/lib/auth', () => ({
+  authOptions: {},
+}));
+
 // Mock the NFT position service
 vi.mock('@/services/uniswap/nftPosition', () => ({
   fetchNFTPosition: vi.fn(),
 }));
 
 import { fetchNFTPosition } from '@/services/uniswap/nftPosition';
+import { getServerSession } from 'next-auth/next';
 
 describe('/api/positions/import-nft', () => {
   beforeEach(() => {

@@ -252,13 +252,24 @@ The position management system now includes sophisticated event-driven PnL calcu
 - Development server: `npm run dev`
 - Build command: `npm run build`
 - Linting: `npm run lint`
-- Testing: `npm run test` (64+ unit tests with comprehensive API coverage, all SubgraphService tests now passing)
+- Testing: `npm run test` (374 unit tests with comprehensive API coverage, but 92 currently failing)
 
 **Known Issues / TODOs:**
-- ~~**SubgraphService Tests:** 4 von 13 Tests schlagen fehl aufgrund von MSW-Handler Problemen~~ ✅ **RESOLVED**
-  - ~~Problem: MSW-Handler werden nicht korrekt aufgerufen (wahrscheinlich undici/Node.js Kompatibilitätsproblem)~~
-  - ✅ **Solution:** Replaced MSW with direct fetch mocking using `vi.spyOn(global, 'fetch')` for SubgraphService tests
-  - ✅ **Result:** All 13 SubgraphService tests now pass reliably across Node.js versions
+- **Test Suite Failures:** 92 of 374 tests currently failing (10 test files affected) ⚠️ **HIGH PRIORITY**
+  - ✅ **Fixed:** Authentication mocking issue - added proper `getServerSession` and `authOptions` mocking
+  - **Progress:** Reduced from 98→92 failing tests, fixed 6 tests total
+  - **Remaining Issues:** Date serialization, rate limiting cache, module isolation, database setup
+  - **Affected Areas:** API route tests (registration, positions, tokens, refresh endpoints)  
+  - **Impact:** Improved test coverage, but CI/CD still affected by remaining failures
+  - **Priority:** MEDIUM - Primary auth blocker resolved, secondary issues remain
+  - **Success:** `src/app/api/positions/route.test.ts` - ✅ **ALL 19 TESTS PASSING** (Auth fix successful)
+  - **Remaining Failing Files:**
+    - `src/app/api/auth/register/route.test.ts` - ~48 failures (Date serialization, module cache)
+    - `src/app/api/positions/import-nft/route.test.ts` - ~8 failures (Auth + validation issues)
+    - `src/app/api/positions/[id]/refresh/route.test.ts` - ~6 failures (Rate limiting, date serialization)
+    - `src/app/api/tokens/route.test.ts` - ~8 failures (Database setup, parameter validation)
+    - Other API route tests - Various secondary issues
+  - **Next Steps:** Focus on date serialization and rate limiting cache fixes
 
 **UI/UX Principles:**
 - Dark theme as primary design language

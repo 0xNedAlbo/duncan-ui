@@ -8,6 +8,11 @@ vi.mock('next-auth/next', () => ({
   getServerSession: vi.fn(),
 }));
 
+// Mock auth options
+vi.mock('@/lib/auth', () => ({
+  authOptions: {},
+}));
+
 // Mock Position Service
 vi.mock('@/services/positions', () => ({
   getPositionService: vi.fn(),
