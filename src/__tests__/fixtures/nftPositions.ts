@@ -40,14 +40,14 @@ export const mockNFTPositions: Record<string, ParsedNFTPosition> = {
     nftId: '54321',
     chainId: 42161,
     chainName: 'arbitrum',
-    token0Address: TOKEN_ADDRESSES.arbitrum.USDC,
-    token1Address: TOKEN_ADDRESSES.arbitrum.WETH,
+    token0Address: TOKEN_ADDRESSES.arbitrum.WETH, // WETH (lower address)
+    token1Address: TOKEN_ADDRESSES.arbitrum.USDC, // USDC (higher address)
     fee: 3000,
     tickLower: -276300,
     tickUpper: -276250,
     liquidity: '2000000000000000000',
-    tokensOwed0: '200000000',
-    tokensOwed1: '100000000000000000',
+    tokensOwed0: '100000000000000000', // WETH amount
+    tokensOwed1: '200000000', // USDC amount
     isActive: true,
   },
 

@@ -223,11 +223,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
           error: error.message,
         }, { status: 404 });
       }
+    } else if (typeof error === 'string') {
+      // Non-Error exceptions (strings) are treated as 404 errors
+      return NextResponse.json({
+        success: false,
+        error: error,
+      }, { status: 404 });
     }
     
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : typeof error === 'string' ? error : 'Internal server error',
+      error: error instanceof Error ? error.message : 'Internal server error',
     }, { status: 500 }); // Return 500 for general internal server errors
   }
 }

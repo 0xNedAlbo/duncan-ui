@@ -23,6 +23,56 @@ vi.mock('@/services/uniswap/nftPosition', () => ({
 import { fetchNFTPosition, fetchNFTPositionWithOwner } from '@/services/uniswap/nftPosition';
 import { getServerSession } from 'next-auth/next';
 
+// Mock PoolService to avoid viem mocking complexity
+vi.mock('@/services/uniswap/poolService', async () => {
+  const actual = await vi.importActual('@/services/uniswap/poolService');
+  return {
+    ...actual,
+    PoolService: vi.fn().mockImplementation(() => ({
+      findOrCreatePool: vi.fn().mockImplementation(async (chain, token0, token1, fee, userId) => {
+        // Get the global test factories to create a real pool in the database
+        const testFactories = (globalThis as any).__testFactories;
+        if (testFactories) {
+          // Create a real pool using the factories
+          const rawPool = await testFactories.pools.createWethUsdcPool(userId, chain);
+          
+          // Add the resolved token data fields that the route expects
+          const poolWithTokenData = {
+            ...rawPool,
+            token0Data: {
+              symbol: chain === 'arbitrum' ? 'WETH' : 'USDC', // Token0 should be WETH for Arbitrum
+              name: chain === 'arbitrum' ? 'Wrapped Ether' : 'USD Coin',
+              address: token0,
+              decimals: chain === 'arbitrum' ? 18 : 6
+            },
+            token1Data: {
+              symbol: chain === 'arbitrum' ? 'USDC' : 'WETH', // Token1 should be USDC for Arbitrum 
+              name: chain === 'arbitrum' ? 'USD Coin' : 'Wrapped Ether',
+              address: token1,
+              decimals: chain === 'arbitrum' ? 6 : 18
+            }
+          };
+          
+          return poolWithTokenData;
+        }
+        
+        // Fallback - return a mock pool that matches the expected structure
+        return {
+          id: 'mock-pool-id',
+          chain: chain,
+          poolAddress: '0x17c14D2c404D167802b16C450d3c99F88F2c4F4d', // Arbitrum WETH/USDC pool address
+          fee: fee,
+          token0Data: { symbol: 'WETH', address: token0, decimals: 18 },
+          token1Data: { symbol: 'USDC', address: token1, decimals: 6 },
+          token0Ref: { id: 'token0-ref' },
+          token1Ref: { id: 'token1-ref' }
+        };
+      }),
+      disconnect: vi.fn().mockResolvedValue(undefined) // Add missing disconnect method
+    }))
+  };
+});
+
 describe('/api/positions/import-nft', () => {
   let testPrisma: PrismaClient;
   let factories: ReturnType<typeof createTestFactorySuite>;
@@ -44,6 +94,9 @@ describe('/api/positions/import-nft', () => {
     
     // Inject test prisma client for API routes
     globalThis.__testPrisma = testPrisma;
+    
+    // Expose factories globally for PoolService mock
+    (globalThis as any).__testFactories = factories;
   });
 
   beforeEach(async () => {
@@ -55,8 +108,12 @@ describe('/api/positions/import-nft', () => {
     // Create test user and mock session
     const { user, sessionData } = await factories.users.createUserForApiTest('nft-test-user');
     
-    // Mock valid session for all tests
+    // Mock valid session for all tests - ensure it uses the same user ID
     vi.mocked(getServerSession).mockResolvedValue(sessionData as any);
+    
+    // Also update the mocked auth service to use the same user ID
+    const { getSession } = await import('@/lib/auth');
+    vi.mocked(getSession).mockResolvedValue(sessionData as any);
   });
 
   afterAll(async () => {
