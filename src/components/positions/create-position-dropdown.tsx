@@ -139,7 +139,7 @@ export function CreatePositionDropdown({ onImportSuccess }: CreatePositionDropdo
                                                         isActive: true
                                                     };
                                                     setImportSuccess(displayData);
-                                                    console.log('Successfully imported NFT position:', result.position);
+                                                    // Successfully imported NFT position
                                                     
                                                     // Notify parent component
                                                     onImportSuccess?.(result.position);

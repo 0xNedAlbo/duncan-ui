@@ -296,15 +296,8 @@ export class PositionService {
         // If we have events, use event-based calculation
         if (eventCount > 0) {
             try {
-                console.log(
-                    `📊 Using event-based PnL calculation (${eventCount} events)`
-                );
                 return await this.calculateEventBasedPnL(positionId);
             } catch (eventError) {
-                console.warn(
-                    `⚠️ Event-based PnL failed, falling back to legacy calculation:`,
-                    eventError.message
-                );
                 // Fall through to legacy calculation
             }
         }
@@ -514,10 +507,7 @@ export class PositionService {
         try {
             currentValue = await this.calculateCurrentValue(position);
         } catch (error: any) {
-            console.warn(
-                `Using initialValue as currentValue for position ${positionId}:`,
-                error.message
-            );
+            // Using initialValue as currentValue fallback
             // Fallback: verwende initialValue als currentValue wenn Berechnung fehlschlägt
             currentValue = initialValue.value;
         }
@@ -735,7 +725,6 @@ export class PositionService {
      * Refresht Position-Daten (Pool + Initial Value + Events)
      */
     async refreshPosition(positionId: string): Promise<PositionWithPnL> {
-        console.log(`🔄 Refreshing position ${positionId}...`);
 
         // 1. Get position to find associated pool
         const position = await prisma.position.findUnique({
@@ -749,7 +738,6 @@ export class PositionService {
 
         try {
             // 2. Update pool state from blockchain
-            console.log(`📊 Updating pool state...`);
             const { PoolService } = await import("../uniswap/poolService");
             const poolService = new PoolService();
             try {
@@ -759,7 +747,6 @@ export class PositionService {
             }
 
             // 3. Sync position events from Subgraph (NEW)
-            console.log(`🎯 Syncing position events...`);
             const { getEventSyncService } = await import("./eventSyncService");
             const eventSyncService = getEventSyncService();
 
@@ -767,35 +754,22 @@ export class PositionService {
                 const syncResult = await eventSyncService.syncPositionEvents(
                     positionId
                 );
-                console.log(`✅ Event sync completed:`, {
-                    eventsAdded: syncResult.eventsAdded,
-                    eventsUpdated: syncResult.eventsUpdated,
-                    duration: `${syncResult.syncDuration}ms`,
-                    errors: syncResult.errors.length,
-                });
 
                 // Log errors if any
                 if (syncResult.errors.length > 0) {
-                    console.warn(`⚠️ Event sync errors:`, syncResult.errors);
+                    // Errors logged but not blocking
                 }
             } catch (eventSyncError) {
                 // Don't fail the refresh if event sync fails - log and continue
-                console.warn(
-                    `⚠️ Event sync failed for position ${positionId}:`,
-                    eventSyncError.message
-                );
-                console.warn(`Continuing with legacy PnL calculation...`);
+                // Event sync error handled gracefully
             }
 
             // 4. Initial Value updaten (fallback for positions without events)
-            console.log(`📈 Updating initial value...`);
             await this.initialValueService.getOrUpdateInitialValue(positionId);
 
             // 5. Calculate PnL (now with event-based calculation if available)
-            console.log(`💰 Calculating PnL...`);
             const result = await this.calculatePositionPnL(positionId);
 
-            console.log(`✅ Position refresh completed for ${positionId}`);
             return result;
         } catch (error) {
             console.error(

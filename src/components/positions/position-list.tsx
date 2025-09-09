@@ -137,7 +137,7 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
         // Show upgrade notification if data was upgraded
         if (result.meta.upgraded) {
           // TODO: Show toast notification
-          console.log("Position data upgraded to exact historical values!");
+          // Position data upgraded to exact historical values
         }
       } else {
         console.error("Failed to refresh position:", result.error);
