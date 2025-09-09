@@ -4,7 +4,9 @@
     "error": "Error",
     "cancel": "Cancel",
     "done": "Done",
-    "save": "Save"
+    "save": "Save",
+    "copied": "Copied!",
+    "comingSoon": "Coming Soon"
   },
   "header": {
     "title": "DUNCAN",
@@ -112,6 +114,8 @@
     },
     "positions": {
       "refresh": "Refresh Position",
+      "viewDetails": "View Details",
+      "noNftId": "Position details not available (no NFT ID)",
       "showDetails": "Show Details",
       "hideDetails": "Hide Details",
       "currentValue": "Current Value",
@@ -176,6 +180,35 @@
       "passwordPlaceholder": "Password (at least 6 characters)",
       "submitButton": "Register",
       "loading": "Loading..."
+    }
+  },
+  "positionDetails": {
+    "header": {
+      "backToDashboard": "Back to Dashboard",
+      "fee": "Fee",
+      "nftId": "NFT ID",
+      "copyId": "Copy ID",
+      "viewOnExplorer": "View on Explorer",
+      "lastUpdated": "Last Updated",
+      "refresh": "Refresh Position"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "events": "Events",
+      "range": "Range Analysis",
+      "fees": "Fees & Returns",
+      "analytics": "Analytics"
+    },
+    "status": {
+      "active": "Active",
+      "closed": "Closed",
+      "liquidated": "Liquidated"
+    },
+    "overview": {
+      "placeholder": "Overview tab content will be implemented here"
+    },
+    "events": {
+      "placeholder": "Events history will be displayed here"
     }
   },
   "homepage": {

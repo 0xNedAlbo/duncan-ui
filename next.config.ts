@@ -6,7 +6,8 @@ const nextConfig: NextConfig = {
       'static.alchemyapi.io',
       'assets.coingecko.com',
       'cdn.jsdelivr.net',
-      'raw.githubusercontent.com'
+      'raw.githubusercontent.com',
+      'tokens.1inch.io'
     ],
   },
 };

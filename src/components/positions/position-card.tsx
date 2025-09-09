@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { RefreshCw, TrendingUp, TrendingDown, Copy, Search } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import { formatPercent } from "@/lib/utils/formatters";
@@ -266,13 +267,23 @@ export function PositionCard({
                 {/* Action Buttons */}
                 <div className="flex items-center gap-1">
                     {/* Details Button */}
-                    <button
-                        onClick={() => {/* TODO: Open details page */}}
-                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
-                        title="View details"
-                    >
-                        <Search className="w-4 h-4" />
-                    </button>
+                    {position.nftId ? (
+                        <Link
+                            href={`/position/uniswapv3/${position.pool.chain}/${position.nftId}`}
+                            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
+                            title={t("dashboard.positions.viewDetails")}
+                        >
+                            <Search className="w-4 h-4" />
+                        </Link>
+                    ) : (
+                        <button
+                            disabled
+                            className="p-2 text-slate-600 cursor-not-allowed rounded-lg opacity-50"
+                            title={t("dashboard.positions.noNftId")}
+                        >
+                            <Search className="w-4 h-4" />
+                        </button>
+                    )}
                     
                     {/* Refresh Button */}
                     <button

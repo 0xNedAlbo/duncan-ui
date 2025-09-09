@@ -4,6 +4,7 @@ export interface ChainConfig {
   chainId: number;
   name: string;
   shortName: string;
+  slug: string;
   wrappedNativeToken: {
     address: string;
     symbol: string;
@@ -19,6 +20,7 @@ export const CHAIN_CONFIG: Record<string, ChainConfig> = {
     chainId: 1,
     name: 'Ethereum Mainnet',
     shortName: 'Ethereum',
+    slug: 'ethereum',
     wrappedNativeToken: {
       address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
       symbol: 'WETH',
@@ -31,6 +33,7 @@ export const CHAIN_CONFIG: Record<string, ChainConfig> = {
     chainId: 42161,
     name: 'Arbitrum One',
     shortName: 'Arbitrum',
+    slug: 'arbitrum',
     wrappedNativeToken: {
       address: '0x82aF49447D8a07e3bd95BD0d56f35241523fBAb1',
       symbol: 'WETH',
@@ -43,6 +46,7 @@ export const CHAIN_CONFIG: Record<string, ChainConfig> = {
     chainId: 8453,
     name: 'Base',
     shortName: 'Base',
+    slug: 'base',
     wrappedNativeToken: {
       address: '0x4200000000000000000000000000000000000006',
       symbol: 'WETH',
@@ -85,4 +89,14 @@ export const CHAIN_ID_TO_NAME: Record<number, string> = {
 
 export function getChainFromId(chainId: number): string | null {
   return CHAIN_ID_TO_NAME[chainId] || null;
+}
+
+// Helper function to validate chain slug
+export function isValidChainSlug(slug: string): boolean {
+  return SUPPORTED_CHAINS.includes(slug.toLowerCase());
+}
+
+// Get chain config by slug
+export function getChainConfigBySlug(slug: string): ChainConfig | null {
+  return getChainConfig(slug);
 }
