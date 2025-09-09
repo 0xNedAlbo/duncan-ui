@@ -1,39 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Loader2, Filter, SortAsc, SortDesc, AlertCircle } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import { PositionCard } from "./position-card";
+import { usePositions, useRefreshPosition, useIsRefreshingPosition } from "@/hooks/api/usePositions";
+import { handleApiError } from "@/lib/api/apiError";
 import type { PositionWithPnL } from "@/services/positions/positionService";
-
-interface PositionListResponse {
-  success: boolean;
-  data: {
-    positions: PositionWithPnL[];
-    pagination: {
-      total: number;
-      limit: number;
-      offset: number;
-      hasMore: boolean;
-      nextOffset: number | null;
-    };
-  };
-  meta: {
-    requestedAt: string;
-    filters: {
-      status: string;
-      chain: string | null;
-      sortBy: string;
-      sortOrder: string;
-    };
-    dataQuality: {
-      subgraphPositions: number;
-      snapshotPositions: number;
-      upgradedPositions: number;
-    };
-  };
-  error?: string;
-}
+import type { PositionListParams } from "@/types/api";
 
 interface PositionListProps {
   className?: string;
@@ -42,134 +16,85 @@ interface PositionListProps {
 
 export function PositionList({ className, refreshTrigger }: PositionListProps) {
   const t = useTranslations();
-  const [positions, setPositions] = useState<PositionWithPnL[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshingId, setRefreshingId] = useState<string | null>(null);
   
-  // Filters and sorting
+  // Filters and sorting state
   const [status, setStatus] = useState<string>("active");
   const [chain, setChain] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("createdAt");
   const [sortOrder, setSortOrder] = useState<string>("desc");
   
-  // Pagination
+  // Pagination state
   const [limit] = useState(20);
   const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [total, setTotal] = useState(0);
 
-  // Data quality info
-  const [dataQuality, setDataQuality] = useState({
+  // Build query parameters (memoized to prevent unnecessary re-renders)
+  const queryParams: PositionListParams = useMemo(() => ({
+    status: status as any,
+    chain: chain !== "all" ? chain : undefined,
+    sortBy,
+    sortOrder: sortOrder as "asc" | "desc",
+    limit,
+    offset,
+  }), [status, chain, sortBy, sortOrder, limit, offset]);
+
+  // Use position hooks
+  const { data, error, isLoading, refetch } = usePositions(queryParams, {
+    // Refetch when refreshTrigger changes
+    refetchOnMount: true,
+  });
+  
+  const refreshPosition = useRefreshPosition();
+
+  // Extract data from query result
+  const positions = data?.positions || [];
+  const pagination = data?.pagination;
+  const dataQuality = data?.dataQuality || {
     subgraphPositions: 0,
     snapshotPositions: 0,
     upgradedPositions: 0
-  });
-
-  // Fetch positions
-  const fetchPositions = async (reset = false) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const params = new URLSearchParams({
-        status,
-        limit: limit.toString(),
-        offset: reset ? "0" : offset.toString(),
-        sortBy,
-        sortOrder,
-      });
-      
-      if (chain !== "all") {
-        params.append("chain", chain);
-      }
-
-      const response = await fetch(`/api/positions?${params}`);
-      const result: PositionListResponse = await response.json();
-
-      if (result.success) {
-        if (reset) {
-          setPositions(result.data.positions);
-          setOffset(0);
-        } else {
-          setPositions(prev => [...prev, ...result.data.positions]);
-        }
-        
-        setHasMore(result.data.pagination.hasMore);
-        setTotal(result.data.pagination.total);
-        setDataQuality(result.meta.dataQuality);
-      } else {
-        setError(result.error || "Failed to load positions");
-      }
-    } catch (err) {
-      console.error("Error fetching positions:", err);
-      setError("Failed to connect to server");
-    } finally {
-      setLoading(false);
-    }
   };
+  const hasMore = pagination?.hasMore || false;
+  const total = pagination?.total || 0;
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setOffset(0);
+  }, [status, chain, sortBy, sortOrder]);
+
+  // Handle external refresh trigger
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      refetch();
+    }
+  }, [refreshTrigger]); // Remove refetch from dependencies to prevent infinite loops
 
   // Load more positions
   const loadMore = () => {
-    if (!hasMore || loading) return;
+    if (!hasMore || isLoading) return;
     setOffset(prev => prev + limit);
   };
 
-  // Refresh single position
-  const refreshPosition = async (positionId: string) => {
+  // Handle single position refresh
+  const handleRefreshPosition = async (positionId: string) => {
     try {
-      setRefreshingId(positionId);
-      
-      const response = await fetch(`/api/positions/${positionId}/refresh`, {
-        method: "POST",
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        // Update the position in the list
-        setPositions(prev => 
-          prev.map(pos => 
-            pos.id === positionId ? result.data.position : pos
-          )
-        );
-        
-        // Show upgrade notification if data was upgraded
-        if (result.meta.upgraded) {
-          // TODO: Show toast notification
-          // Position data upgraded to exact historical values
-        }
-      } else {
-        console.error("Failed to refresh position:", result.error);
-        // TODO: Show error toast
-      }
+      await refreshPosition.mutateAsync(positionId);
+      // Success is handled by the hook's onSuccess callback
+      // which updates the cache automatically
     } catch (error) {
-      console.error("Error refreshing position:", error);
-    } finally {
-      setRefreshingId(null);
+      console.error("Failed to refresh position:", error);
+      // TODO: Show error toast
     }
   };
 
-  // Effect for fetching positions when filters change
-  useEffect(() => {
-    fetchPositions(true);
-  }, [status, chain, sortBy, sortOrder]);
+  // Check if a specific position is being refreshed
+  const isPositionRefreshing = (positionId: string) => {
+    return refreshPosition.isPending && refreshPosition.variables === positionId;
+  };
 
-  // Effect for loading more when offset changes
-  useEffect(() => {
-    if (offset > 0) {
-      fetchPositions(false);
-    }
-  }, [offset]);
+  // Get user-friendly error message
+  const errorMessage = error ? handleApiError(error, "Failed to load positions") : null;
 
-  // Effect for external refresh trigger (e.g., after import)
-  useEffect(() => {
-    if (refreshTrigger && refreshTrigger > 0) {
-      fetchPositions(true);
-    }
-  }, [refreshTrigger]);
-
-  if (loading && positions.length === 0) {
+  if (isLoading && positions.length === 0) {
     return (
       <div className={`flex items-center justify-center py-12 ${className}`}>
         <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
@@ -177,15 +102,15 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
     );
   }
 
-  if (error && positions.length === 0) {
+  if (errorMessage && positions.length === 0) {
     return (
       <div className={`flex items-center justify-center py-12 ${className}`}>
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-white mb-2">Error Loading Positions</h3>
-          <p className="text-slate-400 mb-4">{error}</p>
+          <p className="text-slate-400 mb-4">{errorMessage}</p>
           <button
-            onClick={() => fetchPositions(true)}
+            onClick={() => refetch()}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
           >
             Try Again
@@ -292,8 +217,8 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
             <PositionCard
               key={position.id}
               position={position}
-              onRefresh={refreshPosition}
-              isRefreshing={refreshingId === position.id}
+              onRefresh={handleRefreshPosition}
+              isRefreshing={isPositionRefreshing(position.id)}
             />
           ))}
           
@@ -302,10 +227,10 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
             <div className="text-center pt-6">
               <button
                 onClick={loadMore}
-                disabled={loading}
+                disabled={isLoading}
                 className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
               >
-                {loading ? (
+                {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Loading...

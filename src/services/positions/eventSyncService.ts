@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { SubgraphService } from '../subgraph/subgraphService';
+import { getSubgraphService } from '../subgraph';
 import { getHistoricalPriceService, PriceDataPoint } from './historicalPriceService';
 import { determineQuoteToken } from './quoteTokenService';
 
@@ -45,7 +45,7 @@ export interface ParsedPositionEvent {
 }
 
 export class EventSyncService {
-    private readonly subgraphService = new SubgraphService();
+    private readonly subgraphService = getSubgraphService();
     private readonly historicalPriceService = getHistoricalPriceService();
 
     /**

@@ -241,6 +241,18 @@ export class SubgraphService {
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+
+  /**
+   * Generic public query method for custom subgraph queries
+   * Used by other services that need direct subgraph access
+   */
+  async query<T = any>(
+    chain: string,
+    query: string,
+    variables: Record<string, any> = {}
+  ): Promise<SubgraphResponse<T>> {
+    return this.querySubgraph<T>(chain, { query, variables });
+  }
 }
 
 // Custom Error Class

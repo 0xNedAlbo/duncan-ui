@@ -3,7 +3,9 @@
 import { Plus, ChevronDown, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslations } from "@/i18n/client";
-import type { NFTImportResponse } from "@/app/api/positions/import-nft/route";
+import { useImportNFT } from "@/hooks/api/usePositions";
+import { handleApiError } from "@/lib/api/apiError";
+import type { ImportNFTResponse } from "@/types/api";
 import type { ParsedNFTPosition } from "@/services/uniswap/nftPosition";
 
 interface CreatePositionDropdownProps {
@@ -16,9 +18,41 @@ export function CreatePositionDropdown({ onImportSuccess }: CreatePositionDropdo
     const [showNftForm, setShowNftForm] = useState(false);
     const [nftId, setNftId] = useState("");
     const [selectedChain, setSelectedChain] = useState("ethereum");
-    const [isImporting, setIsImporting] = useState(false);
     const [importError, setImportError] = useState<string | null>(null);
     const [importSuccess, setImportSuccess] = useState<ParsedNFTPosition | null>(null);
+
+    // Use the import NFT mutation hook
+    const importNFT = useImportNFT({
+        onSuccess: (response) => {
+            if (response.data?.position) {
+                // Create display data for success message
+                const displayData = {
+                    token0Address: response.data.position.pool.token0Data?.address || 'Unknown',
+                    token1Address: response.data.position.pool.token1Data?.address || 'Unknown',
+                    fee: response.data.position.pool.fee,
+                    isActive: true
+                };
+                setImportSuccess(displayData);
+                setImportError(null);
+                
+                // Notify parent component
+                onImportSuccess?.(response.data.position);
+                
+                // Reset form after 2 seconds
+                setTimeout(() => {
+                    setIsDropdownOpen(false);
+                    setShowNftForm(false);
+                    setNftId("");
+                    setImportSuccess(null);
+                }, 2000);
+            }
+        },
+        onError: (error) => {
+            const errorMessage = handleApiError(error, t("dashboard.addPosition.nft.importError"));
+            setImportError(errorMessage);
+            setImportSuccess(null);
+        }
+    });
 
     return (
         <div className="relative">
@@ -111,61 +145,20 @@ export function CreatePositionDropdown({ onImportSuccess }: CreatePositionDropdo
                                     </div>
                                     
                                     <button
-                                        onClick={async () => {
-                                            setIsImporting(true);
+                                        onClick={() => {
                                             setImportError(null);
                                             setImportSuccess(null);
                                             
-                                            try {
-                                                const response = await fetch('/api/positions/import-nft', {
-                                                    method: 'POST',
-                                                    headers: {
-                                                        'Content-Type': 'application/json',
-                                                    },
-                                                    body: JSON.stringify({
-                                                        chain: selectedChain,
-                                                        nftId: nftId.trim(),
-                                                    }),
-                                                });
-                                                
-                                                const result: NFTImportResponse = await response.json();
-                                                
-                                                if (result.success && result.position) {
-                                                    // Create display data for success message
-                                                    const displayData = {
-                                                        token0Address: result.position.pool.token0Data?.address || 'Unknown',
-                                                        token1Address: result.position.pool.token1Data?.address || 'Unknown',
-                                                        fee: result.position.pool.fee,
-                                                        isActive: true
-                                                    };
-                                                    setImportSuccess(displayData);
-                                                    // Successfully imported NFT position
-                                                    
-                                                    // Notify parent component
-                                                    onImportSuccess?.(result.position);
-                                                    
-                                                    // Reset form after 2 seconds
-                                                    setTimeout(() => {
-                                                        setIsDropdownOpen(false);
-                                                        setShowNftForm(false);
-                                                        setNftId("");
-                                                        setImportSuccess(null);
-                                                    }, 2000);
-                                                } else {
-                                                    setImportError(result.error || 'Unknown error occurred');
-                                                }
-                                            } catch (error) {
-                                                console.error('Import error:', error);
-                                                setImportError(t("dashboard.addPosition.nft.importError"));
-                                            } finally {
-                                                setIsImporting(false);
-                                            }
+                                            importNFT.mutate({
+                                                chain: selectedChain,
+                                                nftId: nftId.trim(),
+                                            });
                                         }}
-                                        disabled={!nftId.trim() || isImporting}
+                                        disabled={!nftId.trim() || importNFT.isPending}
                                         className="w-full px-3 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:text-slate-400 text-white rounded transition-colors flex items-center justify-center gap-2"
                                     >
-                                        {isImporting && <Loader2 className="w-3 h-3 animate-spin" />}
-                                        {isImporting ? t("dashboard.addPosition.nft.importing") : t("dashboard.addPosition.nft.import")}
+                                        {importNFT.isPending && <Loader2 className="w-3 h-3 animate-spin" />}
+                                        {importNFT.isPending ? t("dashboard.addPosition.nft.importing") : t("dashboard.addPosition.nft.import")}
                                     </button>
                                     
                                     {/* Error Message */}

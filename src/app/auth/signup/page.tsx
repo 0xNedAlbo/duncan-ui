@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthTranslations } from "@/lib/auth-translations";
+import { apiClient } from "@/lib/api/apiClient";
+import { handleApiError } from "@/lib/api/apiError";
+import type { RegisterRequest, RegisterResponse } from "@/types/api";
 
 export default function SignUpPage() {
     const [email, setEmail] = useState("");
@@ -20,29 +23,23 @@ export default function SignUpPage() {
         setError("");
 
         try {
-            const response = await fetch("/api/auth/register", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    email,
-                    password,
-                    name,
-                }),
-            });
+            const requestData: RegisterRequest = {
+                email,
+                password,
+                name,
+            };
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || t("auth.signIn.errorGeneral"));
-            }
+            const response = await apiClient.post<RegisterResponse>(
+                "/api/auth/register", 
+                requestData,
+                { skipAuth: true } // Registration doesn't require authentication
+            );
 
             // Registration successful, redirect to signin
             router.push("/auth/signin?message=registration-success");
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (error: any) {
-            setError(error.message);
+        } catch (error) {
+            const errorMessage = handleApiError(error, t("auth.signIn.errorGeneral"));
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }
