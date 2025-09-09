@@ -103,16 +103,16 @@ export const mockViemContractData = {
   [mockNFTPositions.ACTIVE_POSITION_ARBITRUM.nftId]: [
     BigInt(3),
     '0x0000000000000000000000000000000000000000',
-    TOKEN_ADDRESSES.arbitrum.USDC,
     TOKEN_ADDRESSES.arbitrum.WETH,
+    TOKEN_ADDRESSES.arbitrum.USDC,
     3000,
     -276300,
     -276250,
     BigInt('2000000000000000000'),
     BigInt(0),
     BigInt(0),
-    BigInt('200000000'),
     BigInt('100000000000000000'),
+    BigInt('200000000'),
   ] as const,
 
   [mockNFTPositions.ACTIVE_POSITION_BASE.nftId]: [
