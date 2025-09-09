@@ -43,7 +43,7 @@ describe('TokenResolutionService', () => {
   beforeAll(async () => {
     server.listen();
     
-    // Set up test database
+    // Set up test database with unique suffix for isolation
     testPrisma = new PrismaClient({
       datasources: {
         db: {
@@ -54,7 +54,7 @@ describe('TokenResolutionService', () => {
     
     await testPrisma.$connect();
     
-    // Initialize factories
+    // Initialize factories with improved cleanup
     factories = createTestFactorySuite(testPrisma);
   });
 
@@ -65,11 +65,12 @@ describe('TokenResolutionService', () => {
   });
 
   beforeEach(async () => {
-    // Clean up database before each test
+    // Clean up database before each test with improved order
     await factories.cleanup();
     
-    // Create test user
-    const { user } = await factories.users.createUserForApiTest('test-user');
+    // Create test user with timestamp for uniqueness
+    const uniqueUserId = `token-test-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const { user } = await factories.users.createUserForApiTest(uniqueUserId);
     testUserId = user.id;
     
     // Create service with test database
@@ -77,8 +78,6 @@ describe('TokenResolutionService', () => {
     
     // Seed common tokens
     await factories.tokens.createCommonTokens('ethereum');
-    
-    server.resetHandlers();
   });
 
   afterEach(async () => {
@@ -196,6 +195,7 @@ describe('TokenResolutionService', () => {
     });
 
     it('should update lastUsedAt for existing user tokens', async () => {
+      
       // Add custom token using factory
       const { userToken: originalToken } = await factories.tokens.createTokenForUser(
         testUserId,
@@ -293,6 +293,7 @@ describe('TokenResolutionService', () => {
     });
 
     it('should throw error if token already exists', async () => {
+      
       // Create existing token using factory
       await factories.tokens.createTokenForUser(
         testUserId,
@@ -327,6 +328,7 @@ describe('TokenResolutionService', () => {
 
   describe('updateUserToken', () => {
     it('should update user token successfully', async () => {
+      
       const { userToken: token } = await factories.tokens.createTokenForUser(
         testUserId,
         {
@@ -369,6 +371,7 @@ describe('TokenResolutionService', () => {
 
   describe('removeUserToken', () => {
     it('should remove user token successfully', async () => {
+      
       const { userToken: token } = await factories.tokens.createTokenForUser(
         testUserId,
         {
@@ -396,6 +399,7 @@ describe('TokenResolutionService', () => {
     });
 
     it('should throw error if token is used in pools', async () => {
+      
       // Create a pool with user token dependency using factory
       const pool = await factories.pools.createWethUsdcPool(testUserId);
       
@@ -445,6 +449,7 @@ describe('TokenResolutionService', () => {
 
   describe('getUserTokens', () => {
     it('should get user tokens filtered by chain', async () => {
+      
       // Create tokens on ethereum using factory
       await factories.tokens.createTokenForUser(
         testUserId,
@@ -481,6 +486,7 @@ describe('TokenResolutionService', () => {
     });
 
     it('should get all user tokens if no chain filter', async () => {
+      
       // Create tokens on different chains using factory
       await factories.tokens.createTokenForUser(
         testUserId,
@@ -518,6 +524,7 @@ describe('TokenResolutionService', () => {
 
   describe('enrichUserTokens', () => {
     it('should upgrade custom tokens to global when they become available', async () => {
+      
       // Add a placeholder token for a known address that will be found by Alchemy (WETH)
       const wethAddress = mockTokens.WETH_ETHEREUM.address;
       await factories.tokens.createTokenForUser(

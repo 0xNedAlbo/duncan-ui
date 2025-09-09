@@ -79,17 +79,33 @@ export class TestDatabaseManager {
    * Clean up all test data - maintains FK order
    */
   async cleanup() {
-    // Delete in FK dependency order (most dependent first)
-    await this.prisma.position.deleteMany();
-    await this.prisma.pool.deleteMany();
-    await this.prisma.userToken.deleteMany();
-    await this.prisma.token.deleteMany();
-    await this.prisma.session.deleteMany();
-    await this.prisma.account.deleteMany();
-    await this.prisma.user.deleteMany();
-    await this.prisma.verificationToken.deleteMany();
-    
-    this.createdUserIds.clear();
+    try {
+      // Delete in correct FK dependency order (most dependent first)
+      await this.prisma.positionEvent.deleteMany();
+      await this.prisma.position.deleteMany();
+      await this.prisma.pool.deleteMany();
+      await this.prisma.tokenReference.deleteMany();
+      await this.prisma.userToken.deleteMany();
+      await this.prisma.token.deleteMany();
+      await this.prisma.session.deleteMany();
+      await this.prisma.account.deleteMany();
+      await this.prisma.user.deleteMany();
+      await this.prisma.verificationToken.deleteMany();
+      
+      this.createdUserIds.clear();
+    } catch (error) {
+      // If cleanup fails, log the error but don't fail the test
+      console.warn('Database cleanup error:', error);
+      
+      // Try a more aggressive cleanup with cascade
+      try {
+        await this.prisma.$executeRaw`TRUNCATE TABLE "PositionEvent", "Position", "Pool", "TokenReference", "UserToken", "Token", "Session", "Account", "User", "VerificationToken" RESTART IDENTITY CASCADE`;
+        this.createdUserIds.clear();
+      } catch (cascadeError) {
+        console.error('Failed to cleanup database even with CASCADE:', cascadeError);
+        throw cascadeError;
+      }
+    }
   }
 
   /**
