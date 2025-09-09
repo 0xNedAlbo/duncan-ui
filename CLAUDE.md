@@ -252,16 +252,13 @@ The position management system now includes sophisticated event-driven PnL calcu
 - Development server: `npm run dev`
 - Build command: `npm run build`
 - Linting: `npm run lint`
-- Testing: `npm run test` (51+ unit tests with comprehensive API coverage)
+- Testing: `npm run test` (64+ unit tests with comprehensive API coverage, all SubgraphService tests now passing)
 
 **Known Issues / TODOs:**
-- **SubgraphService Tests:** 4 von 13 Tests schlagen fehl aufgrund von MSW-Handler Problemen
-  - `fetchPositionHistory > should fetch position history successfully` 
-  - `fetchPositionHistory > should work with API key`
-  - `fetchPositionsByOwner > should fetch positions by owner successfully`
-  - `parseInitialValue > should calculate initial value correctly`
-  - Problem: MSW-Handler werden nicht korrekt aufgerufen (wahrscheinlich undici/Node.js Kompatibilitätsproblem)
-  - Workaround: Tests könnten mit direktem Mocking statt MSW umgeschrieben werden
+- ~~**SubgraphService Tests:** 4 von 13 Tests schlagen fehl aufgrund von MSW-Handler Problemen~~ ✅ **RESOLVED**
+  - ~~Problem: MSW-Handler werden nicht korrekt aufgerufen (wahrscheinlich undici/Node.js Kompatibilitätsproblem)~~
+  - ✅ **Solution:** Replaced MSW with direct fetch mocking using `vi.spyOn(global, 'fetch')` for SubgraphService tests
+  - ✅ **Result:** All 13 SubgraphService tests now pass reliably across Node.js versions
 
 **UI/UX Principles:**
 - Dark theme as primary design language
