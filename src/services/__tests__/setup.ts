@@ -6,6 +6,7 @@ import { server } from '../../__tests__/mocks/server';
 // Singleton test database instance
 let sharedTestPrisma: PrismaClient | null = null;
 let sharedFactories: TestFactorySuite | null = null;
+let serverStarted = false;
 
 /**
  * Get or create shared test database instance
@@ -40,8 +41,9 @@ export function getSharedFactories(): TestFactorySuite {
  */
 export async function setupServiceTestEnvironment() {
   // Start MSW server if not already started
-  if (!server.listenerCount('request')) {
+  if (!serverStarted) {
     server.listen();
+    serverStarted = true;
   }
   
   // Connect to database
@@ -87,6 +89,12 @@ afterAll(async () => {
   if (sharedTestPrisma) {
     await sharedTestPrisma.$disconnect();
     sharedTestPrisma = null;
+  }
+  
+  // Reset MSW server state
+  if (serverStarted) {
+    server.close();
+    serverStarted = false;
   }
   
   sharedFactories = null;

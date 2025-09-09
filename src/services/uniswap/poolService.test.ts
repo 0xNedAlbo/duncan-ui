@@ -8,7 +8,6 @@ import {
     beforeAll,
     afterAll,
 } from "vitest";
-import { PrismaClient } from "@prisma/client";
 import { PoolService } from "./poolService";
 import { mockTokens } from "../../__tests__/fixtures/tokens";
 import {
@@ -16,9 +15,15 @@ import {
     mockUserTokens,
     mockFactoryResponses,
 } from "../../__tests__/fixtures/pools";
-import { server } from "../../__tests__/mocks/server";
 import { mockViemCalls } from "../../__tests__/mocks/poolHandlers";
-import { createTestFactorySuite } from "../../__tests__/factories";
+import { 
+  getSharedTestPrisma, 
+  getSharedFactories, 
+  setupServiceTestEnvironment,
+  cleanupServiceTestEnvironment,
+  createTestFileUserId 
+} from '../__tests__/setup';
+import { server } from '../../__tests__/mocks/server';
 
 // Mock viem functions
 vi.mock("viem", () => ({
@@ -63,44 +68,32 @@ vi.mock("viem/chains", () => ({
 }));
 
 describe("PoolService", () => {
-    let testPrisma: PrismaClient;
-    let factories: ReturnType<typeof createTestFactorySuite>;
     let service: PoolService;
     let testUserId: string;
+    let testPrisma: ReturnType<typeof getSharedTestPrisma>;
+    let factories: ReturnType<typeof getSharedFactories>;
 
     beforeAll(async () => {
-        server.listen();
-        
-        // Set up test database
-        testPrisma = new PrismaClient({
-            datasources: {
-                db: {
-                    url: "postgresql://duncan:dev123@localhost:5432/duncan_test",
-                },
-            },
-        });
-
-        await testPrisma.$connect();
-        
-        // Initialize factories
-        factories = createTestFactorySuite(testPrisma);
+        await setupServiceTestEnvironment();
     });
 
     afterAll(async () => {
-        server.close();
-        await factories.cleanup();
-        await testPrisma.$disconnect();
+        await cleanupServiceTestEnvironment();
     });
 
     beforeEach(async () => {
+        testPrisma = getSharedTestPrisma();
+        factories = getSharedFactories();
+        
         // Clean up database before each test
         await factories.cleanup();
         
-        // Create test user
-        const { user } = await factories.users.createUserForApiTest('pool-test-user');
+        // Create test user with unique ID for this test file
+        const uniqueUserId = createTestFileUserId('poolService');
+        const { user } = await factories.users.createUserForApiTest(uniqueUserId);
         testUserId = user.id;
         
-        // Create service with test database
+        // Create service with shared test database
         service = new PoolService(testPrisma);
         
         // Seed common tokens
