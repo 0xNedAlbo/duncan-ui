@@ -5,6 +5,7 @@ import { mockTokens } from '../../__tests__/fixtures/tokens';
 import { mockUserTokens } from '../../__tests__/fixtures/pools';
 import { server } from '../../__tests__/mocks/server';
 import { mockViemCalls } from '../../__tests__/mocks/poolHandlers';
+import { createTestFactorySuite } from '../../__tests__/factories';
 
 // Mock viem functions
 vi.mock('viem', () => ({
@@ -34,21 +35,16 @@ vi.mock('viem/chains', () => ({
 }));
 
 describe('TokenResolutionService', () => {
-  let prisma: PrismaClient;
+  let testPrisma: PrismaClient;
+  let factories: ReturnType<typeof createTestFactorySuite>;
   let service: TokenResolutionService;
-  const testUserId = 'user_test_1';
+  let testUserId: string;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     server.listen();
-  });
-
-  afterAll(() => {
-    server.close();
-  });
-
-  beforeEach(async () => {
-    // Use PostgreSQL test database
-    prisma = new PrismaClient({
+    
+    // Set up test database
+    testPrisma = new PrismaClient({
       datasources: {
         db: {
           url: 'postgresql://duncan:dev123@localhost:5432/duncan_test'
@@ -56,34 +52,36 @@ describe('TokenResolutionService', () => {
       }
     });
     
-    service = new TokenResolutionService(prisma);
+    await testPrisma.$connect();
     
-    // Reset database state
-    await prisma.$executeRaw`DELETE FROM positions`;
-    await prisma.$executeRaw`DELETE FROM pools`;
-    await prisma.$executeRaw`DELETE FROM token_references`;
-    await prisma.$executeRaw`DELETE FROM user_tokens`;
-    await prisma.$executeRaw`DELETE FROM tokens`;
-    await prisma.$executeRaw`DELETE FROM users`;
+    // Initialize factories
+    factories = createTestFactorySuite(testPrisma);
+  });
 
-    // Create test user for foreign key constraints
-    await prisma.user.create({
-      data: {
-        id: testUserId,
-        email: 'test@example.com',
-        name: 'Test User',
-        password: 'test123'
-      }
-    });
+  afterAll(async () => {
+    server.close();
+    await factories.cleanup();
+    await testPrisma.$disconnect();
+  });
+
+  beforeEach(async () => {
+    // Clean up database before each test
+    await factories.cleanup();
     
-    // Seed test data
-    await prisma.token.createMany({
-      data: [mockTokens.WETH_ETHEREUM, mockTokens.USDC_ETHEREUM]
-    });
+    // Create test user
+    const { user } = await factories.users.createUserForApiTest('test-user');
+    testUserId = user.id;
+    
+    // Create service with test database
+    service = new TokenResolutionService(testPrisma);
+    
+    // Seed common tokens
+    await factories.tokens.createCommonTokens('ethereum');
+    
+    server.resetHandlers();
   });
 
   afterEach(async () => {
-    server.resetHandlers();
     await service.disconnect();
   });
 
@@ -102,14 +100,27 @@ describe('TokenResolutionService', () => {
     });
 
     it('should return user token if exists in custom list', async () => {
-      // Add custom token
-      await prisma.userToken.create({
-        data: mockUserTokens.CUSTOM_TOKEN
-      });
+      // Add custom token using factory
+      const customToken = await factories.tokens.createTokenForUser(
+        testUserId,
+        {
+          id: 'custom-token-1',
+          chain: 'ethereum',
+          address: '0x0123456789012345678901234567890123456789',
+          symbol: 'CUSTOM',
+          name: 'Custom Token',
+          decimals: 18,
+          verified: false
+        },
+        {
+          userLabel: 'My Test Token',
+          source: 'manual'
+        }
+      );
 
       const result = await service.resolveToken(
         'ethereum',
-        mockUserTokens.CUSTOM_TOKEN.address,
+        customToken.address,
         testUserId
       );
 
@@ -132,7 +143,7 @@ describe('TokenResolutionService', () => {
       expect(result.isVerified).toBe(true);
       
       // Verify token was created in database
-      const createdToken = await prisma.token.findUnique({
+      const createdToken = await testPrisma.token.findUnique({
         where: {
           chain_address: {
             chain: 'ethereum',
@@ -159,7 +170,7 @@ describe('TokenResolutionService', () => {
       expect(result.source).toBe('contract');
       
       // Verify user token was created
-      const userToken = await prisma.userToken.findFirst({
+      const userToken = await testPrisma.userToken.findFirst({
         where: {
           userId: testUserId,
           address: customTokenAddress.toLowerCase()
@@ -185,10 +196,23 @@ describe('TokenResolutionService', () => {
     });
 
     it('should update lastUsedAt for existing user tokens', async () => {
-      // Add custom token
-      const originalToken = await prisma.userToken.create({
-        data: mockUserTokens.CUSTOM_TOKEN
-      });
+      // Add custom token using factory
+      const { userToken: originalToken } = await factories.tokens.createTokenForUser(
+        testUserId,
+        {
+          id: 'custom-token-2',
+          chain: 'ethereum',
+          address: '0x2222222222222222222222222222222222222222',
+          symbol: 'CUSTOM2',
+          name: 'Custom Token 2',
+          decimals: 18,
+          verified: false
+        },
+        {
+          userLabel: 'My Test Token 2',
+          source: 'manual'
+        }
+      );
 
       const originalLastUsed = originalToken.lastUsedAt;
       
@@ -197,11 +221,11 @@ describe('TokenResolutionService', () => {
       
       await service.resolveToken(
         'ethereum',
-        mockUserTokens.CUSTOM_TOKEN.address,
+        originalToken.address,
         testUserId
       );
 
-      const updatedToken = await prisma.userToken.findUnique({
+      const updatedToken = await testPrisma.userToken.findUnique({
         where: { id: originalToken.id }
       });
 
@@ -269,13 +293,27 @@ describe('TokenResolutionService', () => {
     });
 
     it('should throw error if token already exists', async () => {
-      await prisma.userToken.create({
-        data: mockUserTokens.CUSTOM_TOKEN
-      });
+      // Create existing token using factory
+      await factories.tokens.createTokenForUser(
+        testUserId,
+        {
+          id: 'duplicate-token',
+          chain: 'ethereum',
+          address: '0x3333333333333333333333333333333333333333',
+          symbol: 'DUP',
+          name: 'Duplicate Token',
+          decimals: 18,
+          verified: false
+        },
+        {
+          userLabel: 'Existing Token',
+          source: 'manual'
+        }
+      );
 
       const tokenData = {
-        chain: mockUserTokens.CUSTOM_TOKEN.chain,
-        address: mockUserTokens.CUSTOM_TOKEN.address,
+        chain: 'ethereum',
+        address: '0x3333333333333333333333333333333333333333',
         symbol: 'DUPLICATE',
         name: 'Duplicate Token',
         decimals: 18,
@@ -289,9 +327,23 @@ describe('TokenResolutionService', () => {
 
   describe('updateUserToken', () => {
     it('should update user token successfully', async () => {
-      const token = await prisma.userToken.create({
-        data: mockUserTokens.CUSTOM_TOKEN
-      });
+      const { userToken: token } = await factories.tokens.createTokenForUser(
+        testUserId,
+        {
+          id: 'update-token',
+          chain: 'ethereum',
+          address: '0x4444444444444444444444444444444444444444',
+          symbol: 'UPDATE',
+          name: 'Update Token',
+          decimals: 18,
+          verified: false
+        },
+        {
+          userLabel: 'Original Label',
+          source: 'manual',
+          notes: 'Original notes'
+        }
+      );
 
       const updates = {
         userLabel: 'Updated Label',
@@ -317,13 +369,26 @@ describe('TokenResolutionService', () => {
 
   describe('removeUserToken', () => {
     it('should remove user token successfully', async () => {
-      const token = await prisma.userToken.create({
-        data: mockUserTokens.CUSTOM_TOKEN
-      });
+      const { userToken: token } = await factories.tokens.createTokenForUser(
+        testUserId,
+        {
+          id: 'remove-token',
+          chain: 'ethereum',
+          address: '0x5555555555555555555555555555555555555555',
+          symbol: 'REMOVE',
+          name: 'Remove Token',
+          decimals: 18,
+          verified: false
+        },
+        {
+          userLabel: 'Token to Remove',
+          source: 'manual'
+        }
+      );
 
       await service.removeUserToken(testUserId, token.id);
 
-      const deletedToken = await prisma.userToken.findUnique({
+      const deletedToken = await testPrisma.userToken.findUnique({
         where: { id: token.id }
       });
 
@@ -331,59 +396,83 @@ describe('TokenResolutionService', () => {
     });
 
     it('should throw error if token is used in pools', async () => {
-      const token = await prisma.userToken.create({
-        data: mockUserTokens.CUSTOM_TOKEN
-      });
+      // Create a pool with user token dependency using factory
+      const pool = await factories.pools.createWethUsdcPool(testUserId);
+      
+      // Create a custom user token that will be referenced in the pool
+      const { userToken: customToken } = await factories.tokens.createTokenForUser(
+        testUserId,
+        {
+          id: 'pool-dependent-token',
+          chain: 'ethereum',
+          address: '0x6666666666666666666666666666666666666666',
+          symbol: 'POOLED',
+          name: 'Pooled Token',
+          decimals: 18,
+          verified: false
+        },
+        {
+          userLabel: 'Pooled Token',
+          source: 'manual'
+        }
+      );
 
-      // Create TokenReferences first
-      const token0Ref = await prisma.tokenReference.create({
+      // Create token reference that will be used by a pool
+      const tokenRef = await testPrisma.tokenReference.create({
         data: {
           tokenType: 'user',
-          userTokenId: token.id,
+          userTokenId: customToken.id,
           chain: 'ethereum',
-          address: token.address,
-          symbol: token.symbol,
-        },
-      });
-      const token1Ref = await prisma.tokenReference.create({
-        data: {
-          tokenType: 'global',
-          globalTokenId: mockTokens.USDC_ETHEREUM.id,
-          chain: 'ethereum',
-          address: mockTokens.USDC_ETHEREUM.address,
-          symbol: 'USDC',
+          address: customToken.address,
+          symbol: customToken.symbol,
         },
       });
 
-      // Create a pool that uses this token
-      await prisma.pool.create({
+      // Update the existing pool to use our custom token
+      await testPrisma.pool.update({
+        where: { id: pool.id },
         data: {
-          chain: 'ethereum',
-          poolAddress: '0x1234567890123456789012345678901234567890',
-          token0RefId: token0Ref.id,
-          token1RefId: token1Ref.id,
-          token0Address: token.address,
-          token1Address: mockTokens.USDC_ETHEREUM.address,
-          fee: 3000,
-          tickSpacing: 60,
-          ownerId: testUserId,
+          token0RefId: tokenRef.id,
+          token0Address: customToken.address,
         }
       });
 
       await expect(
-        service.removeUserToken(testUserId, token.id)
+        service.removeUserToken(testUserId, customToken.id)
       ).rejects.toThrow('Cannot remove token that is used in pools');
     });
   });
 
   describe('getUserTokens', () => {
     it('should get user tokens filtered by chain', async () => {
-      await prisma.userToken.createMany({
-        data: [
-          { ...mockUserTokens.CUSTOM_TOKEN },
-          { ...mockUserTokens.PLACEHOLDER_TOKEN }
-        ]
-      });
+      // Create tokens on ethereum using factory
+      await factories.tokens.createTokenForUser(
+        testUserId,
+        {
+          id: 'chain-filter-1',
+          chain: 'ethereum',
+          address: '0x7777777777777777777777777777777777777777',
+          symbol: 'FILT1',
+          name: 'Filter Token 1',
+          decimals: 18,
+          verified: false
+        },
+        { userLabel: 'Filter Token 1', source: 'manual' }
+      );
+
+      await factories.tokens.createTokenForUser(
+        testUserId,
+        {
+          id: 'chain-filter-2',
+          chain: 'ethereum',
+          address: '0x8888888888888888888888888888888888888888',
+          symbol: 'FILT2',
+          name: 'Filter Token 2',
+          decimals: 18,
+          verified: false
+        },
+        { userLabel: 'Filter Token 2', source: 'manual' }
+      );
 
       const tokens = await service.getUserTokens(testUserId, 'ethereum');
 
@@ -392,12 +481,34 @@ describe('TokenResolutionService', () => {
     });
 
     it('should get all user tokens if no chain filter', async () => {
-      await prisma.userToken.createMany({
-        data: [
-          { ...mockUserTokens.CUSTOM_TOKEN },
-          { ...mockUserTokens.PLACEHOLDER_TOKEN, id: 'usertoken_placeholder_2', chain: 'arbitrum' }
-        ]
-      });
+      // Create tokens on different chains using factory
+      await factories.tokens.createTokenForUser(
+        testUserId,
+        {
+          id: 'multi-chain-1',
+          chain: 'ethereum',
+          address: '0x9999999999999999999999999999999999999999',
+          symbol: 'MULTI1',
+          name: 'Multi Chain Token 1',
+          decimals: 18,
+          verified: false
+        },
+        { userLabel: 'Multi Chain Token 1', source: 'manual' }
+      );
+
+      await factories.tokens.createTokenForUser(
+        testUserId,
+        {
+          id: 'multi-chain-2',
+          chain: 'arbitrum',
+          address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          symbol: 'MULTI2',
+          name: 'Multi Chain Token 2',
+          decimals: 18,
+          verified: false
+        },
+        { userLabel: 'Multi Chain Token 2', source: 'manual' }
+      );
 
       const tokens = await service.getUserTokens(testUserId);
 
@@ -409,22 +520,29 @@ describe('TokenResolutionService', () => {
     it('should upgrade custom tokens to global when they become available', async () => {
       // Add a placeholder token for a known address that will be found by Alchemy (WETH)
       const wethAddress = mockTokens.WETH_ETHEREUM.address;
-      await prisma.userToken.create({
-        data: {
-          ...mockUserTokens.PLACEHOLDER_TOKEN,
+      await factories.tokens.createTokenForUser(
+        testUserId,
+        {
+          id: 'enrich-token',
+          chain: 'ethereum',
           address: wethAddress,
-          source: 'placeholder',
           symbol: 'UNKNOWN',
-          name: 'Unknown Token'
+          name: 'Unknown Token',
+          decimals: 18,
+          verified: false
+        },
+        {
+          userLabel: 'Unknown Token',
+          source: 'placeholder'
         }
-      });
+      );
 
       const enrichedCount = await service.enrichUserTokens(testUserId);
 
       expect(enrichedCount).toBe(1);
 
       // Verify token was moved to global (should already exist from seed data)
-      const globalToken = await prisma.token.findUnique({
+      const globalToken = await testPrisma.token.findUnique({
         where: {
           chain_address: {
             chain: 'ethereum',
@@ -437,7 +555,7 @@ describe('TokenResolutionService', () => {
       expect(globalToken!.verified).toBe(true);
 
       // Verify user token was removed
-      const userToken = await prisma.userToken.findFirst({
+      const userToken = await testPrisma.userToken.findFirst({
         where: {
           userId: testUserId,
           address: wethAddress

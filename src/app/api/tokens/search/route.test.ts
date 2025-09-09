@@ -1,11 +1,20 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import { PrismaClient } from '@prisma/client';
-import { GET } from './route';
+
+// Setup comprehensive mocking BEFORE importing routes
+import { setupApiRouteTestEnvironment } from '../../../../__tests__/mocks/nextRequestContext';
+import { createTestFactorySuite } from '../../../../__tests__/factories';
 import { createTestRequest } from '../../../../__tests__/utils/testRequest';
 import { TOKEN_ADDRESSES } from '../../../../__tests__/fixtures/tokens';
 
+const apiTestEnv = setupApiRouteTestEnvironment();
+
+// Import route handlers AFTER mocking setup
+import { GET } from './route';
+
 describe('/api/tokens/search', () => {
   let testPrisma: PrismaClient;
+  let factories: ReturnType<typeof createTestFactorySuite>;
 
   beforeAll(async () => {
     // Set up test environment
@@ -20,61 +29,47 @@ describe('/api/tokens/search', () => {
     });
 
     await testPrisma.$connect();
+    
+    // Initialize factories
+    factories = createTestFactorySuite(testPrisma);
+    
+    // Inject test prisma client for API routes
+    globalThis.__testPrisma = testPrisma;
   });
 
   beforeEach(async () => {
     // Clean up database before each test
-    await testPrisma.position.deleteMany();
-    await testPrisma.pool.deleteMany();
-    await testPrisma.token.deleteMany();
-    await testPrisma.user.deleteMany();
+    await factories.cleanup();
 
-    // Create test tokens
-    await testPrisma.token.createMany({
-      data: [
-        {
-          chain: 'ethereum',
-          address: TOKEN_ADDRESSES.ethereum.WETH.toLowerCase(),
-          symbol: 'WETH',
-          name: 'Wrapped Ether',
-          decimals: 18,
-          verified: true,
-        },
-        {
-          chain: 'ethereum',
-          address: TOKEN_ADDRESSES.ethereum.USDC.toLowerCase(),
-          symbol: 'USDC',
-          name: 'USD Coin',
-          decimals: 6,
-          verified: true,
-        },
-        {
-          chain: 'arbitrum',
-          address: TOKEN_ADDRESSES.arbitrum.WETH.toLowerCase(),
-          symbol: 'WETH',
-          name: 'Wrapped Ether',
-          decimals: 18,
-          verified: false,
-        },
-        {
-          chain: 'ethereum',
-          address: '0x1234567890123456789012345678901234567890',
-          symbol: 'UNVERIFIED',
-          name: 'Unverified Token',
-          decimals: 18,
-          verified: false,
-        },
-      ],
+    // Create test user and tokens using factories
+    const { user, sessionData } = await factories.users.createUserForApiTest('search-test-user');
+    
+    // Create test tokens using factory
+    await factories.tokens.createCommonTokens('ethereum');
+    await factories.tokens.createCommonTokens('arbitrum');
+    
+    // Create additional test tokens for search functionality
+    await testPrisma.token.create({
+      data: {
+        id: 'unverified-token',
+        chain: 'ethereum',
+        address: '0x1234567890123456789012345678901234567890',
+        symbol: 'UNVERIFIED',
+        name: 'Unverified Token',
+        decimals: 18,
+        verified: false,
+      }
     });
   });
 
   afterAll(async () => {
-    // Clean up and disconnect
-    await testPrisma.position.deleteMany();
-    await testPrisma.pool.deleteMany();
-    await testPrisma.token.deleteMany();
-    await testPrisma.user.deleteMany();
+    // Final cleanup and disconnect
+    await factories.cleanup();
     await testPrisma.$disconnect();
+    
+    // Clean up global reference and API test environment
+    globalThis.__testPrisma = undefined;
+    apiTestEnv.cleanup();
   });
 
   describe('GET /api/tokens/search', () => {

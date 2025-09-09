@@ -1,17 +1,18 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { NextRequest } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+
+// Setup comprehensive mocking BEFORE importing routes that need it
+import { setupViemMocks } from '@/__tests__/mocks/viemMocks';
+import { setupApiRouteTestEnvironment } from '@/__tests__/mocks/nextRequestContext';
+import { createTestFactorySuite } from '@/__tests__/factories';
+
+setupViemMocks();
+const apiTestEnv = setupApiRouteTestEnvironment();
+
+// Import route handlers AFTER mocking setup
 import { POST, GET } from './route';
 import { mockNFTPositions } from '@/__tests__/fixtures/nftPositions';
-
-// Mock NextAuth
-vi.mock('next-auth/next', () => ({
-  getServerSession: vi.fn(),
-}));
-
-// Mock auth options
-vi.mock('@/lib/auth', () => ({
-  authOptions: {},
-}));
 
 // Mock the NFT position service
 vi.mock('@/services/uniswap/nftPosition', () => ({
@@ -23,17 +24,49 @@ import { fetchNFTPosition, fetchNFTPositionWithOwner } from '@/services/uniswap/
 import { getServerSession } from 'next-auth/next';
 
 describe('/api/positions/import-nft', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  let testPrisma: PrismaClient;
+  let factories: ReturnType<typeof createTestFactorySuite>;
+
+  beforeAll(async () => {
+    // Set up test database
+    testPrisma = new PrismaClient({
+      datasources: {
+        db: {
+          url: 'postgresql://duncan:dev123@localhost:5432/duncan_test',
+        },
+      },
+    });
+
+    await testPrisma.$connect();
     
-    // Mock valid session for all tests
-    vi.mocked(getServerSession).mockResolvedValue({
-      user: { id: 'test-user-123', email: 'test@example.com' }
-    } as any);
+    // Initialize factories
+    factories = createTestFactorySuite(testPrisma);
+    
+    // Inject test prisma client for API routes
+    globalThis.__testPrisma = testPrisma;
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    
+    // Clean up database before each test
+    await factories.cleanup();
+    
+    // Create test user and mock session
+    const { user, sessionData } = await factories.users.createUserForApiTest('nft-test-user');
+    
+    // Mock valid session for all tests
+    vi.mocked(getServerSession).mockResolvedValue(sessionData as any);
+  });
+
+  afterAll(async () => {
+    // Final cleanup and disconnect
+    await factories.cleanup();
+    await testPrisma.$disconnect();
+    
+    // Clean up global reference and API test environment
+    globalThis.__testPrisma = undefined;
+    apiTestEnv.cleanup();
   });
 
   describe('POST', () => {

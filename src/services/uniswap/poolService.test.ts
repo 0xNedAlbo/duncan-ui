@@ -18,6 +18,7 @@ import {
 } from "../../__tests__/fixtures/pools";
 import { server } from "../../__tests__/mocks/server";
 import { mockViemCalls } from "../../__tests__/mocks/poolHandlers";
+import { createTestFactorySuite } from "../../__tests__/factories";
 
 // Mock viem functions
 vi.mock("viem", () => ({
@@ -62,21 +63,16 @@ vi.mock("viem/chains", () => ({
 }));
 
 describe("PoolService", () => {
-    let prisma: PrismaClient;
+    let testPrisma: PrismaClient;
+    let factories: ReturnType<typeof createTestFactorySuite>;
     let service: PoolService;
-    const testUserId = "user_test_1";
+    let testUserId: string;
 
-    beforeAll(() => {
+    beforeAll(async () => {
         server.listen();
-    });
-
-    afterAll(() => {
-        server.close();
-    });
-
-    beforeEach(async () => {
-        // Use PostgreSQL test database
-        prisma = new PrismaClient({
+        
+        // Set up test database
+        testPrisma = new PrismaClient({
             datasources: {
                 db: {
                     url: "postgresql://duncan:dev123@localhost:5432/duncan_test",
@@ -84,34 +80,36 @@ describe("PoolService", () => {
             },
         });
 
-        service = new PoolService(prisma);
+        await testPrisma.$connect();
+        
+        // Initialize factories
+        factories = createTestFactorySuite(testPrisma);
+    });
 
-        // Reset database state
-        await prisma.$executeRaw`DELETE FROM positions`;
-        await prisma.$executeRaw`DELETE FROM pools`;
-        await prisma.$executeRaw`DELETE FROM token_references`;
-        await prisma.$executeRaw`DELETE FROM user_tokens`;
-        await prisma.$executeRaw`DELETE FROM tokens`;
-        await prisma.$executeRaw`DELETE FROM users`;
+    afterAll(async () => {
+        server.close();
+        await factories.cleanup();
+        await testPrisma.$disconnect();
+    });
 
-        // Create test user for foreign key constraints
-        await prisma.user.create({
-            data: {
-                id: testUserId,
-                email: 'test@example.com',
-                name: 'Test User',
-                password: 'test123'
-            }
-        });
-
-        // Seed test data
-        await prisma.token.createMany({
-            data: [mockTokens.WETH_ETHEREUM, mockTokens.USDC_ETHEREUM],
-        });
+    beforeEach(async () => {
+        // Clean up database before each test
+        await factories.cleanup();
+        
+        // Create test user
+        const { user } = await factories.users.createUserForApiTest('pool-test-user');
+        testUserId = user.id;
+        
+        // Create service with test database
+        service = new PoolService(testPrisma);
+        
+        // Seed common tokens
+        await factories.tokens.createCommonTokens('ethereum');
+        
+        server.resetHandlers();
     });
 
     afterEach(async () => {
-        server.resetHandlers();
         await service.disconnect();
     });
 
@@ -212,14 +210,27 @@ describe("PoolService", () => {
         });
 
         it("should create pool with custom tokens", async () => {
-            // Add custom token for user
-            await prisma.userToken.create({
-                data: mockUserTokens.CUSTOM_TOKEN,
-            });
+            // Add custom token for user using factory
+            const { userToken: customToken } = await factories.tokens.createTokenForUser(
+                testUserId,
+                {
+                    id: 'pool-custom-token',
+                    chain: 'ethereum',
+                    address: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+                    symbol: 'CUSTOM',
+                    name: 'Custom Token',
+                    decimals: 18,
+                    verified: false
+                },
+                {
+                    userLabel: 'My Custom Token',
+                    source: 'manual'
+                }
+            );
 
             const result = await service.findOrCreatePool(
                 "ethereum",
-                mockUserTokens.CUSTOM_TOKEN.address,
+                customToken.address,
                 mockTokens.USDC_ETHEREUM.address,
                 3000,
                 testUserId
@@ -548,14 +559,27 @@ describe("PoolService", () => {
 
     describe("integration with TokenReferenceService", () => {
         it("should resolve both global and custom tokens correctly", async () => {
-            // Add custom token
-            await prisma.userToken.create({
-                data: mockUserTokens.CUSTOM_TOKEN,
-            });
+            // Add custom token using factory
+            const { userToken: customToken } = await factories.tokens.createTokenForUser(
+                testUserId,
+                {
+                    id: 'integration-custom-token',
+                    chain: 'ethereum',
+                    address: '0xcccccccccccccccccccccccccccccccccccccccc',
+                    symbol: 'INTEG',
+                    name: 'Integration Token',
+                    decimals: 18,
+                    verified: false
+                },
+                {
+                    userLabel: 'My Test Token',
+                    source: 'manual'
+                }
+            );
 
             const result = await service.findOrCreatePool(
                 "ethereum",
-                mockUserTokens.CUSTOM_TOKEN.address,
+                customToken.address,
                 mockTokens.USDC_ETHEREUM.address,
                 3000,
                 testUserId

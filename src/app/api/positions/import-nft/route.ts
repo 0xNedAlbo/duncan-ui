@@ -85,8 +85,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
     }
 
     // 2. Initialize services
-    const poolService = new PoolService();
-    const prisma = new PrismaClient();
+    const prisma = (globalThis as any).__testPrisma || new PrismaClient();
+    const poolService = new PoolService(prisma);
 
     try {
       // 3. Find or create pool internally
