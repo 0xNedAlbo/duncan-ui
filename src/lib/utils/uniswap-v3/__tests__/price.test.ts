@@ -65,6 +65,20 @@ describe('Uniswap V3 Price Utilities', () => {
       expect(humanReadable).toBeLessThan(4350);
     });
 
+    it('should convert RDNT/WETH tick to reasonable price', () => {
+      const { tick, token0, token1 } = fixtures.rdntWeth;
+      
+      const result = tickToPrice(tick, token0.address!, token1.address!, token0.decimals);
+
+      // Should be positive
+      expect(result > 0n).toBe(true);
+      
+      // Should be in reasonable range for WETH per RDNT (~0.000004-0.000006 WETH per RDNT)
+      const humanReadable = Number(result) / Math.pow(10, token1.decimals);
+      expect(humanReadable).toBeGreaterThan(0.000004);
+      expect(humanReadable).toBeLessThan(0.000006);
+    });
+
     it('should handle different decimal configurations', () => {
       const tick = -73000; // Around current WBTC/WETH level
       const result = tickToPrice(tick, WBTC, WETH, 8);
@@ -199,6 +213,24 @@ describe('Uniswap V3 Price Utilities', () => {
         token1PerToken0: "4327484675", // ~4327.48 USDC per WETH
         token0PerToken1: "231081118708235", // ~0.0002310811 WETH per USDC
       }
+    },
+    rdntWeth: {
+      sqrtPriceX96: JSBI.BigInt("176914143096444148763602317"),
+      tick: -122095,
+      token0: {
+        symbol: 'RDNT',
+        address: '0x3082CC23568eA640225c2467653dB90e9250AaA0',
+        decimals: 18,
+      },
+      token1: {
+        symbol: 'WETH',
+        address: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+        decimals: 18,
+      },
+      expected: {
+        token1PerToken0: "4986156883694", // ~0.000004986 WETH per RDNT
+        token0PerToken1: "200555261963407082975182", // ~200555.26 RDNT per WETH
+      }
     }
   };
 
@@ -213,6 +245,14 @@ describe('Uniswap V3 Price Utilities', () => {
 
     it('should calculate correct USDC per WETH', () => {
       const { sqrtPriceX96, token0, expected } = fixtures.wethUsdc;
+      
+      const result = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, token0.decimals);
+      
+      expect(result.toString()).toBe(expected.token1PerToken0);
+    });
+
+    it('should calculate correct WETH per RDNT', () => {
+      const { sqrtPriceX96, token0, expected } = fixtures.rdntWeth;
       
       const result = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, token0.decimals);
       
@@ -240,6 +280,17 @@ describe('Uniswap V3 Price Utilities', () => {
       expect(humanReadable).toBeGreaterThan(4000);
       expect(humanReadable).toBeLessThan(5000);
     });
+
+    it('should produce reasonable human-readable values for RDNT/WETH', () => {
+      const { sqrtPriceX96, token0, token1 } = fixtures.rdntWeth;
+      
+      const result = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, token0.decimals);
+      const humanReadable = Number(result) / Math.pow(10, token1.decimals);
+      
+      // Should be around 0.000004-0.000006 WETH per RDNT (based on ~$0.02175 RDNT / ~$4357 WETH)
+      expect(humanReadable).toBeGreaterThan(0.000004);
+      expect(humanReadable).toBeLessThan(0.000006);
+    });
   });
 
   describe('sqrtRatioX96ToToken0PerToken1', () => {
@@ -253,6 +304,14 @@ describe('Uniswap V3 Price Utilities', () => {
 
     it('should calculate correct WETH per USDC', () => {
       const { sqrtPriceX96, token1, expected } = fixtures.wethUsdc;
+      
+      const result = sqrtRatioX96ToToken0PerToken1(sqrtPriceX96, token1.decimals);
+      
+      expect(result.toString()).toBe(expected.token0PerToken1);
+    });
+
+    it('should calculate correct RDNT per WETH', () => {
+      const { sqrtPriceX96, token1, expected } = fixtures.rdntWeth;
       
       const result = sqrtRatioX96ToToken0PerToken1(sqrtPriceX96, token1.decimals);
       
@@ -280,6 +339,17 @@ describe('Uniswap V3 Price Utilities', () => {
       expect(humanReadable).toBeGreaterThan(0.0002);
       expect(humanReadable).toBeLessThan(0.0003);
     });
+
+    it('should produce reasonable human-readable values for RDNT/WETH', () => {
+      const { sqrtPriceX96, token0, token1 } = fixtures.rdntWeth;
+      
+      const result = sqrtRatioX96ToToken0PerToken1(sqrtPriceX96, token1.decimals);
+      const humanReadable = Number(result) / Math.pow(10, token0.decimals);
+      
+      // Should be around 180,000-220,000 RDNT per WETH (based on ~$4357 WETH / ~$0.02175 RDNT)
+      expect(humanReadable).toBeGreaterThan(180000);
+      expect(humanReadable).toBeLessThan(220000);
+    });
   });
 
   describe('Reciprocal relationships', () => {
@@ -300,6 +370,21 @@ describe('Uniswap V3 Price Utilities', () => {
 
     it('should maintain reciprocal relationship for WETH/USDC', () => {
       const { sqrtPriceX96, token0, token1 } = fixtures.wethUsdc;
+      
+      const token1PerToken0 = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, token0.decimals);
+      const token0PerToken1 = sqrtRatioX96ToToken0PerToken1(sqrtPriceX96, token1.decimals);
+      
+      const humanToken1PerToken0 = Number(token1PerToken0) / Math.pow(10, token1.decimals);
+      const humanToken0PerToken1 = Number(token0PerToken1) / Math.pow(10, token0.decimals);
+      
+      const reciprocal = 1 / humanToken1PerToken0;
+      
+      // Should be approximately equal (within 0.1% tolerance due to precision)
+      expect(Math.abs(reciprocal - humanToken0PerToken1) / humanToken0PerToken1).toBeLessThan(0.001);
+    });
+
+    it('should maintain reciprocal relationship for RDNT/WETH', () => {
+      const { sqrtPriceX96, token0, token1 } = fixtures.rdntWeth;
       
       const token1PerToken0 = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, token0.decimals);
       const token0PerToken1 = sqrtRatioX96ToToken0PerToken1(sqrtPriceX96, token1.decimals);
