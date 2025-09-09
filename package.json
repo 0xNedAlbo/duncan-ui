@@ -55,5 +55,20 @@
     "tw-animate-css": "^1.3.8",
     "typescript": "^5",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "ansi-styles": "4.3.0",
+    "debug": "4.4.1",
+    "chalk": "4.1.2",
+    "supports-color": "7.2.0",
+    "strip-ansi": "6.0.1",
+    "ansi-regex": "5.0.1",
+    "wrap-ansi": "6.2.0",
+    "color-convert": "2.0.1",
+    "color-name": "1.1.4",
+    "color": "4.2.3",
+    "color-string": "1.9.1",
+    "simple-swizzle": "0.2.2",
+    "is-arrayish": "0.3.2"
   }
 }
