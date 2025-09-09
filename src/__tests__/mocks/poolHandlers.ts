@@ -36,11 +36,25 @@ export const mockViemCalls = {
       if (fee === 500) return mockFactoryResponses.WETH_USDC_500;
     }
     
-    // Custom token with USDC
+    // Custom tokens with USDC
     if (key.includes('0123456789012345678901234567890123456789') && 
         key.includes('a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48') && 
         fee === 3000) {
       return '0x1234567890123456789012345678901234567890';
+    }
+    
+    // CUSTOM token (0xbbbb...) with USDC
+    if (key.includes('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb') && 
+        key.includes('a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48') && 
+        fee === 3000) {
+      return '0x2345678901234567890123456789012345678901';
+    }
+    
+    // INTEG token (0xcccc...) with USDC  
+    if (key.includes('cccccccccccccccccccccccccccccccccccccccc') && 
+        key.includes('a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48') && 
+        fee === 3000) {
+      return '0x3456789012345678901234567890123456789012';
     }
     
     // Return zero address for non-existent pools
@@ -71,6 +85,30 @@ export const mockViemCalls = {
         true,    // unlocked
       ];
     }
+    // CUSTOM token pool (0x2345...)
+    if (poolAddress === '0x2345678901234567890123456789012345678901') {
+      return [
+        BigInt('3543191142285914205922034323214'), // sqrtPriceX96
+        202500,  // tick
+        1,       // observationIndex
+        1,       // observationCardinality
+        1,       // observationCardinalityNext
+        0,       // feeProtocol
+        true,    // unlocked
+      ];
+    }
+    // INTEG token pool (0x3456...)
+    if (poolAddress === '0x3456789012345678901234567890123456789012') {
+      return [
+        BigInt('3543191142285914205922034323214'), // sqrtPriceX96
+        202500,  // tick
+        1,       // observationIndex
+        1,       // observationCardinality
+        1,       // observationCardinalityNext
+        0,       // feeProtocol
+        true,    // unlocked
+      ];
+    }
     
     throw new Error('Pool not found');
   },
@@ -81,6 +119,12 @@ export const mockViemCalls = {
       return BigInt('12345678901234567890');
     }
     if (poolAddress === '0x1234567890123456789012345678901234567890') {
+      return BigInt('12345678901234567890');
+    }
+    if (poolAddress === '0x2345678901234567890123456789012345678901') {
+      return BigInt('12345678901234567890');
+    }
+    if (poolAddress === '0x3456789012345678901234567890123456789012') {
       return BigInt('12345678901234567890');
     }
     
@@ -95,6 +139,12 @@ export const mockViemCalls = {
     if (poolAddress === '0x1234567890123456789012345678901234567890') {
       return '0x0123456789012345678901234567890123456789'; // Custom token (lower)
     }
+    if (poolAddress === '0x2345678901234567890123456789012345678901') {
+      return '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'; // USDC (lower)
+    }
+    if (poolAddress === '0x3456789012345678901234567890123456789012') {
+      return '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'; // USDC (lower)
+    }
     
     throw new Error('Pool not found');
   },
@@ -107,6 +157,12 @@ export const mockViemCalls = {
     if (poolAddress === '0x1234567890123456789012345678901234567890') {
       return '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'; // USDC (higher)
     }
+    if (poolAddress === '0x2345678901234567890123456789012345678901') {
+      return '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'; // CUSTOM token
+    }
+    if (poolAddress === '0x3456789012345678901234567890123456789012') {
+      return '0xcccccccccccccccccccccccccccccccccccccccc'; // INTEG token
+    }
     
     throw new Error('Pool not found');
   },
@@ -117,6 +173,12 @@ export const mockViemCalls = {
       return 3000;
     }
     if (poolAddress === '0x1234567890123456789012345678901234567890') {
+      return 3000;
+    }
+    if (poolAddress === '0x2345678901234567890123456789012345678901') {
+      return 3000;
+    }
+    if (poolAddress === '0x3456789012345678901234567890123456789012') {
       return 3000;
     }
     
@@ -131,6 +193,12 @@ export const mockViemCalls = {
     if (poolAddress === '0x1234567890123456789012345678901234567890') {
       return 60;
     }
+    if (poolAddress === '0x2345678901234567890123456789012345678901') {
+      return 60;
+    }
+    if (poolAddress === '0x3456789012345678901234567890123456789012') {
+      return 60;
+    }
     
     throw new Error('Pool not found');
   },
@@ -141,6 +209,8 @@ export const mockViemCalls = {
     if (address === '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2') return 'Wrapped Ether';
     if (address === '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48') return 'USD Coin';
     if (address === '0x0123456789012345678901234567890123456789') return 'Custom Test Token';
+    if (address === '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb') return 'Custom Token';
+    if (address === '0xcccccccccccccccccccccccccccccccccccccccc') return 'Integration Token';
     if (address === '0xffffffffffffffffffffffffffffffffffffffff') {
       throw new Error('Contract call failed');
     }
@@ -152,6 +222,8 @@ export const mockViemCalls = {
     if (address === '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2') return 'WETH';
     if (address === '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48') return 'USDC';
     if (address === '0x0123456789012345678901234567890123456789') return 'CUSTOM';
+    if (address === '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb') return 'CUSTOM';
+    if (address === '0xcccccccccccccccccccccccccccccccccccccccc') return 'INTEG';
     if (address === '0xffffffffffffffffffffffffffffffffffffffff') {
       throw new Error('Contract call failed');
     }
@@ -163,6 +235,8 @@ export const mockViemCalls = {
     if (address === '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2') return 18; // WETH
     if (address === '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48') return 6;  // USDC
     if (address === '0x0123456789012345678901234567890123456789') return 18; // Custom
+    if (address === '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb') return 18; // CUSTOM
+    if (address === '0xcccccccccccccccccccccccccccccccccccccccc') return 18; // INTEG
     if (address === '0xffffffffffffffffffffffffffffffffffffffff') {
       throw new Error('Contract call failed');
     }

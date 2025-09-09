@@ -101,7 +101,7 @@ describe('TokenResolutionService', () => {
 
     it('should return user token if exists in custom list', async () => {
       // Add custom token using factory
-      const customToken = await factories.tokens.createTokenForUser(
+      const { userToken: customToken } = await factories.tokens.createTokenForUser(
         testUserId,
         {
           id: 'custom-token-1',

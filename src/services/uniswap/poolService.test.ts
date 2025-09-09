@@ -156,7 +156,7 @@ describe("PoolService", () => {
             expect(result.token1Data.type).toBe("global");
 
             // Verify pool was created in database
-            const createdPool = await prisma.pool.findUnique({
+            const createdPool = await testPrisma.pool.findUnique({
                 where: { id: result.id },
             });
             expect(createdPool).not.toBeNull();
@@ -220,7 +220,7 @@ describe("PoolService", () => {
                     symbol: 'CUSTOM',
                     name: 'Custom Token',
                     decimals: 18,
-                    verified: false
+                    isVerified: false
                 },
                 {
                     userLabel: 'My Custom Token',
@@ -237,40 +237,15 @@ describe("PoolService", () => {
             );
 
             expect(result.ownerId).toBe(testUserId);
-            expect(result.token0Data.type).toBe("user"); // Custom token
-            expect(result.token1Data.type).toBe("global"); // Global USDC
+            expect(result.token0Data.type).toBe("global"); // Global USDC (lower address)
+            expect(result.token1Data.type).toBe("user"); // Custom token (higher address)
         });
     });
 
     describe("getPoolById", () => {
         it("should return pool with token data", async () => {
-            // Create TokenReferences first
-            const token0Ref = await prisma.tokenReference.create({
-                data: {
-                    tokenType: "global",
-                    globalTokenId: mockTokens.WETH_ETHEREUM.id,
-                    chain: "ethereum",
-                    address: mockTokens.WETH_ETHEREUM.address,
-                    symbol: "WETH",
-                },
-            });
-            const token1Ref = await prisma.tokenReference.create({
-                data: {
-                    tokenType: "global",
-                    globalTokenId: mockTokens.USDC_ETHEREUM.id,
-                    chain: "ethereum",
-                    address: mockTokens.USDC_ETHEREUM.address,
-                    symbol: "USDC",
-                },
-            });
-
-            const pool = await prisma.pool.create({
-                data: {
-                    ...mockPools.WETH_USDC_3000,
-                    token0RefId: token0Ref.id,
-                    token1RefId: token1Ref.id,
-                },
-            });
+            // Create pool using factory which will create tokens and references properly
+            const pool = await factories.pools.createWethUsdcPool(testUserId);
 
             const result = await service.getPoolById(pool.id);
 
@@ -288,40 +263,15 @@ describe("PoolService", () => {
 
     describe("getPoolsForTokenPair", () => {
         beforeEach(async () => {
-            // Create TokenReferences for WETH and USDC
-            const wethRef = await prisma.tokenReference.create({
-                data: {
-                    tokenType: "global",
-                    globalTokenId: mockTokens.WETH_ETHEREUM.id,
-                    chain: "ethereum",
-                    address: mockTokens.WETH_ETHEREUM.address,
-                    symbol: "WETH",
-                },
-            });
-            const usdcRef = await prisma.tokenReference.create({
-                data: {
-                    tokenType: "global",
-                    globalTokenId: mockTokens.USDC_ETHEREUM.id,
-                    chain: "ethereum",
-                    address: mockTokens.USDC_ETHEREUM.address,
-                    symbol: "USDC",
-                },
-            });
-
-            // Create multiple pools with different fees
-            await prisma.pool.createMany({
-                data: [
-                    {
-                        ...mockPools.WETH_USDC_3000,
-                        token0RefId: usdcRef.id, // USDC has lower address
-                        token1RefId: wethRef.id,
-                    },
-                    {
-                        ...mockPools.WETH_USDC_500,
-                        token0RefId: usdcRef.id, // USDC has lower address
-                        token1RefId: wethRef.id,
-                    },
-                ],
+            // Create multiple pools with different fees using factory pattern
+            await factories.pools.createWethUsdcPool(testUserId, 'ethereum');
+            
+            // Create a second pool with different fee using factory with custom data
+            const commonTokens = await factories.tokens.createCommonTokens('ethereum');
+            await factories.pools.createPoolWithTokens(testUserId, commonTokens.WETH.id, commonTokens.USDC.id, {
+                fee: 500,
+                tickSpacing: 10,
+                poolAddress: mockPools.WETH_USDC_500.poolAddress
             });
         });
 
@@ -362,46 +312,26 @@ describe("PoolService", () => {
 
     describe("searchPools", () => {
         beforeEach(async () => {
-            // Create TokenReferences first
-            const wethRef = await prisma.tokenReference.create({
-                data: {
-                    tokenType: "global",
-                    globalTokenId: mockTokens.WETH_ETHEREUM.id,
-                    chain: "ethereum",
-                    address: mockTokens.WETH_ETHEREUM.address,
-                    symbol: "WETH",
-                },
+            // Create multiple test pools using factory
+            const userPool = await factories.pools.createWethUsdcPool(testUserId, 'ethereum');
+            
+            // Create additional pools for testing
+            const commonTokens = await factories.tokens.createCommonTokens('ethereum');
+            
+            // Create additional pools with different configurations
+            await factories.pools.createPoolWithTokens(testUserId, commonTokens.WETH.id, commonTokens.USDC.id, {
+                fee: 500,
+                tickSpacing: 10,
+                poolAddress: mockPools.WETH_USDC_500.poolAddress,
+                ownerId: null // Global pool
             });
-            const usdcRef = await prisma.tokenReference.create({
-                data: {
-                    tokenType: "global",
-                    globalTokenId: mockTokens.USDC_ETHEREUM.id,
-                    chain: "ethereum",
-                    address: mockTokens.USDC_ETHEREUM.address,
-                    symbol: "USDC",
-                },
-            });
-
-            // Create test pools with TokenReference IDs
-            await prisma.pool.createMany({
-                data: [
-                    {
-                        ...mockPools.WETH_USDC_3000,
-                        token0RefId: usdcRef.id, // USDC has lower address
-                        token1RefId: wethRef.id,
-                    },
-                    {
-                        ...mockPools.WETH_USDC_500,
-                        token0RefId: usdcRef.id, // USDC has lower address
-                        token1RefId: wethRef.id,
-                    },
-                    { 
-                        ...mockPools.CUSTOM_TOKEN_POOL, 
-                        ownerId: testUserId,
-                        token0RefId: wethRef.id, // Temporary, will be fixed later
-                        token1RefId: usdcRef.id,
-                    },
-                ],
+            
+            // Create a second user pool
+            await factories.pools.createPoolWithTokens(testUserId, commonTokens.USDC.id, commonTokens.WETH.id, {
+                fee: 10000,
+                tickSpacing: 200,
+                poolAddress: mockPools.CUSTOM_TOKEN_POOL.poolAddress,
+                ownerId: testUserId // User pool
             });
         });
 
@@ -459,39 +389,22 @@ describe("PoolService", () => {
 
     describe("updatePoolState", () => {
         it("should update pool state from blockchain", async () => {
-            // Create TokenReferences first
-            const wethRef = await prisma.tokenReference.create({
+            // Create pool using factory and then reset its state
+            const createdPool = await factories.pools.createWethUsdcPool(testUserId, 'ethereum');
+            
+            // Update the pool to have null current state for testing
+            const pool = await testPrisma.pool.update({
+                where: { id: createdPool.id },
                 data: {
-                    tokenType: "global",
-                    globalTokenId: mockTokens.WETH_ETHEREUM.id,
-                    chain: "ethereum",
-                    address: mockTokens.WETH_ETHEREUM.address,
-                    symbol: "WETH",
-                },
-            });
-            const usdcRef = await prisma.tokenReference.create({
-                data: {
-                    tokenType: "global",
-                    globalTokenId: mockTokens.USDC_ETHEREUM.id,
-                    chain: "ethereum",
-                    address: mockTokens.USDC_ETHEREUM.address,
-                    symbol: "USDC",
-                },
-            });
-
-            const pool = await prisma.pool.create({
-                data: {
-                    ...mockPools.WETH_USDC_3000,
-                    token0RefId: usdcRef.id, // USDC has lower address
-                    token1RefId: wethRef.id,
                     currentPrice: null,
                     currentTick: null,
+                    sqrtPriceX96: null,
                 },
             });
 
             await service.updatePoolState(pool.id);
 
-            const updatedPool = await prisma.pool.findUnique({
+            const updatedPool = await testPrisma.pool.findUnique({
                 where: { id: pool.id },
             });
 
@@ -569,7 +482,7 @@ describe("PoolService", () => {
                     symbol: 'INTEG',
                     name: 'Integration Token',
                     decimals: 18,
-                    verified: false
+                    isVerified: false
                 },
                 {
                     userLabel: 'My Test Token',
@@ -585,9 +498,9 @@ describe("PoolService", () => {
                 testUserId
             );
 
-            expect(result.token0Data.type).toBe("user"); // Custom token
-            expect(result.token1Data.type).toBe("global"); // Global USDC
-            expect(result.token0Data.userLabel).toBe("My Test Token");
+            expect(result.token0Data.type).toBe("global"); // Global USDC (lower address)
+            expect(result.token1Data.type).toBe("user"); // Custom token (higher address)
+            expect(result.token1Data.userLabel).toBe("My Test Token");
         });
     });
 });
