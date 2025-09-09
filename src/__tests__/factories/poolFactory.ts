@@ -14,6 +14,7 @@ export interface TestPoolData {
   token1Address?: string;
   token0RefId?: string;
   token1RefId?: string;
+  ownerId?: string | null;
 }
 
 /**
@@ -100,7 +101,7 @@ export class PoolFactory {
         token1Address: token1Address!,
         token0RefId: token0RefId!,
         token1RefId: token1RefId!,
-        ownerId: userId,
+        ownerId: data.ownerId !== undefined ? data.ownerId : userId,
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -117,24 +118,29 @@ export class PoolFactory {
   async createWethUsdcPool(userId: string, chain: string = 'ethereum') {
     const commonTokens = await this.tokenFactory.createCommonTokens(chain);
     
+    // Determine token order according to Uniswap V3 convention (lower address = token0)
+    const isWethToken0 = BigInt(commonTokens.WETH.address) < BigInt(commonTokens.USDC.address);
+    const token0 = isWethToken0 ? commonTokens.WETH : commonTokens.USDC;
+    const token1 = isWethToken0 ? commonTokens.USDC : commonTokens.WETH;
+    
     // Create token references for the common tokens
     const token0Ref = await this.prisma.tokenReference.create({
       data: {
         tokenType: 'global',
-        globalTokenId: commonTokens.WETH.id,
+        globalTokenId: token0.id,
         chain,
-        address: commonTokens.WETH.address,
-        symbol: commonTokens.WETH.symbol
+        address: token0.address,
+        symbol: token0.symbol
       }
     });
 
     const token1Ref = await this.prisma.tokenReference.create({
       data: {
         tokenType: 'global',
-        globalTokenId: commonTokens.USDC.id,
+        globalTokenId: token1.id,
         chain,
-        address: commonTokens.USDC.address,
-        symbol: commonTokens.USDC.symbol
+        address: token1.address,
+        symbol: token1.symbol
       }
     });
 
@@ -144,8 +150,9 @@ export class PoolFactory {
       tickSpacing: 60, // Standard for 0.3% fee tier
       token0RefId: token0Ref.id,
       token1RefId: token1Ref.id,
-      token0Address: commonTokens.WETH.address,
-      token1Address: commonTokens.USDC.address,
+      token0Address: token0.address,
+      token1Address: token1.address,
+      poolAddress: '0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8', // Use mock pool address
       currentPrice: '2000.50',
       currentTick: 201000
     });
@@ -170,9 +177,16 @@ export class PoolFactory {
   /**
    * Create pool with existing tokens
    */
-  async createPoolWithTokens(userId: string, token0Id: string, token1Id: string, data: Partial<TestPoolData> = {}) {
-    const token0 = await this.prisma.token.findUniqueOrThrow({ where: { id: token0Id } });
-    const token1 = await this.prisma.token.findUniqueOrThrow({ where: { id: token1Id } });
+  async createPoolWithTokens(userId: string, tokenAId: string, tokenBId: string, data: Partial<TestPoolData> = {}) {
+    const tokenA = await this.prisma.token.findUniqueOrThrow({ where: { id: tokenAId } });
+    const tokenB = await this.prisma.token.findUniqueOrThrow({ where: { id: tokenBId } });
+
+    // Sort tokens by address according to Uniswap V3 convention
+    const isAToken0 = BigInt(tokenA.address) < BigInt(tokenB.address);
+    const token0 = isAToken0 ? tokenA : tokenB;
+    const token1 = isAToken0 ? tokenB : tokenA;
+    const token0Id = isAToken0 ? tokenAId : tokenBId;
+    const token1Id = isAToken0 ? tokenBId : tokenAId;
 
     // Find or create token references
     let token0Ref = await this.prisma.tokenReference.findFirst({

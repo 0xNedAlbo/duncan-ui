@@ -16,8 +16,8 @@ import {
 import {
     UNISWAP_V3_POOL_ABI,
     PoolState,
-    sortTokens,
 } from "@/lib/contracts/uniswapV3Pool";
+import { sortTokens as sortTokensUtil } from "@/lib/utils/uniswap-v3";
 import { sqrtRatioX96ToToken1PerToken0 } from "@/lib/utils/uniswap-v3/price";
 import { normalizeAddress } from "@/lib/contracts/erc20";
 import JSBI from "jsbi";
@@ -45,6 +45,17 @@ export interface PoolWithTokenReferences extends Pool {
 export interface PoolWithTokens extends Pool {
     token0Data: UnifiedTokenData;
     token1Data: UnifiedTokenData;
+}
+
+/**
+ * Helper function to sort token addresses using the correct Uniswap V3 method
+ */
+function sortTokens(tokenA: string, tokenB: string): [string, string] {
+    const sorted = sortTokensUtil(
+        { address: tokenA },
+        { address: tokenB }
+    );
+    return [sorted.token0.address, sorted.token1.address];
 }
 
 export class PoolService {

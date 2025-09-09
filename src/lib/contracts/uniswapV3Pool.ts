@@ -78,11 +78,3 @@ export interface PoolState {
 
 // sqrtPriceX96ToPrice function removed - now using shared implementation from utils/uniswap-v3/price.ts
 
-/**
- * Determine which token should be token0 (lower address)
- */
-export function sortTokens(tokenA: string, tokenB: string): [string, string] {
-  const token0 = tokenA.toLowerCase() < tokenB.toLowerCase() ? tokenA : tokenB;
-  const token1 = tokenA.toLowerCase() < tokenB.toLowerCase() ? tokenB : tokenA;
-  return [token0, token1];
-}

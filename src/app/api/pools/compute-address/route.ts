@@ -9,7 +9,7 @@ import {
   UNISWAP_V3_FACTORY_ABI,
   isValidFeeTier
 } from '@/lib/contracts/uniswapV3Factory';
-import { sortTokens } from '@/lib/contracts/uniswapV3Pool';
+import { sortTokens } from '@/lib/utils/uniswap-v3';
 import { normalizeAddress } from '@/lib/contracts/erc20';
 
 // Chain configuration for viem clients
@@ -74,10 +74,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Sort token addresses
-    const [sortedToken0, sortedToken1] = sortTokens(
-      normalizeAddress(token0Address),
-      normalizeAddress(token1Address)
+    const sorted = sortTokens(
+      { address: normalizeAddress(token0Address) },
+      { address: normalizeAddress(token1Address) }
     );
+    const sortedToken0 = sorted.token0.address;
+    const sortedToken1 = sorted.token1.address;
 
     // Create public client
     const publicClient = createPublicClient({
