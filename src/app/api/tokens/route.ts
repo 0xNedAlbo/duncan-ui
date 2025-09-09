@@ -3,9 +3,11 @@ import { TokenResolutionService } from '@/services/tokens/tokenResolutionService
 import { PrismaClient } from '@prisma/client';
 import { getSession } from '@/lib/auth';
 
-// Allow test injection of prisma client
-const prisma = globalThis.__testPrisma || new PrismaClient();
-const tokenResolutionService = new TokenResolutionService(prisma);
+// Create service lazily to allow test injection
+function getTokenResolutionService() {
+  const prisma = globalThis.__testPrisma || new PrismaClient();
+  return new TokenResolutionService(prisma);
+}
 
 export async function GET(request: NextRequest) {
   // Check authentication
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Resolve token for user
-    const token = await tokenResolutionService.resolveToken(chain, address, session.user.id);
+    const token = await getTokenResolutionService().resolveToken(chain, address, session.user.id);
 
     return NextResponse.json({ token });
   } catch (error) {
@@ -77,7 +79,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Add custom token for user
-    const token = await tokenResolutionService.addCustomToken(session.user.id, {
+    const token = await getTokenResolutionService().addCustomToken(session.user.id, {
       chain,
       address,
       symbol,

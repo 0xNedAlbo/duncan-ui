@@ -16,14 +16,20 @@ vi.mock('@/lib/auth', () => ({
 // Mock the NFT position service
 vi.mock('@/services/uniswap/nftPosition', () => ({
   fetchNFTPosition: vi.fn(),
+  fetchNFTPositionWithOwner: vi.fn(),
 }));
 
-import { fetchNFTPosition } from '@/services/uniswap/nftPosition';
+import { fetchNFTPosition, fetchNFTPositionWithOwner } from '@/services/uniswap/nftPosition';
 import { getServerSession } from 'next-auth/next';
 
 describe('/api/positions/import-nft', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Mock valid session for all tests
+    vi.mocked(getServerSession).mockResolvedValue({
+      user: { id: 'test-user-123', email: 'test@example.com' }
+    } as any);
   });
 
   afterEach(() => {
@@ -43,7 +49,7 @@ describe('/api/positions/import-nft', () => {
 
     it('should successfully import NFT position from Ethereum', async () => {
       const mockPosition = mockNFTPositions.ACTIVE_WETH_USDC_ETHEREUM;
-      vi.mocked(fetchNFTPosition).mockResolvedValue(mockPosition);
+      vi.mocked(fetchNFTPositionWithOwner).mockResolvedValue(mockPosition);
 
       const request = createRequest({
         chain: 'ethereum',
@@ -58,12 +64,12 @@ describe('/api/positions/import-nft', () => {
       expect(data.data).toEqual(mockPosition);
       expect(data.error).toBeUndefined();
       
-      expect(fetchNFTPosition).toHaveBeenCalledWith('ethereum', '12345');
+      expect(fetchNFTPositionWithOwner).toHaveBeenCalledWith('ethereum', '12345');
     });
 
     it('should successfully import NFT position from Arbitrum', async () => {
       const mockPosition = mockNFTPositions.ACTIVE_POSITION_ARBITRUM;
-      vi.mocked(fetchNFTPosition).mockResolvedValue(mockPosition);
+      vi.mocked(fetchNFTPositionWithOwner).mockResolvedValue(mockPosition);
 
       const request = createRequest({
         chain: 'arbitrum',
@@ -77,12 +83,12 @@ describe('/api/positions/import-nft', () => {
       expect(data.success).toBe(true);
       expect(data.data).toEqual(mockPosition);
       
-      expect(fetchNFTPosition).toHaveBeenCalledWith('arbitrum', '54321');
+      expect(fetchNFTPositionWithOwner).toHaveBeenCalledWith('arbitrum', '54321');
     });
 
     it('should successfully import NFT position from Base', async () => {
       const mockPosition = mockNFTPositions.ACTIVE_POSITION_BASE;
-      vi.mocked(fetchNFTPosition).mockResolvedValue(mockPosition);
+      vi.mocked(fetchNFTPositionWithOwner).mockResolvedValue(mockPosition);
 
       const request = createRequest({
         chain: 'base',
@@ -96,12 +102,12 @@ describe('/api/positions/import-nft', () => {
       expect(data.success).toBe(true);
       expect(data.data).toEqual(mockPosition);
       
-      expect(fetchNFTPosition).toHaveBeenCalledWith('base', '98765');
+      expect(fetchNFTPositionWithOwner).toHaveBeenCalledWith('base', '98765');
     });
 
     it('should handle case-insensitive chain names', async () => {
       const mockPosition = mockNFTPositions.ACTIVE_WETH_USDC_ETHEREUM;
-      vi.mocked(fetchNFTPosition).mockResolvedValue(mockPosition);
+      vi.mocked(fetchNFTPositionWithOwner).mockResolvedValue(mockPosition);
 
       const request = createRequest({
         chain: 'ETHEREUM',
@@ -115,7 +121,7 @@ describe('/api/positions/import-nft', () => {
       expect(data.success).toBe(true);
       
       // Should convert to lowercase before calling service
-      expect(fetchNFTPosition).toHaveBeenCalledWith('ethereum', '12345');
+      expect(fetchNFTPositionWithOwner).toHaveBeenCalledWith('ethereum', '12345');
     });
 
     it('should return 400 when chain is missing', async () => {
@@ -230,7 +236,7 @@ describe('/api/positions/import-nft', () => {
 
     it('should accept valid numeric NFT ID as string', async () => {
       const mockPosition = mockNFTPositions.ACTIVE_WETH_USDC_ETHEREUM;
-      vi.mocked(fetchNFTPosition).mockResolvedValue(mockPosition);
+      vi.mocked(fetchNFTPositionWithOwner).mockResolvedValue(mockPosition);
 
       const request = createRequest({
         chain: 'ethereum',
@@ -278,7 +284,7 @@ describe('/api/positions/import-nft', () => {
     });
 
     it('should return 404 when NFT does not exist', async () => {
-      vi.mocked(fetchNFTPosition).mockRejectedValue(
+      vi.mocked(fetchNFTPositionWithOwner).mockRejectedValue(
         new Error('NFT with ID 99999999 does not exist on ethereum')
       );
 
@@ -294,11 +300,11 @@ describe('/api/positions/import-nft', () => {
       expect(data.success).toBe(false);
       expect(data.error).toBe('NFT with ID 99999999 does not exist on ethereum');
       
-      expect(fetchNFTPosition).toHaveBeenCalledWith('ethereum', '99999999');
+      expect(fetchNFTPositionWithOwner).toHaveBeenCalledWith('ethereum', '99999999');
     });
 
     it('should return 404 for network errors', async () => {
-      vi.mocked(fetchNFTPosition).mockRejectedValue(
+      vi.mocked(fetchNFTPositionWithOwner).mockRejectedValue(
         new Error('Network error while fetching position from ethereum')
       );
 
@@ -316,7 +322,7 @@ describe('/api/positions/import-nft', () => {
     });
 
     it('should handle generic service errors', async () => {
-      vi.mocked(fetchNFTPosition).mockRejectedValue(
+      vi.mocked(fetchNFTPositionWithOwner).mockRejectedValue(
         new Error('Failed to fetch NFT position: Contract call failed')
       );
 
@@ -334,7 +340,7 @@ describe('/api/positions/import-nft', () => {
     });
 
     it('should handle non-Error exceptions', async () => {
-      vi.mocked(fetchNFTPosition).mockRejectedValue('String error');
+      vi.mocked(fetchNFTPositionWithOwner).mockRejectedValue('String error');
 
       const request = createRequest({
         chain: 'ethereum',

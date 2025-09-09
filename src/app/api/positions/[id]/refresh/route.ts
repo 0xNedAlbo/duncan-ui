@@ -13,6 +13,9 @@ interface RouteContext {
 // Simple in-memory cache for rate limiting
 const refreshCache = new Map<string, number>();
 
+// Export for testing purposes only
+export const clearRefreshCache = () => refreshCache.clear();
+
 /**
  * POST /api/positions/[id]/refresh - Refresh position with PnL data
  * 

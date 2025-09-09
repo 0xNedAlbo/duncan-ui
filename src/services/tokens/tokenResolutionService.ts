@@ -295,6 +295,7 @@ export class TokenResolutionService {
             notes?: string;
         }
     ): Promise<UserToken> {
+        
         const normalizedAddress = normalizeAddress(tokenData.address);
 
         // Check if already exists

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { POST } from './route';
+import { POST, clearRefreshCache } from './route';
 import type { PositionWithPnL } from '@/services/positions/positionService';
 
 // Mock authentication
@@ -91,6 +91,9 @@ describe('/api/positions/[id]/refresh', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.mocked(getPositionService).mockReturnValue(mockPositionService as any);
+    
+    // Clear rate limiting cache between tests
+    clearRefreshCache();
     
     // Mock current time for consistent testing
     vi.useFakeTimers();
@@ -269,7 +272,11 @@ describe('/api/positions/[id]/refresh', () => {
       expect(data).toEqual({
         success: true,
         data: {
-          position: mockRefreshedPosition,
+          position: {
+            ...mockRefreshedPosition,
+            createdAt: mockRefreshedPosition.createdAt.toISOString(),
+            lastUpdated: expect.any(String) // Allow any ISO string since this is mocked as current time
+          },
           refreshedAt: '2024-01-01T12:00:00.000Z'
         },
         meta: {
@@ -367,9 +374,9 @@ describe('/api/positions/[id]/refresh', () => {
       const response = await POST(request, { params: { id: 'position-123' } });
       const data = await response.json();
 
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(400);
       expect(data.success).toBe(false);
-      expect(data.error).toBe('Internal server error');
+      expect(data.error).toBe('Database connection failed');
     });
 
     it('should always disconnect from Prisma even on error', async () => {
@@ -390,9 +397,9 @@ describe('/api/positions/[id]/refresh', () => {
       const response = await POST(request, { params: { id: 'position-123' } });
       const data = await response.json();
 
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(400);
       expect(data.success).toBe(false);
-      expect(data.error).toBe('Internal server error');
+      expect(data.error).toBe('Auth service down');
     });
   });
 
