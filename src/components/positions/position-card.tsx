@@ -12,7 +12,7 @@ import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy";
 
 interface PositionCardProps {
     position: PositionWithPnL;
-    onRefresh?: (positionId: string) => void;
+    onRefresh?: (position: PositionWithPnL) => void;
     isRefreshing?: boolean;
 }
 
@@ -287,7 +287,7 @@ export function PositionCard({
                     
                     {/* Refresh Button */}
                     <button
-                        onClick={() => onRefresh?.(position.id)}
+                        onClick={() => onRefresh?.(position)}
                         disabled={isRefreshing}
                         className="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors disabled:opacity-50"
                         title={t("dashboard.positions.refresh")}

@@ -141,22 +141,30 @@ export function useImportNFT(
  * Hook to refresh a single position
  */
 export function useRefreshPosition(
-  options?: UseMutationOptions<PositionRefreshResponse, ApiError, string>
+  options?: UseMutationOptions<PositionRefreshResponse, ApiError, PositionWithPnL>
 ) {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationKey: MUTATION_KEYS.refreshPosition,
-    mutationFn: (positionId: string) => 
-      apiClient.post<PositionRefreshResponse>(`/api/positions/${positionId}/refresh`),
+    mutationFn: (position: PositionWithPnL) => {
+      // Use new protocol-aware endpoint for NFT positions
+      if (position.nftId && position.pool.chain) {
+        return apiClient.post<PositionRefreshResponse>(
+          `/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/refresh`
+        );
+      }
+      // Fallback for non-NFT positions - they can't be refreshed with new API structure
+      throw new Error('Position refresh is only available for NFT positions');
+    },
     
-    onSuccess: (response, positionId) => {
+    onSuccess: (response, position) => {
       const refreshedPosition = response.data?.position;
       
       if (refreshedPosition) {
         // Update the specific position in cache
         queryClient.setQueryData(
-          QUERY_KEYS.positionDetails(positionId),
+          QUERY_KEYS.positionDetails(position.id),
           refreshedPosition
         );
         
@@ -171,7 +179,7 @@ export function useRefreshPosition(
               data: {
                 ...oldData.data,
                 positions: oldData.data.positions.map(pos => 
-                  pos.id === positionId ? refreshedPosition : pos
+                  pos.id === position.id ? refreshedPosition : pos
                 ),
               },
             };
@@ -180,11 +188,11 @@ export function useRefreshPosition(
       }
       
       // Optionally invalidate to ensure fresh data
-      // queryClient.invalidateQueries({ queryKey: QUERY_KEYS.positionDetails(positionId) });
+      // queryClient.invalidateQueries({ queryKey: QUERY_KEYS.positionDetails(position.id) });
     },
     
-    onError: (error, positionId) => {
-      console.error(`Failed to refresh position ${positionId}:`, error);
+    onError: (error, position) => {
+      console.error(`Failed to refresh position ${position.id}:`, error);
     },
     
     ...options,

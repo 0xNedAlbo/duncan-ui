@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Loader2, Filter, SortAsc, SortDesc, AlertCircle } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import { PositionCard } from "./position-card";
-import { usePositions, useRefreshPosition, useIsRefreshingPosition } from "@/hooks/api/usePositions";
+import { usePositions, useRefreshPosition } from "@/hooks/api/usePositions";
 import { handleApiError } from "@/lib/api/apiError";
 import type { PositionWithPnL } from "@/services/positions/positionService";
 import type { PositionListParams } from "@/types/api";
@@ -75,9 +75,9 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
   };
 
   // Handle single position refresh
-  const handleRefreshPosition = async (positionId: string) => {
+  const handleRefreshPosition = async (position: PositionWithPnL) => {
     try {
-      await refreshPosition.mutateAsync(positionId);
+      await refreshPosition.mutateAsync(position);
       // Success is handled by the hook's onSuccess callback
       // which updates the cache automatically
     } catch (error) {
@@ -87,8 +87,8 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
   };
 
   // Check if a specific position is being refreshed
-  const isPositionRefreshing = (positionId: string) => {
-    return refreshPosition.isPending && refreshPosition.variables === positionId;
+  const isPositionRefreshing = (position: PositionWithPnL) => {
+    return refreshPosition.isPending && refreshPosition.variables?.id === position.id;
   };
 
   // Get user-friendly error message
@@ -218,7 +218,7 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
               key={position.id}
               position={position}
               onRefresh={handleRefreshPosition}
-              isRefreshing={isPositionRefreshing(position.id)}
+              isRefreshing={isPositionRefreshing(position)}
             />
           ))}
           
