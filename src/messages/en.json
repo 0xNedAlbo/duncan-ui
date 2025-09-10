@@ -211,7 +211,39 @@
       "placeholder": "Overview tab content will be implemented here"
     },
     "events": {
-      "placeholder": "Events history will be displayed here"
+      "title": "Position Events",
+      "description": "Complete history of your position's liquidity changes and fee collections",
+      "noEvents": "No events found for this position",
+      "loadingEvents": "Loading events...",
+      "totalEvents": "Total Events",
+      "columns": {
+        "datetime": "Date & Time",
+        "eventType": "Event Type",
+        "value": "Value",
+        "details": "Details",
+        "transaction": "Transaction"
+      },
+      "eventTypes": {
+        "CREATE": "Position Created",
+        "INCREASE": "Liquidity Added",
+        "DECREASE": "Liquidity Removed", 
+        "COLLECT": "Fees Collected",
+        "CLOSE": "Position Closed"
+      },
+      "valueDisplay": {
+        "liquidity": "Liquidity Change",
+        "fees": "Fees Collected",
+        "tokens": "Token Amounts"
+      },
+      "confidence": {
+        "exact": "Exact",
+        "estimated": "Estimated"
+      },
+      "source": {
+        "subgraph": "Subgraph",
+        "onchain": "On-Chain",
+        "manual": "Manual"
+      }
     }
   },
   "homepage": {

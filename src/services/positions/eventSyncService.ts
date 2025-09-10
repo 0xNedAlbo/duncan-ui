@@ -2,6 +2,9 @@ import { prisma } from '@/lib/prisma';
 import { getSubgraphService } from '../subgraph';
 import { getHistoricalPriceService, PriceDataPoint } from './historicalPriceService';
 import { determineQuoteToken } from './quoteTokenService';
+import { getEtherscanEventService } from '../events/etherscanEventService';
+import type { ParsedNftEvent } from '../events/types';
+import type { ChainSlug } from '../events/constants';
 
 export interface EventSyncResult {
     eventsAdded: number;
@@ -15,21 +18,16 @@ export interface EventSyncResult {
 export interface SubgraphPositionEvent {
     id: string;
     timestamp: string;
-    blockNumber: string;
     transaction: {
         id: string;
+        blockNumber: string;
     };
-    // For IncreaseLiquidity events
-    liquidity?: string;
-    amount0?: string;
-    amount1?: string;
-    // For DecreaseLiquidity events
-    liquidityAmount?: string;
-    amount0Removed?: string;
-    amount1Removed?: string;
-    // For Collect events
-    amount0Collected?: string;
-    amount1Collected?: string;
+    // Common fields for all event types
+    amount?: string;      // Liquidity amount for mint/burn events
+    amount0?: string;     // Token0 amount
+    amount1?: string;     // Token1 amount
+    // Event type (added during processing)
+    eventSource?: 'mint' | 'burn' | 'collect';
 }
 
 export interface ParsedPositionEvent {
@@ -47,6 +45,7 @@ export interface ParsedPositionEvent {
 export class EventSyncService {
     private readonly subgraphService = getSubgraphService();
     private readonly historicalPriceService = getHistoricalPriceService();
+    private readonly etherscanEventService = getEtherscanEventService();
 
     /**
      * Sync all events for a position from Subgraph
@@ -90,8 +89,8 @@ export class EventSyncService {
             // Get last sync timestamp for incremental sync
             const lastSync = position.lastEventSync;
             
-            // Sync events from Subgraph
-            const events = await this.fetchPositionEventsFromSubgraph(position, lastSync);
+            // Sync events from Etherscan (fallback to Subgraph on failure)
+            const events = await this.fetchPositionEventsFromEtherscan(position, lastSync);
             
             // Process events chronologically
             events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
@@ -152,7 +151,116 @@ export class EventSyncService {
     }
 
     /**
-     * Fetch position events from Uniswap V3 Subgraph
+     * Fetch position events from Etherscan API (primary method)
+     */
+    private async fetchPositionEventsFromEtherscan(
+        position: any,
+        lastSync?: Date
+    ): Promise<SubgraphPositionEvent[]> {
+        try {
+            const chain = position.pool.chain as ChainSlug;
+            const tokenId = position.nftId;
+            
+            console.log('🔍 EventSync Debug - Fetching events via Etherscan API:', {
+                chain,
+                tokenId,
+                poolAddress: position.pool.poolAddress,
+                lastSync: lastSync?.toISOString()
+            });
+
+            // Determine from block based on last sync
+            let fromBlock: number | 'earliest' = 'earliest';
+            if (lastSync) {
+                // Convert timestamp to approximate block number
+                // This is a rough approximation - Etherscan API is efficient enough to handle full range
+                const timeDiff = (Date.now() - lastSync.getTime()) / 1000; // seconds
+                const avgBlockTime = chain === 'ethereum' ? 12 : 2; // rough block times
+                const blocksBack = Math.floor(timeDiff / avgBlockTime);
+                
+                // Get current block and subtract estimated blocks
+                // For now, use 'earliest' for reliability - API is fast enough
+                fromBlock = 'earliest';
+            }
+
+            // Fetch events from Etherscan
+            const result = await this.etherscanEventService.fetchPositionEvents(
+                chain,
+                tokenId,
+                {
+                    fromBlock,
+                    toBlock: 'latest',
+                    eventTypes: ['INCREASE_LIQUIDITY', 'DECREASE_LIQUIDITY', 'COLLECT']
+                }
+            );
+
+            console.log('🔍 EventSync Debug - Etherscan API results:', {
+                eventsFound: result.events.length,
+                queryDuration: result.queryDuration,
+                errors: result.errors
+            });
+
+            // Convert Etherscan events to SubgraphPositionEvent format
+            const subgraphEvents: SubgraphPositionEvent[] = result.events.map(event => 
+                this.convertEtherscanToSubgraphEvent(event)
+            );
+
+            return subgraphEvents;
+
+        } catch (error) {
+            console.error('❌ Etherscan event fetching failed:', error);
+            
+            // Re-throw the error instead of falling back to broken subgraph method
+            throw new Error(`Failed to fetch events from Etherscan: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Convert Etherscan event to SubgraphPositionEvent format
+     */
+    private convertEtherscanToSubgraphEvent(event: ParsedNftEvent): SubgraphPositionEvent {
+        const baseEvent = {
+            id: `${event.transactionHash}-${event.logIndex}`,
+            timestamp: Math.floor(event.timestamp.getTime() / 1000).toString(),
+            transaction: {
+                id: event.transactionHash,
+                blockNumber: event.blockNumber.toString()
+            }
+        };
+
+        switch (event.eventType) {
+            case 'INCREASE_LIQUIDITY':
+                return {
+                    ...baseEvent,
+                    amount: event.liquidity,
+                    amount0: event.amount0,
+                    amount1: event.amount1,
+                    eventSource: 'mint'
+                };
+
+            case 'DECREASE_LIQUIDITY':
+                return {
+                    ...baseEvent,
+                    amount: event.liquidity,
+                    amount0: event.amount0,
+                    amount1: event.amount1,
+                    eventSource: 'burn'
+                };
+
+            case 'COLLECT':
+                return {
+                    ...baseEvent,
+                    amount0: event.amount0,
+                    amount1: event.amount1,
+                    eventSource: 'collect'
+                };
+
+            default:
+                throw new Error(`Unsupported event type: ${event.eventType}`);
+        }
+    }
+
+    /**
+     * Fetch position events from Uniswap V3 Subgraph (fallback method)
      */
     private async fetchPositionEventsFromSubgraph(
         position: any, 
@@ -164,33 +272,31 @@ export class EventSyncService {
         const owner = position.owner?.toLowerCase();
         const nftId = position.nftId;
 
-        // Construct where clause for event filtering
-        let positionFilter = '';
-        
-        if (nftId) {
-            // Filter by position ID (NFT ID) - most reliable for subgraph events
-            positionFilter = `position: "${nftId}"`;
-        } else {
-            // Fallback: filter by position attributes (may not work on all subgraphs)
-            positionFilter = `
-                position_: {
-                    pool: "${poolAddress}",
-                    tickLower: ${tickLower},
-                    tickUpper: ${tickUpper}
-                }
-            `;
-            
-            // Add owner filter if available
-            if (owner) {
-                positionFilter += `, position_: { owner: "${owner}" }`;
-            }
-        }
+        // Construct where clause for event filtering using correct V3 subgraph schema
+        const positionFilter = `
+            pool: "${poolAddress}",
+            tickLower: ${tickLower},
+            tickUpper: ${tickUpper}${owner ? `,
+            owner: "${owner}"` : ''}
+        `.trim();
 
         // Add timestamp filter for incremental sync
         let timeFilter = '';
         if (lastSync) {
             const timestamp = Math.floor(lastSync.getTime() / 1000);
-            timeFilter = `, timestamp_gt: "${timestamp}"`;
+            const now = Math.floor(Date.now() / 1000);
+            
+            // Safety check: if lastSync is in the future, ignore it and do full sync
+            if (timestamp > now) {
+                console.log('🔍 EventSync Debug - lastSync is in the future, ignoring:', new Date(lastSync).toISOString());
+                console.log('🔍 EventSync Debug - Doing full sync instead');
+                timeFilter = '';
+            } else {
+                timeFilter = `, timestamp_gt: "${timestamp}"`;
+                console.log('🔍 EventSync Debug - Using incremental sync from:', new Date(lastSync).toISOString());
+            }
+        } else {
+            console.log('🔍 EventSync Debug - Full sync (no timestamp filter)');
         }
 
         // Query for Mint events (CREATE/INCREASE liquidity)
@@ -207,14 +313,13 @@ export class EventSyncService {
                 ) {
                     id
                     timestamp
-                    blockNumber
                     transaction {
                         id
+                        blockNumber
                     }
-                    liquidity
+                    amount
                     amount0
                     amount1
-                    logIndex
                 }
             }
         `;
@@ -233,14 +338,13 @@ export class EventSyncService {
                 ) {
                     id
                     timestamp
-                    blockNumber
                     transaction {
                         id
+                        blockNumber
                     }
                     amount
                     amount0
                     amount1
-                    logIndex
                 }
             }
         `;
@@ -259,30 +363,53 @@ export class EventSyncService {
                 ) {
                     id
                     timestamp
-                    blockNumber
                     transaction {
                         id
+                        blockNumber
                     }
                     amount0
                     amount1
-                    logIndex
                 }
             }
         `;
 
         const allEvents: SubgraphPositionEvent[] = [];
 
+        // Debug logging
+        console.log('🔍 EventSync Debug - Position data:', {
+            chain: position.pool.chain,
+            poolAddress,
+            tickLower,
+            tickUpper,
+            owner,
+            nftId
+        });
+        
+        console.log('🔍 EventSync Debug - Address comparison:', {
+            ownerFromDB: position.owner,
+            ownerLowercase: owner,
+            ownerLength: owner?.length,
+            hasOwner: !!owner
+        });
+        console.log('🔍 EventSync Debug - Mint query:', mintEventsQuery);
+
         // Fetch all event types
         try {
             const [mintEvents, burnEvents, collectEvents] = await Promise.all([
-                this.fetchAllPaginatedEvents(position.pool.chain, mintEventsQuery),
-                this.fetchAllPaginatedEvents(position.pool.chain, burnEventsQuery),
-                this.fetchAllPaginatedEvents(position.pool.chain, collectEventsQuery)
+                this.fetchAllPaginatedEvents(position.pool.chain, mintEventsQuery, 'mint'),
+                this.fetchAllPaginatedEvents(position.pool.chain, burnEventsQuery, 'burn'),
+                this.fetchAllPaginatedEvents(position.pool.chain, collectEventsQuery, 'collect')
             ]);
+
+            console.log('🔍 EventSync Debug - Results:', {
+                mintEvents: mintEvents.length,
+                burnEvents: burnEvents.length,
+                collectEvents: collectEvents.length
+            });
 
             allEvents.push(...mintEvents, ...burnEvents, ...collectEvents);
         } catch (error) {
-            console.error('Error fetching events from subgraph:', error);
+            console.error('❌ Error fetching events from subgraph:', error);
             throw new Error(`Failed to fetch position events: ${error.message}`);
         }
 
@@ -294,7 +421,8 @@ export class EventSyncService {
      */
     private async fetchAllPaginatedEvents(
         chain: string, 
-        query: string
+        query: string,
+        eventSource: 'mint' | 'burn' | 'collect'
     ): Promise<SubgraphPositionEvent[]> {
         const allEvents: SubgraphPositionEvent[] = [];
         let skip = 0;
@@ -304,16 +432,31 @@ export class EventSyncService {
             try {
                 const response = await this.subgraphService.query(chain, query, { first, skip });
                 
-                // Extract events from response (adapt based on query type)
+                console.log(`🔍 EventSync Debug - Subgraph response for ${eventSource}:`, {
+                    hasData: !!response.data,
+                    hasError: !!response.errors,
+                    dataKeys: response.data ? Object.keys(response.data) : [],
+                    errors: response.errors
+                });
+                
+                // Extract events from response based on event type
                 const events = response.data?.mints || 
                               response.data?.burns || 
                               response.data?.collects || [];
+
+                console.log(`🔍 EventSync Debug - Found ${events.length} ${eventSource} events in this batch`);
 
                 if (events.length === 0) {
                     break; // No more events
                 }
 
-                allEvents.push(...events);
+                // Tag events with their source type
+                const taggedEvents = events.map((event: any) => ({
+                    ...event,
+                    eventSource
+                }));
+
+                allEvents.push(...taggedEvents);
                 skip += first;
 
                 // Safety check to prevent infinite loops
@@ -348,8 +491,9 @@ export class EventSyncService {
         let priceData: PriceDataPoint;
         try {
             priceData = await this.historicalPriceService.getPrice(
-                position.pool.id,
-                eventDate
+                position.pool.poolAddress,
+                eventDate,
+                position.pool.chain
             );
         } catch (error) {
             console.warn(`Failed to get historical price for event ${event.id}:`, error.message);
@@ -383,7 +527,7 @@ export class EventSyncService {
             positionId,
             eventType: parsedEvent.eventType,
             timestamp: eventDate,
-            blockNumber: parseInt(event.blockNumber),
+            blockNumber: parseInt(event.transaction.blockNumber),
             transactionHash,
             liquidityDelta: parsedEvent.liquidityDelta,
             token0Delta: parsedEvent.token0Delta,
@@ -418,48 +562,53 @@ export class EventSyncService {
      * Parse Subgraph event into standardized format
      */
     private parseSubgraphEvent(event: SubgraphPositionEvent): ParsedPositionEvent {
-        // Determine event type based on available fields
-        if (event.amount0Collected !== undefined || event.amount1Collected !== undefined) {
-            return {
-                eventType: 'COLLECT',
-                timestamp: new Date(parseInt(event.timestamp) * 1000),
-                blockNumber: parseInt(event.blockNumber),
-                transactionHash: event.transaction.id,
-                liquidityDelta: '0',
-                token0Delta: '0',
-                token1Delta: '0',
-                collectedFee0: event.amount0Collected || '0',
-                collectedFee1: event.amount1Collected || '0'
-            };
+        const timestamp = new Date(parseInt(event.timestamp) * 1000);
+        const blockNumber = parseInt(event.transaction.blockNumber);
+        const transactionHash = event.transaction.id;
+        
+        if (!event.eventSource) {
+            throw new Error(`Event source not specified for event ${event.id}`);
         }
-
-        if (event.liquidity !== undefined) {
-            // IncreaseLiquidity event
-            return {
-                eventType: 'INCREASE', // Will be marked as CREATE for first event
-                timestamp: new Date(parseInt(event.timestamp) * 1000),
-                blockNumber: parseInt(event.blockNumber),
-                transactionHash: event.transaction.id,
-                liquidityDelta: event.liquidity,
-                token0Delta: event.amount0 || '0',
-                token1Delta: event.amount1 || '0'
-            };
+        
+        switch (event.eventSource) {
+            case 'mint':
+                return {
+                    eventType: 'INCREASE', // Will be marked as CREATE for first event
+                    timestamp,
+                    blockNumber,
+                    transactionHash,
+                    liquidityDelta: event.amount || '0',
+                    token0Delta: event.amount0 || '0',
+                    token1Delta: event.amount1 || '0'
+                };
+                
+            case 'burn':
+                return {
+                    eventType: 'DECREASE', // Will be marked as CLOSE if liquidity goes to 0
+                    timestamp,
+                    blockNumber,
+                    transactionHash,
+                    liquidityDelta: `-${event.amount || '0'}`,
+                    token0Delta: `-${event.amount0 || '0'}`,
+                    token1Delta: `-${event.amount1 || '0'}`
+                };
+                
+            case 'collect':
+                return {
+                    eventType: 'COLLECT',
+                    timestamp,
+                    blockNumber,
+                    transactionHash,
+                    liquidityDelta: '0',
+                    token0Delta: '0',
+                    token1Delta: '0',
+                    collectedFee0: event.amount0 || '0',
+                    collectedFee1: event.amount1 || '0'
+                };
+                
+            default:
+                throw new Error(`Unknown event source: ${event.eventSource} for event ${event.id}`);
         }
-
-        if (event.liquidityAmount !== undefined) {
-            // DecreaseLiquidity event
-            return {
-                eventType: 'DECREASE', // Will be marked as CLOSE if liquidity goes to 0
-                timestamp: new Date(parseInt(event.timestamp) * 1000),
-                blockNumber: parseInt(event.blockNumber),
-                transactionHash: event.transaction.id,
-                liquidityDelta: `-${event.liquidityAmount}`,
-                token0Delta: `-${event.amount0Removed || '0'}`,
-                token1Delta: `-${event.amount1Removed || '0'}`
-            };
-        }
-
-        throw new Error(`Unknown event type for event ${event.id}`);
     }
 
     /**

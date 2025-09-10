@@ -211,7 +211,39 @@
       "placeholder": "Übersicht-Tab-Inhalte werden hier implementiert"
     },
     "events": {
-      "placeholder": "Ereignisverlauf wird hier angezeigt"
+      "title": "Positions-Events",
+      "description": "Kompletter Verlauf eurer Liquiditätsänderungen und Fee-Einsammlungen",
+      "noEvents": "Keine Events für diese Position gefunden",
+      "loadingEvents": "Lade Events...",
+      "totalEvents": "Gesamt Events",
+      "columns": {
+        "datetime": "Datum & Zeit",
+        "eventType": "Event-Typ",
+        "value": "Wert",
+        "details": "Details",
+        "transaction": "Transaktion"
+      },
+      "eventTypes": {
+        "CREATE": "Position Erstellt",
+        "INCREASE": "Liquidität Hinzugefügt",
+        "DECREASE": "Liquidität Entfernt", 
+        "COLLECT": "Fees Eingesammelt",
+        "CLOSE": "Position Geschlossen"
+      },
+      "valueDisplay": {
+        "liquidity": "Liquiditäts-Änderung",
+        "fees": "Fees Eingesammelt",
+        "tokens": "Token-Mengen"
+      },
+      "confidence": {
+        "exact": "Exakt",
+        "estimated": "Geschätzt"
+      },
+      "source": {
+        "subgraph": "Subgraph",
+        "onchain": "On-Chain",
+        "manual": "Manuell"
+      }
     }
   },
   "homepage": {

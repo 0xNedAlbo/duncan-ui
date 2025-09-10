@@ -9,7 +9,7 @@ import { z } from 'zod';
 const GetEventsSchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(20),
   offset: z.coerce.number().min(0).default(0),
-  eventType: z.enum(['MINT', 'BURN', 'COLLECT', 'INCREASE_LIQUIDITY', 'DECREASE_LIQUIDITY']).optional(),
+  eventType: z.enum(['CREATE', 'INCREASE', 'DECREASE', 'COLLECT', 'CLOSE']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 
@@ -117,14 +117,17 @@ export async function GET(
           timestamp: true,
           blockNumber: true,
           transactionHash: true,
-          logIndex: true,
           liquidityDelta: true,
-          token0Amount: true,
-          token1Amount: true,
-          feeAmount0: true,
-          feeAmount1: true,
-          gasUsed: true,
-          gasPrice: true,
+          token0Delta: true,
+          token1Delta: true,
+          collectedFee0: true,
+          collectedFee1: true,
+          poolPrice: true,
+          tick: true,
+          valueInQuote: true,
+          feeValueInQuote: true,
+          source: true,
+          confidence: true,
           createdAt: true
         }
       }),

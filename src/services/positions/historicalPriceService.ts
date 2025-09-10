@@ -1,4 +1,4 @@
-import { SubgraphService } from '../subgraph/subgraphService';
+import { getSubgraphService } from '../subgraph';
 
 export interface PriceDataPoint {
     timestamp: Date;
@@ -22,15 +22,15 @@ interface PriceCache {
 }
 
 export class HistoricalPriceService {
-    private readonly subgraphService = new SubgraphService();
+    private readonly subgraphService = getSubgraphService();
     private readonly priceCache: PriceCache = {};
     private readonly CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
     /**
      * Get price at specific timestamp with fallback strategies
      */
-    async getPrice(poolId: string, timestamp: Date): Promise<PriceDataPoint> {
-        const cacheKey = `${poolId}-${timestamp.getTime()}`;
+    async getPrice(poolAddress: string, timestamp: Date, chain: string): Promise<PriceDataPoint> {
+        const cacheKey = `${poolAddress}-${timestamp.getTime()}`;
         
         // Check cache first
         if (this.priceCache[cacheKey]) {
@@ -43,15 +43,15 @@ export class HistoricalPriceService {
         }
 
         try {
-            const priceData = await this.fetchHistoricalPrice(poolId, timestamp);
+            const priceData = await this.fetchHistoricalPrice(poolAddress, timestamp, chain);
             this.priceCache[cacheKey] = priceData;
             return priceData;
         } catch (error) {
-            console.warn(`Failed to get historical price for ${poolId} at ${timestamp}:`, error.message);
+            console.warn(`Failed to get historical price for ${poolAddress} at ${timestamp}:`, error.message);
             
             // Fallback to current price with estimated confidence
             try {
-                const currentPrice = await this.getCurrentPoolPrice(poolId);
+                const currentPrice = await this.getCurrentPoolPrice(poolAddress, chain);
                 const fallbackPrice: PriceDataPoint = {
                     timestamp,
                     price: currentPrice.price,
@@ -62,7 +62,16 @@ export class HistoricalPriceService {
                 this.priceCache[cacheKey] = fallbackPrice;
                 return fallbackPrice;
             } catch (fallbackError) {
-                throw new Error(`Unable to get price data for ${poolId}: ${error.message}`);
+                // Final fallback with zero values
+                const zeroPriceData: PriceDataPoint = {
+                    timestamp,
+                    price: "0",
+                    tick: 0,
+                    source: 'current',
+                    confidence: 'estimated'
+                };
+                this.priceCache[cacheKey] = zeroPriceData;
+                return zeroPriceData;
             }
         }
     }
@@ -70,7 +79,7 @@ export class HistoricalPriceService {
     /**
      * Get price range for multiple timestamps
      */
-    async getPriceRange(poolId: string, from: Date, to: Date): Promise<PriceDataPoint[]> {
+    async getPriceRange(poolId: string, from: Date, to: Date, chain: string): Promise<PriceDataPoint[]> {
         const now = new Date();
         const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
         const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -78,53 +87,53 @@ export class HistoricalPriceService {
         // Determine data granularity based on age
         if (from > hourAgo) {
             // Recent data - try hourly
-            return this.fetchHourlyPrices(poolId, from, to);
+            return this.fetchHourlyPrices(poolId, from, to, chain);
         } else if (from > dayAgo) {
             // Last day - try hourly then daily
             try {
-                return await this.fetchHourlyPrices(poolId, from, to);
+                return await this.fetchHourlyPrices(poolId, from, to, chain);
             } catch (error) {
                 console.warn('Hourly data failed, falling back to daily:', error.message);
-                return this.fetchDailyPrices(poolId, from, to);
+                return this.fetchDailyPrices(poolId, from, to, chain);
             }
         } else {
             // Older data - use daily
-            return this.fetchDailyPrices(poolId, from, to);
+            return this.fetchDailyPrices(poolId, from, to, chain);
         }
     }
 
     /**
      * Fetch historical price using best available data source
      */
-    private async fetchHistoricalPrice(poolId: string, timestamp: Date): Promise<PriceDataPoint> {
+    private async fetchHistoricalPrice(poolAddress: string, timestamp: Date, chain: string): Promise<PriceDataPoint> {
         const now = new Date();
         const ageInHours = (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60);
 
         if (ageInHours < 24) {
             // Try hourly data first for recent timestamps
             try {
-                return await this.fetchHourlyPrice(poolId, timestamp);
+                return await this.fetchHourlyPrice(poolAddress, timestamp, chain);
             } catch (error) {
                 console.warn('Hourly data unavailable, trying daily:', error.message);
-                return await this.fetchDailyPrice(poolId, timestamp);
+                return await this.fetchDailyPrice(poolAddress, timestamp, chain);
             }
         } else {
             // Use daily data for older timestamps
-            return await this.fetchDailyPrice(poolId, timestamp);
+            return await this.fetchDailyPrice(poolAddress, timestamp, chain);
         }
     }
 
     /**
      * Fetch price from hourly data
      */
-    private async fetchHourlyPrice(poolId: string, timestamp: Date): Promise<PriceDataPoint> {
+    private async fetchHourlyPrice(poolAddress: string, timestamp: Date, chain: string): Promise<PriceDataPoint> {
         const hourTimestamp = Math.floor(timestamp.getTime() / 1000 / 3600) * 3600; // Round to hour
         
         const query = `
             query GetPoolHourData($poolId: String!, $timestamp: Int!) {
                 poolHourDatas(
                     where: { 
-                        pool: $poolId, 
+                        pool: $poolId,
                         periodStartUnix_lte: $timestamp 
                     },
                     orderBy: periodStartUnix,
@@ -141,8 +150,8 @@ export class HistoricalPriceService {
             }
         `;
 
-        const response = await this.subgraphService.query(poolId, query, {
-            poolId,
+        const response = await this.subgraphService.query(chain, query, {
+            poolId: poolAddress,
             timestamp: hourTimestamp
         });
 
@@ -183,14 +192,14 @@ export class HistoricalPriceService {
     /**
      * Fetch price from daily data
      */
-    private async fetchDailyPrice(poolId: string, timestamp: Date): Promise<PriceDataPoint> {
+    private async fetchDailyPrice(poolAddress: string, timestamp: Date, chain: string): Promise<PriceDataPoint> {
         const dayTimestamp = Math.floor(timestamp.getTime() / 1000 / 86400) * 86400; // Round to day
         
         const query = `
             query GetPoolDayData($poolId: String!, $timestamp: Int!) {
                 poolDayDatas(
                     where: { 
-                        pool: $poolId, 
+                        pool: $poolId,
                         date_lte: $timestamp 
                     },
                     orderBy: date,
@@ -207,8 +216,8 @@ export class HistoricalPriceService {
             }
         `;
 
-        const response = await this.subgraphService.query(poolId, query, {
-            poolId,
+        const response = await this.subgraphService.query(chain, query, {
+            poolId: poolAddress,
             timestamp: dayTimestamp
         });
 
@@ -249,7 +258,7 @@ export class HistoricalPriceService {
     /**
      * Fetch multiple hourly prices
      */
-    private async fetchHourlyPrices(poolId: string, from: Date, to: Date): Promise<PriceDataPoint[]> {
+    private async fetchHourlyPrices(poolId: string, from: Date, to: Date, chain: string): Promise<PriceDataPoint[]> {
         const fromTimestamp = Math.floor(from.getTime() / 1000 / 3600) * 3600;
         const toTimestamp = Math.floor(to.getTime() / 1000 / 3600) * 3600;
         
@@ -257,7 +266,7 @@ export class HistoricalPriceService {
             query GetPoolHourDataRange($poolId: String!, $from: Int!, $to: Int!) {
                 poolHourDatas(
                     where: { 
-                        pool: $poolId, 
+                        pool: $poolId,
                         periodStartUnix_gte: $from,
                         periodStartUnix_lte: $to
                     },
@@ -275,7 +284,7 @@ export class HistoricalPriceService {
             }
         `;
 
-        const response = await this.subgraphService.query(poolId, query, {
+        const response = await this.subgraphService.query(chain, query, {
             poolId,
             from: fromTimestamp,
             to: toTimestamp
@@ -285,8 +294,8 @@ export class HistoricalPriceService {
             throw new Error('No hourly price data found for range');
         }
 
-        return response.data.poolHourDatas.map((hourData: PoolHistoricalData) => ({
-            timestamp: new Date(hourData.date * 1000),
+        return response.data.poolHourDatas.map((hourData: any) => ({
+            timestamp: new Date(hourData.periodStartUnix * 1000),
             price: this.calculatePrice(hourData.token0Price, hourData.token1Price),
             tick: parseInt(hourData.tick),
             source: 'hourly' as const,
@@ -297,7 +306,7 @@ export class HistoricalPriceService {
     /**
      * Fetch multiple daily prices
      */
-    private async fetchDailyPrices(poolId: string, from: Date, to: Date): Promise<PriceDataPoint[]> {
+    private async fetchDailyPrices(poolId: string, from: Date, to: Date, chain: string): Promise<PriceDataPoint[]> {
         const fromTimestamp = Math.floor(from.getTime() / 1000 / 86400) * 86400;
         const toTimestamp = Math.floor(to.getTime() / 1000 / 86400) * 86400;
         
@@ -305,7 +314,7 @@ export class HistoricalPriceService {
             query GetPoolDayDataRange($poolId: String!, $from: Int!, $to: Int!) {
                 poolDayDatas(
                     where: { 
-                        pool: $poolId, 
+                        pool: $poolId,
                         date_gte: $from,
                         date_lte: $to
                     },
@@ -323,7 +332,7 @@ export class HistoricalPriceService {
             }
         `;
 
-        const response = await this.subgraphService.query(poolId, query, {
+        const response = await this.subgraphService.query(chain, query, {
             poolId,
             from: fromTimestamp,
             to: toTimestamp
@@ -333,7 +342,7 @@ export class HistoricalPriceService {
             throw new Error('No daily price data found for range');
         }
 
-        return response.data.poolDayDatas.map((dayData: PoolHistoricalData) => ({
+        return response.data.poolDayDatas.map((dayData: any) => ({
             timestamp: new Date(dayData.date * 1000),
             price: this.calculatePrice(dayData.token0Price, dayData.token1Price),
             tick: parseInt(dayData.tick),
@@ -345,7 +354,7 @@ export class HistoricalPriceService {
     /**
      * Get current pool price as fallback
      */
-    private async getCurrentPoolPrice(poolId: string): Promise<{ price: string; tick: number }> {
+    private async getCurrentPoolPrice(poolAddress: string, chain: string): Promise<{ price: string; tick: number }> {
         const query = `
             query GetCurrentPoolPrice($poolId: String!) {
                 pool(id: $poolId) {
@@ -358,7 +367,7 @@ export class HistoricalPriceService {
             }
         `;
 
-        const response = await this.subgraphService.query(poolId, query, { poolId });
+        const response = await this.subgraphService.query(chain, query, { poolId: poolAddress });
         
         if (!response.data?.pool) {
             throw new Error('Pool not found');
@@ -375,12 +384,13 @@ export class HistoricalPriceService {
      * Interpolate price between two data points
      */
     private interpolatePrice(
-        before: PoolHistoricalData, 
-        after: PoolHistoricalData, 
+        before: any, 
+        after: any, 
         targetTimestamp: Date
     ): PriceDataPoint {
-        const beforeTime = before.date * 1000;
-        const afterTime = after.date * 1000;
+        // Handle both date and periodStartUnix fields
+        const beforeTime = (before.date || before.periodStartUnix) * 1000;
+        const afterTime = (after.date || after.periodStartUnix) * 1000;
         const targetTime = targetTimestamp.getTime();
 
         // Linear interpolation

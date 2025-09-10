@@ -13,7 +13,9 @@ import type {
   PositionDetailsResponse,
   PositionRefreshResponse,
   ImportNFTRequest,
-  ImportNFTResponse
+  ImportNFTResponse,
+  PositionEventsParams,
+  PositionEventsResponse
 } from '@/types/api';
 import { QUERY_KEYS, MUTATION_KEYS, QUERY_OPTIONS } from '@/types/api';
 import type { PositionWithPnL } from '@/services/positions/positionService';
@@ -78,6 +80,46 @@ export function useNFTPosition(
     
     // Transform response - extract position from data
     select: (response) => response.data.position,
+    
+    ...options,
+  });
+}
+
+/**
+ * Hook to fetch position events for a specific NFT position
+ */
+export function usePositionEvents(
+  chain: string,
+  nftId: string,
+  params: PositionEventsParams = {},
+  options?: Omit<UseQueryOptions<PositionEventsResponse, ApiError>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery({
+    queryKey: QUERY_KEYS.positionEvents(chain, nftId, params),
+    queryFn: () => apiClient.get<PositionEventsResponse>(
+      `/api/positions/uniswapv3/nft/${chain}/${nftId}/events`,
+      { params }
+    ),
+    
+    // Default options
+    staleTime: QUERY_OPTIONS.positionEvents.staleTime,
+    gcTime: QUERY_OPTIONS.positionEvents.cacheTime,
+    
+    // Only run query if chain and nftId are provided
+    enabled: !!chain && !!nftId,
+    
+    // Transform response to extract data
+    select: (response) => ({
+      events: response.data?.events || [],
+      pagination: response.data?.pagination || {
+        total: 0,
+        limit: 20,
+        offset: 0,
+        hasMore: false,
+        nextOffset: null,
+      },
+      meta: response.meta,
+    }),
     
     ...options,
   });

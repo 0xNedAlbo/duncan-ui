@@ -10,6 +10,27 @@ const nextConfig: NextConfig = {
       'tokens.1inch.io'
     ],
   },
+  webpack: (config, { isServer }) => {
+    // Fix for RainbowKit and wagmi ESM issues with Next.js 15
+    config.externals.push('pino-pretty', 'lokijs', 'encoding');
+    
+    // Handle ESM modules properly
+    config.resolve.extensionAlias = {
+      '.js': ['.js', '.ts', '.tsx'],
+    };
+    
+    // Fix for RainbowKit vendor chunk issues
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      };
+    }
+    
+    return config;
+  },
 };
 
 export default nextConfig;

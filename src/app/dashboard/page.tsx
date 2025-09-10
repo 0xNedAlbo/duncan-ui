@@ -7,11 +7,13 @@ import { CreatePositionDropdown } from "@/components/positions/create-position-d
 import { PositionList } from "@/components/positions/position-list";
 import { useTranslations } from "@/i18n/client";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Dashboard() {
     const t = useTranslations();
     const { data: session, status } = useSession();
+    const router = useRouter();
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     // Handle successful position import
@@ -20,7 +22,14 @@ export default function Dashboard() {
         setRefreshTrigger(prev => prev + 1);
     };
 
-    // Redirect if not authenticated
+    // Handle authentication redirect
+    useEffect(() => {
+        if (status === "unauthenticated" || (!session && status !== "loading")) {
+            router.push("/auth/signin");
+        }
+    }, [status, session, router]);
+
+    // Show loading state
     if (status === "loading") {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
@@ -29,8 +38,9 @@ export default function Dashboard() {
         );
     }
 
-    if (!session) {
-        redirect("/auth/signin");
+    // Don't render anything while redirecting
+    if (status === "unauthenticated" || !session) {
+        return null;
     }
 
     return (

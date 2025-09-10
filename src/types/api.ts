@@ -44,11 +44,55 @@ export interface FilterParams {
 }
 
 // Position API Types
-export interface PositionListParams extends PaginationParams, SortParams, FilterParams {}
+export type PositionListParams = PaginationParams & SortParams & FilterParams;
 
 export interface PositionListData {
   positions: PositionWithPnL[];
   pagination: PaginationResponse;
+}
+
+// Position Events API Types
+export interface PositionEvent {
+  id: string;
+  eventType: 'CREATE' | 'INCREASE' | 'DECREASE' | 'COLLECT' | 'CLOSE';
+  timestamp: string; // ISO string
+  blockNumber: number;
+  transactionHash: string;
+  liquidityDelta: string; // BigInt as string
+  token0Delta: string; // BigInt as string
+  token1Delta: string; // BigInt as string
+  collectedFee0?: string; // BigInt as string, COLLECT events only
+  collectedFee1?: string; // BigInt as string, COLLECT events only
+  poolPrice: string; // BigInt as string
+  tick: number;
+  valueInQuote: string; // BigInt as string
+  feeValueInQuote?: string; // BigInt as string, COLLECT events only
+  source: 'subgraph' | 'onchain' | 'manual';
+  confidence: 'exact' | 'estimated';
+  createdAt: string; // ISO string
+}
+
+export interface PositionEventsParams extends PaginationParams {
+  eventType?: PositionEvent['eventType'];
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface PositionEventsData {
+  events: PositionEvent[];
+  pagination: PaginationResponse;
+}
+
+export interface PositionEventsResponse extends ApiResponse<PositionEventsData> {
+  meta: {
+    requestedAt: string;
+    protocol: 'uniswapv3';
+    chain: string;
+    nftId: string;
+    filters: {
+      eventType: string | null;
+      sortOrder: string;
+    };
+  };
 }
 
 export interface PositionListResponse extends ApiResponse<PositionListData> {
@@ -201,7 +245,7 @@ export interface UserSettingsResponse extends ApiResponse<UserSettings> {
   data?: UserSettings;
 }
 
-export interface UpdateUserSettingsRequest extends Partial<UserSettings> {}
+export type UpdateUserSettingsRequest = Partial<UserSettings>;
 
 export interface UpdateUserSettingsResponse extends ApiResponse<UserSettings> {
   data?: UserSettings;
@@ -227,6 +271,8 @@ export const QUERY_KEYS = {
   positions: ['positions'] as const,
   positionsList: (params: PositionListParams) => ['positions', 'list', params] as const,
   positionDetails: (id: string) => ['positions', 'details', id] as const,
+  positionEvents: (chain: string, nftId: string, params: PositionEventsParams) => 
+    ['positions', 'events', chain, nftId, params] as const,
   
   // Tokens
   tokens: ['tokens'] as const,
@@ -266,6 +312,10 @@ export const QUERY_OPTIONS = {
   positionDetails: {
     staleTime: 60 * 1000, // 1 minute
     cacheTime: 10 * 60 * 1000, // 10 minutes
+  },
+  positionEvents: {
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    cacheTime: 15 * 60 * 1000, // 15 minutes
   },
   
   // Token queries
