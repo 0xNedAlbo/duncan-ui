@@ -73,7 +73,7 @@ vi.mock('@/services/uniswap/poolService', async () => {
   };
 });
 
-describe('/api/positions/import-nft', () => {
+describe('/api/positions/uniswapv3/import-nft', () => {
   let testPrisma: PrismaClient;
   let factories: ReturnType<typeof createTestFactorySuite>;
 
@@ -128,7 +128,7 @@ describe('/api/positions/import-nft', () => {
 
   describe('POST', () => {
     const createRequest = (body: any) => {
-      return new NextRequest('http://localhost:3000/api/positions/import-nft', {
+      return new NextRequest('http://localhost:3000/api/positions/uniswapv3/import-nft', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -446,7 +446,7 @@ describe('/api/positions/import-nft', () => {
     });
 
     it('should handle invalid JSON in request body', async () => {
-      const request = new NextRequest('http://localhost:3000/api/positions/import-nft', {
+      const request = new NextRequest('http://localhost:3000/api/positions/uniswapv3/import-nft', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -480,7 +480,7 @@ describe('/api/positions/import-nft', () => {
 
   describe('GET', () => {
     it('should return 405 Method Not Allowed', async () => {
-      const request = new NextRequest('http://localhost:3000/api/positions/import-nft', {
+      const request = new NextRequest('http://localhost:3000/api/positions/uniswapv3/import-nft', {
         method: 'GET',
       });
 

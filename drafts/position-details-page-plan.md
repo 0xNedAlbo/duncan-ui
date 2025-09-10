@@ -1,15 +1,16 @@
 # Position Details Page Implementation Plan
 
-## ✅ **IMPLEMENTATION STATUS: STRUCTURE COMPLETE**
+## ✅ **IMPLEMENTATION STATUS: PROTOCOL-AWARE INFRASTRUCTURE COMPLETE**
 
-**Phase 1 Complete**: Route structure, header, and tab navigation fully implemented with new URL schema.
+**Phase 0 Complete**: Protocol-aware URL structure fully implemented and tested.
+**Next**: Implement overview tab components with real API integration.
 
 ## Architecture Overview
-- **Route**: `/position/uniswapv3/[chain]/[nft]` with tab-based navigation ✅ **IMPLEMENTED**
+- **Route**: `/position/uniswapv3/nft/[chain]/[nft]` with tab-based navigation ✅ **IMPLEMENTED**
 - **URL Schema**: 
-  - `/position/uniswapv3/ethereum/12345` (default overview tab)
-  - `/position/uniswapv3/arbitrum/67890?tab=events`
-  - `/position/uniswapv3/base/54321?tab=range`
+  - `/position/uniswapv3/nft/ethereum/12345` (default overview tab)
+  - `/position/uniswapv3/nft/arbitrum/67890?tab=events`
+  - `/position/uniswapv3/nft/base/54321?tab=range`
 - **URL Query Parameters**: `?tab=overview` (default), `?tab=events`, `?tab=range`, `?tab=fees`, `?tab=analytics` ✅ **IMPLEMENTED**
 - **Chain Validation**: Chain slugs validated against supported chains (ethereum, arbitrum, base) ✅ **IMPLEMENTED**
 - **NFT ID Validation**: Must be numeric, returns 404 for invalid IDs ✅ **IMPLEMENTED**
@@ -150,13 +151,20 @@ Each event card shows:
 
 ## Technical Implementation Details
 
-### API Endpoints Required
-- `GET /api/positions/nft/[chain]/[nftId]` - Fetch complete position details by chain and NFT ID (BigInt strings)
-- `GET /api/positions/nft/[chain]/[nftId]/events` - Fetch position events (paginated)
-- `POST /api/positions/nft/[chain]/[nftId]/refresh` - Refresh position data
-- `GET /api/pools/[poolId]/stats` - Fetch pool statistics
+### API Endpoints ✅ **IMPLEMENTED**
+- `GET /api/positions/uniswapv3/nft/[chain]/[nft]` - Fetch complete position details by protocol/chain/NFT ID (BigInt strings) ✅
+- `GET /api/positions/uniswapv3/nft/[chain]/[nft]/events` - Fetch position events with pagination and filtering ✅
+- `POST /api/positions/uniswapv3/nft/[chain]/[nft]/refresh` - Refresh position data with rate limiting ✅
+- `POST /api/positions/uniswapv3/import-nft` - Import NFT position (chain/nft in request body) ✅
+- `GET /api/pools/[poolId]/stats` - Fetch pool statistics (TODO)
 
-**Note**: New API endpoints needed to support chain/NFT ID routing instead of internal position IDs.
+**Features Implemented:**
+- Complete chain and NFT ID validation
+- User ownership verification
+- Rate limiting for refresh operations
+- Comprehensive error handling with proper HTTP status codes
+- BigInt precision maintenance throughout API chain
+- Event filtering by type with pagination support
 
 ### Value Formatting Rules
 - Use `formatFractionHuman()` from `src/lib/utils/fraction-format.ts` for display
@@ -166,7 +174,7 @@ Each event card shows:
 
 ### Components Structure ✅ **IMPLEMENTED**
 ```
-src/app/position/uniswapv3/[chain]/[nft]/
+src/app/position/uniswapv3/nft/[chain]/[nft]/
 ├── page.tsx                    // Main page with tab routing ✅
 └── components/
     ├── position-header.tsx     // Header with basic info ✅
@@ -178,6 +186,18 @@ src/app/position/uniswapv3/[chain]/[nft]/
     ├── pool-state-card.tsx     // Pool statistics (TODO)
     ├── composition-card.tsx    // Token composition (TODO)
     └── quick-actions.tsx       // Action buttons (TODO)
+
+src/app/api/positions/uniswapv3/nft/[chain]/[nft]/
+├── route.ts                    // GET position details ✅
+├── events/
+│   └── route.ts               // GET position events ✅
+└── refresh/
+    └── route.ts               // POST refresh position ✅
+
+src/app/api/positions/uniswapv3/
+└── import-nft/
+    ├── route.ts               // POST import NFT ✅
+    └── route.test.ts          // Comprehensive test suite ✅
 
 src/components/positions/details/ (TODO: Create shared components)
 ├── position-detail-skeleton.tsx  // Loading skeleton
@@ -211,35 +231,55 @@ src/components/positions/details/ (TODO: Create shared components)
 
 ## Implementation Priority
 
-### ✅ **Phase 0 Complete: Infrastructure & Navigation**
-- Route structure with new URL schema (`/position/uniswapv3/[chain]/[nft]`) ✅
-- Position header with chain and NFT validation ✅
-- Tab navigation with URL parameter handling ✅
-- Basic internationalization structure ✅
-- Position card linking updated to new URLs ✅
-- Chain configuration with slug support ✅
+### ✅ **Phase 0 Complete: Protocol-Aware Infrastructure**
+- Route structure migration to (`/position/uniswapv3/nft/[chain]/[nft]`) ✅ **COMPLETED**
+- API endpoints migration to protocol-aware structure ✅ **COMPLETED**
+- Position header with chain and NFT validation ✅ **IMPLEMENTED**
+- Tab navigation with URL parameter handling ✅ **IMPLEMENTED**
+- Basic internationalization structure ✅ **IMPLEMENTED**
+- Position card linking update to new URLs ✅ **COMPLETED**
+- Chain configuration with slug support ✅ **IMPLEMENTED**
+- Complete test suite migration and validation ✅ **COMPLETED**
+- Build verification and import path fixes ✅ **COMPLETED**
 
-### **Next Phases (TODO)**
-1. **Phase 1**: Basic overview tab with core metrics (quote token denominated)
-   - API endpoints for chain/NFT based data fetching
+### **Implementation Phases**
+
+**✅ Phase 0: URL Structure Migration COMPLETED**
+- ✅ Migrated frontend routes from `/position/uniswapv3/[chain]/[nft]` to `/position/uniswapv3/nft/[chain]/[nft]`
+- ✅ Created new protocol-aware API endpoints: `/api/positions/uniswapv3/nft/[chain]/[nft]/*`
+- ✅ Updated position card links and all internal routing
+- ✅ Removed old API endpoints and cleaned up legacy code
+- ✅ Updated all tests to use new route structure
+- ✅ Fixed import paths and verified successful build
+
+**🎯 Phase 1: Basic Overview Tab Implementation (NEXT)**
+   - API endpoints for protocol/chain/NFT based data fetching
    - Value & PnL summary card implementation  
    - Range status card
    - Pool state information
    - Position composition display
-2. **Phase 2**: Events history tab with timeline
+
+**Phase 2**: Events history tab with timeline
    - Event fetching API integration
    - Event card components
    - Timeline visualization
-3. **Phase 3**: Interactive charts and visualizations
-4. **Phase 4**: Additional tabs (range, fees)  
-5. **Phase 5**: Advanced analytics and risk metrics
-6. **Phase 6**: Action buttons integration (add/remove liquidity)
+
+**Phase 3**: Interactive charts and visualizations
+**Phase 4**: Additional tabs (range, fees)  
+**Phase 5**: Advanced analytics and risk metrics
+**Phase 6**: Action buttons integration (add/remove liquidity)
 
 ### **URL Structure Benefits Achieved** ✅
-- **SEO-friendly URLs**: `/position/uniswapv3/ethereum/12345`
-- **Bookmarkable positions**: Direct links to specific NFT positions
-- **Chain-aware routing**: Chain validation and explorer links
-- **Clean separation**: Position details independent of dashboard
-- **NFT-native**: Uses actual Uniswap V3 NFT IDs from blockchain
+- **Protocol-aware URLs**: `/position/uniswapv3/nft/ethereum/12345` ✅
+- **SEO-friendly structure**: Clear protocol/resource/chain hierarchy ✅
+- **Bookmarkable positions**: Direct links to specific NFT positions ✅
+- **Chain-aware routing**: Chain validation and explorer links ✅
+- **Future-ready**: Easy expansion for Aerodrome, PancakeSwap, etc. ✅
+- **Complete API consistency**: Frontend and API routes use same structure ✅
+- **Clean separation**: Position details independent of dashboard ✅
+- **NFT-native**: Uses actual Uniswap V3 NFT IDs from blockchain ✅
+- **Rate limiting**: Prevents API abuse with 1-minute cooldown per position ✅
+- **Comprehensive validation**: Chain slugs, NFT ID format, user ownership ✅
+- **Error handling**: Proper HTTP status codes and detailed error messages ✅
 
 This plan ensures all values are consistently displayed in quote token amounts, maintaining alignment with the DUNCAN risk framework where all calculations are based on quote asset units.

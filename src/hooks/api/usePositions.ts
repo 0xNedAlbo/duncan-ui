@@ -92,7 +92,7 @@ export function useImportNFT(
   return useMutation({
     mutationKey: MUTATION_KEYS.importNFT,
     mutationFn: (data: ImportNFTRequest) => 
-      apiClient.post<ImportNFTResponse>('/api/positions/import-nft', data),
+      apiClient.post<ImportNFTResponse>('/api/positions/uniswapv3/import-nft', data),
     
     onSuccess: (response, variables) => {
       // Invalidate positions list to refetch with new position

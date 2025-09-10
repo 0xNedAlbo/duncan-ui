@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET as tokensGET, POST as tokensPOST } from '../tokens/route';
 import { GET as searchGET } from '../tokens/search/route';
-import { POST as importNFTPOST } from '../positions/import-nft/route';
+import { POST as importNFTPOST } from '../positions/uniswapv3/import-nft/route';
 import { POST as batchPOST, GET as batchGET } from '../tokens/batch/route';
 
 // Mock getSession
@@ -102,8 +102,8 @@ describe('API Authentication Integration', () => {
       expect(data.error).toBe('Unauthorized - Please sign in');
     });
 
-    it('should return 401 for POST /api/positions/import-nft without session', async () => {
-      const request = createRequest('POST', 'http://localhost:3000/api/positions/import-nft', {
+    it('should return 401 for POST /api/positions/uniswapv3/import-nft without session', async () => {
+      const request = createRequest('POST', 'http://localhost:3000/api/positions/uniswapv3/import-nft', {
         chain: 'ethereum',
         nftId: '12345',
       });
@@ -152,8 +152,8 @@ describe('API Authentication Integration', () => {
       expect(response.status).not.toBe(401);
     });
 
-    it('should proceed to validation for authenticated POST /api/positions/import-nft', async () => {
-      const request = createRequest('POST', 'http://localhost:3000/api/positions/import-nft', {}); // Missing required params
+    it('should proceed to validation for authenticated POST /api/positions/uniswapv3/import-nft', async () => {
+      const request = createRequest('POST', 'http://localhost:3000/api/positions/uniswapv3/import-nft', {}); // Missing required params
       const response = await importNFTPOST(request);
       const data = await response.json();
 

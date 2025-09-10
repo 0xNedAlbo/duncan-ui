@@ -55,7 +55,7 @@ export function PositionTabs({ activeTab, chainSlug, nftId }: PositionTabsProps)
         }
         
         const queryString = params.toString();
-        const url = `/position/uniswapv3/${chainSlug}/${nftId}${queryString ? `?${queryString}` : ""}`;
+        const url = `/position/uniswapv3/nft/${chainSlug}/${nftId}${queryString ? `?${queryString}` : ""}`;
         router.push(url);
     };
 

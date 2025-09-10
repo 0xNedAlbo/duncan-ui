@@ -2,13 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getPositionService } from '@/services/positions';
+import { isValidChainSlug } from '@/config/chains';
 import { prisma } from '@/lib/prisma';
-
-interface RouteContext {
-  params: Promise<{
-    id: string;
-  }>;
-}
 
 // Simple in-memory cache for rate limiting
 const refreshCache = new Map<string, number>();
@@ -17,7 +12,7 @@ const refreshCache = new Map<string, number>();
 export const clearRefreshCache = () => refreshCache.clear();
 
 /**
- * POST /api/positions/[id]/refresh - Refresh position with PnL data
+ * POST /api/positions/uniswapv3/nft/[chain]/[nft]/refresh - Refresh position by protocol/chain/NFT ID
  * 
  * This endpoint:
  * 1. Verifies the user owns the position
@@ -25,7 +20,10 @@ export const clearRefreshCache = () => refreshCache.clear();
  * 3. Updates pool state and refreshes Initial Value from Subgraph if available
  * 4. Returns updated position with current PnL calculations
  */
-export async function POST(request: NextRequest, context: RouteContext) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { chain: string; nft: string } }
+) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -35,35 +33,63 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const params = await context.params;
-    const { id: positionId } = params;
-    
-    if (!positionId || typeof positionId !== 'string') {
+    const { chain: chainSlug, nft: nftId } = params;
+
+    // Validate chain
+    if (!isValidChainSlug(chainSlug)) {
       return NextResponse.json(
-        { error: 'Invalid position ID' },
+        { 
+          success: false,
+          error: 'Invalid chain', 
+          details: `Supported chains: ethereum, arbitrum, base` 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate NFT ID format (should be numeric)
+    const nftIdNum = parseInt(nftId, 10);
+    if (isNaN(nftIdNum) || nftIdNum <= 0) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Invalid NFT ID format',
+          details: 'NFT ID must be a positive integer'
+        },
         { status: 400 }
       );
     }
 
     try {
-      // 1. Verify position ownership
+      // 1. Verify position ownership and get position ID
       const position = await prisma.position.findFirst({
         where: {
-          id: positionId,
-          userId: session.user.id
+          userId: session.user.id,
+          nftId: nftId,
+          pool: {
+            chain: chainSlug
+          }
         },
-        select: { userId: true, updatedAt: true }
+        select: { 
+          id: true,
+          userId: true, 
+          updatedAt: true 
+        }
       });
 
       if (!position) {
         return NextResponse.json(
-          { error: 'Position not found or not owned by user' },
+          { 
+            success: false,
+            error: 'Position not found',
+            details: `No position found for NFT ID ${nftId} on ${chainSlug}`
+          },
           { status: 404 }
         );
       }
 
       // 2. Rate limiting check
-      const cacheKey = `position-refresh:${session.user.id}:${positionId}`;
+      const cacheKey = `position-refresh:${session.user.id}:${chainSlug}:${nftId}`;
       const lastRefresh = refreshCache.get(cacheKey);
       const now = Date.now();
       const cooldownMs = 60000; // 1 minute
@@ -73,9 +99,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
         
         return NextResponse.json(
           { 
+            success: false,
             error: 'Please wait before refreshing again',
             cooldownSeconds: remainingCooldown,
-            lastRefresh: new Date(lastRefresh)
+            lastRefresh: new Date(lastRefresh),
+            meta: {
+              protocol: 'uniswapv3',
+              chain: chainSlug,
+              nftId: nftId
+            }
           },
           { status: 429 }
         );
@@ -83,7 +115,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
       // 3. Refresh position with Position Service (includes Pool + Initial Value updates)
       const positionService = getPositionService();
-      const refreshedPosition = await positionService.refreshPosition(positionId);
+      const refreshedPosition = await positionService.refreshPosition(position.id);
 
       // 4. Set rate limit cache
       refreshCache.set(cacheKey, now);
@@ -103,6 +135,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
           refreshedAt: new Date().toISOString()
         },
         meta: {
+          protocol: 'uniswapv3',
+          chain: chainSlug,
+          nftId: nftId,
           upgraded: refreshedPosition.dataUpdated || false,
           dataSource: refreshedPosition.initialSource,
           confidence: refreshedPosition.confidence,

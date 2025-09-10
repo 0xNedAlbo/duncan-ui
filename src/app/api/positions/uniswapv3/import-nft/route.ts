@@ -80,81 +80,96 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
     if (isNaN(nftIdNum) || nftIdNum <= 0) {
       return NextResponse.json({
         success: false,
-        error: 'NFT ID must be a valid positive number',
+        error: 'Invalid NFT ID format - must be a positive integer',
       }, { status: 400 });
     }
 
-    // Validate chain
+    // Validate chain format (should be lowercase)
+    const chainLower = chain.toLowerCase();
     const supportedChains = ['ethereum', 'arbitrum', 'base'];
-    if (!supportedChains.includes(chain.toLowerCase())) {
+    if (!supportedChains.includes(chainLower)) {
       return NextResponse.json({
         success: false,
-        error: `Unsupported chain: ${chain}. Supported chains: ${supportedChains.join(', ')}`,
+        error: `Unsupported chain. Supported chains: ${supportedChains.join(', ')}`,
       }, { status: 400 });
     }
 
-    // 1. Fetch NFT position data with owner from blockchain
-    const nftPositionData = await fetchNFTPositionWithOwner(chain.toLowerCase(), nftId);
+    console.log(`Importing NFT ${nftId} from chain ${chainLower}`);
+
+    // Fetch NFT position data from blockchain
+    const nftPositionData = await fetchNFTPositionWithOwner(chainLower, nftId);
+
+    console.log('NFT position data fetched:', {
+      tickLower: nftPositionData.tickLower,
+      tickUpper: nftPositionData.tickUpper,
+      liquidity: nftPositionData.liquidity,
+      fee: nftPositionData.fee,
+      token0: nftPositionData.token0,
+      token1: nftPositionData.token1
+    });
+
+    // Create pool service and ensure pool exists
+    const poolService = new PoolService();
     
-    if (!nftPositionData.isActive) {
-      return NextResponse.json({
-        success: false,
-        error: 'NFT position is not active (liquidity = 0)',
-      }, { status: 400 });
-    }
+    const poolResult = await poolService.getOrCreatePoolWithTokens(
+      session.user.id,
+      chainLower,
+      nftPositionData.token0,
+      nftPositionData.token1,
+      nftPositionData.fee
+    );
 
-    // 2. Initialize services
-    const prisma = (globalThis as any).__testPrisma || new PrismaClient();
-    const poolService = new PoolService(prisma);
+    console.log(`Pool ensured: ${poolResult.pool.id}`);
+
+    // Determine quote token configuration
+    const { token0IsQuote } = determineQuoteToken(
+      nftPositionData.token0,
+      nftPositionData.token1
+    );
+
+    console.log(`Quote token determination: token0IsQuote = ${token0IsQuote}`);
+
+    // Use the global Prisma instance, or create a new one for this request
+    const prisma = (global as any).__testPrisma || new PrismaClient();
 
     try {
-      // 3. Find or create pool internally
-      const pool = await poolService.findOrCreatePool(
-        nftPositionData.chainName,
-        nftPositionData.token0Address,
-        nftPositionData.token1Address,
-        nftPositionData.fee,
-        session.user.id
-      );
-
-      // 4. Check if position already exists
+      // Check if position already exists
       const existingPosition = await prisma.position.findFirst({
         where: {
           userId: session.user.id,
-          nftId: nftPositionData.nftId,
-          importType: 'nft'
+          nftId: nftId,
+          pool: {
+            chain: chainLower
+          }
         }
       });
 
       if (existingPosition) {
         return NextResponse.json({
           success: false,
-          error: 'This NFT position has already been imported',
+          error: `Position with NFT ID ${nftId} on ${chainLower} already exists`,
         }, { status: 409 });
       }
 
-      // 5. Determine quote token for PnL calculations
-      const quoteTokenResult = determineQuoteToken(
-        pool.token0Data.symbol,
-        pool.token0Address,
-        pool.token1Data.symbol,
-        pool.token1Address,
-        pool.chain
-      );
-
-      // 6. Create position in database
+      // Create the position
       const position = await prisma.position.create({
         data: {
           userId: session.user.id,
-          poolId: pool.id,
+          poolId: poolResult.pool.id,
           tickLower: nftPositionData.tickLower,
           tickUpper: nftPositionData.tickUpper,
           liquidity: nftPositionData.liquidity,
-          token0IsQuote: quoteTokenResult.token0IsQuote,
+          token0IsQuote,
+          owner: nftPositionData.owner,
           importType: 'nft',
-          nftId: nftPositionData.nftId,
-          owner: nftPositionData.owner, // Store NFT owner address
-          status: 'active'
+          nftId,
+          status: 'active',
+          // Initial values will be set by the upgrade mechanism
+          initialValue: null,
+          initialToken0Amount: null,
+          initialToken1Amount: null,
+          initialTimestamp: null,
+          initialSource: null
         },
         include: {
           pool: {
@@ -176,9 +191,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
         }
       });
 
+      console.log(`Position created: ${position.id}`);
+
       return NextResponse.json({
         success: true,
-        data: nftPositionData,
         position: {
           id: position.id,
           nftId: position.nftId!,
@@ -186,62 +202,54 @@ export async function POST(request: NextRequest): Promise<NextResponse<NFTImport
           tickUpper: position.tickUpper,
           liquidity: position.liquidity,
           pool: {
-            id: pool.id,
-            chain: pool.chain,
-            poolAddress: pool.poolAddress,
-            fee: pool.fee,
-            token0Data: pool.token0Data,
-            token1Data: pool.token1Data
+            id: position.pool.id,
+            chain: position.pool.chain,
+            poolAddress: position.pool.poolAddress,
+            fee: position.pool.fee,
+            token0Data: poolResult.token0Data,
+            token1Data: poolResult.token1Data
           }
         }
       });
 
-    } catch (poolError) {
-      console.error('Pool/Position creation error:', poolError);
-      
-      return NextResponse.json({
-        success: false,
-        error: poolError instanceof Error ? poolError.message : 'Failed to create pool or position',
-      }, { status: 400 });
-      
+    } catch (dbError) {
+      console.error('Database error during position creation:', dbError);
+      throw dbError;
     } finally {
-      await poolService.disconnect();
-      await prisma.$disconnect();
+      // Only disconnect if we created our own client
+      if (!(global as any).__testPrisma) {
+        await prisma.$disconnect();
+      }
     }
 
   } catch (error) {
     console.error('NFT import error:', error);
     
     if (error instanceof Error) {
-      // Return 404 for network errors, position not found, etc.
-      if (error.message.includes('does not exist') || 
-          error.message.includes('Network error') ||
-          error.message.includes('network request failed') ||
-          error.message.includes('Failed to fetch')) {
+      // Check for specific error types
+      if (error.message.includes('does not exist')) {
+        return NextResponse.json({
+          success: false,
+          error: `NFT with ID ${nftId} does not exist on ${chain}`,
+        }, { status: 404 });
+      }
+      
+      if (error.message.includes('Invalid chain')) {
         return NextResponse.json({
           success: false,
           error: error.message,
-        }, { status: 404 });
+        }, { status: 400 });
       }
-    } else if (typeof error === 'string') {
-      // Non-Error exceptions (strings) are treated as 404 errors
+
       return NextResponse.json({
         success: false,
-        error: error,
-      }, { status: 404 });
+        error: error.message,
+      }, { status: 400 });
     }
-    
+
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Internal server error',
-    }, { status: 500 }); // Return 500 for general internal server errors
+      error: 'Internal server error',
+    }, { status: 500 });
   }
-}
-
-// Handle unsupported methods
-export async function GET(): Promise<NextResponse> {
-  return NextResponse.json({
-    success: false,
-    error: 'Method not allowed',
-  }, { status: 405 });
 }
