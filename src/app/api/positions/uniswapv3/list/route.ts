@@ -15,7 +15,7 @@ const GetPositionsSchema = z.object({
 });
 
 /**
- * GET /api/positions - Get user's positions with PnL calculations
+ * GET /api/positions/uniswapv3/list - Get user's Uniswap V3 positions with PnL calculations
  * Query parameters:
  * - status?: 'active' | 'closed' | 'archived' - Filter by status (default: active)
  * - chain?: string - Filter by blockchain (ethereum, arbitrum, base)
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching positions with PnL:', error);
+    console.error('Error fetching Uniswap V3 positions with PnL:', error);
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(

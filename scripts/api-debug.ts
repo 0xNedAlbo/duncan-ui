@@ -252,11 +252,11 @@ class ApiDebugger {
     // Test specific token
     await this.get('/api/tokens/ethereum/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2');
 
-    // Test positions endpoint
-    await this.get('/api/positions');
+    // Test positions endpoint (new Uniswap V3 route)
+    await this.get('/api/positions/uniswapv3/list');
 
     // Test positions with pagination
-    await this.get('/api/positions?page=1&limit=10');
+    await this.get('/api/positions/uniswapv3/list?page=1&limit=10');
 
     console.log('🏁 Example runs completed!');
   }
@@ -275,7 +275,7 @@ class ApiDebugger {
     console.log('');
     console.log('Examples:');
     console.log('  await debugger.get("/api/tokens")');
-    console.log('  await debugger.post("/api/positions/refresh", { positionId: 123 })');
+    console.log('  await debugger.get("/api/positions/uniswapv3/list")');
     console.log('');
   }
 }

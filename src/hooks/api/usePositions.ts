@@ -27,7 +27,7 @@ export function usePositions(
 ) {
   return useQuery({
     queryKey: QUERY_KEYS.positionsList(params),
-    queryFn: () => apiClient.get<PositionListResponse>('/api/positions', { params }),
+    queryFn: () => apiClient.get<PositionListResponse>('/api/positions/uniswapv3/list', { params }),
     
     // Default options from types
     staleTime: QUERY_OPTIONS.positions.staleTime,
@@ -56,26 +56,67 @@ export function usePositions(
   });
 }
 
+
 /**
- * Hook to fetch a single position by ID
+ * Hook to fetch a single NFT position by chain and NFT ID
  */
-export function usePosition(
-  positionId: string,
+export function useNFTPosition(
+  chain: string,
+  nftId: string,
   options?: Omit<UseQueryOptions<PositionDetailsResponse, ApiError>, 'queryKey' | 'queryFn'>
 ) {
   return useQuery({
-    queryKey: QUERY_KEYS.positionDetails(positionId),
-    queryFn: () => apiClient.get<PositionDetailsResponse>(`/api/positions/${positionId}`),
+    queryKey: ['positions', 'nft', chain, nftId] as const,
+    queryFn: () => apiClient.get<PositionDetailsResponse>(`/api/positions/uniswapv3/nft/${chain}/${nftId}`),
     
     // Default options
     staleTime: QUERY_OPTIONS.positionDetails.staleTime,
     gcTime: QUERY_OPTIONS.positionDetails.cacheTime,
     
-    // Only run query if positionId is provided
-    enabled: !!positionId,
+    // Only run query if chain and nftId are provided
+    enabled: !!chain && !!nftId,
     
     // Transform response
     select: (response) => response.data,
+    
+    ...options,
+  });
+}
+
+/**
+ * Hook to refresh a single NFT position
+ */
+export function useRefreshNFTPosition(
+  options?: UseMutationOptions<PositionRefreshResponse, ApiError, { chain: string; nftId: string }>
+) {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationKey: ['refreshNFTPosition'] as const,
+    mutationFn: ({ chain, nftId }: { chain: string; nftId: string }) => {
+      return apiClient.post<PositionRefreshResponse>(
+        `/api/positions/uniswapv3/nft/${chain}/${nftId}/refresh`
+      );
+    },
+    
+    onSuccess: (response, { chain, nftId }) => {
+      const refreshedPosition = response.data?.position;
+      
+      if (refreshedPosition) {
+        // Update the specific NFT position in cache
+        queryClient.setQueryData(
+          ['positions', 'nft', chain, nftId] as const,
+          refreshedPosition
+        );
+        
+        // Invalidate positions list to ensure it's updated
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.positions });
+      }
+    },
+    
+    onError: (error, { chain, nftId }) => {
+      console.error(`Failed to refresh NFT position ${chain}/${nftId}:`, error);
+    },
     
     ...options,
   });
@@ -98,13 +139,9 @@ export function useImportNFT(
       // Invalidate positions list to refetch with new position
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.positions });
       
-      // If we have the new position data, add it to the cache optimistically
+      // Note: Position details are now accessed via chain/NFT, not database ID
+      // Individual position cache invalidation handled by NFT-specific hooks
       if (response.data?.position) {
-        const position = response.data.position;
-        queryClient.setQueryData(
-          QUERY_KEYS.positionDetails(position.id || 'unknown'), 
-          response.data.position
-        );
         
         // Update positions list cache if it exists
         queryClient.setQueriesData<PositionListResponse>(
@@ -162,11 +199,7 @@ export function useRefreshPosition(
       const refreshedPosition = response.data?.position;
       
       if (refreshedPosition) {
-        // Update the specific position in cache
-        queryClient.setQueryData(
-          QUERY_KEYS.positionDetails(position.id),
-          refreshedPosition
-        );
+        // Note: Individual position cache managed by NFT-specific hooks
         
         // Update position in all positions list queries
         queryClient.setQueriesData<PositionListResponse>(
@@ -187,8 +220,7 @@ export function useRefreshPosition(
         );
       }
       
-      // Optionally invalidate to ensure fresh data
-      // queryClient.invalidateQueries({ queryKey: QUERY_KEYS.positionDetails(position.id) });
+      // Fresh data ensured via position list invalidation
     },
     
     onError: (error, position) => {
@@ -227,26 +259,12 @@ export function usePrefetchPositions() {
   return (params: PositionListParams = {}) => {
     return queryClient.prefetchQuery({
       queryKey: QUERY_KEYS.positionsList(params),
-      queryFn: () => apiClient.get<PositionListResponse>('/api/positions', { params }),
+      queryFn: () => apiClient.get<PositionListResponse>('/api/positions/uniswapv3/list', { params }),
       staleTime: QUERY_OPTIONS.positions.staleTime,
     });
   };
 }
 
-/**
- * Hook to prefetch a single position
- */
-export function usePrefetchPosition() {
-  const queryClient = useQueryClient();
-  
-  return (positionId: string) => {
-    return queryClient.prefetchQuery({
-      queryKey: QUERY_KEYS.positionDetails(positionId),
-      queryFn: () => apiClient.get<PositionDetailsResponse>(`/api/positions/${positionId}`),
-      staleTime: QUERY_OPTIONS.positionDetails.staleTime,
-    });
-  };
-}
 
 /**
  * Hook to invalidate positions cache
@@ -261,10 +279,7 @@ export function useInvalidatePositions() {
       return queryClient.invalidateQueries({ queryKey: QUERY_KEYS.positions });
     },
     
-    // Invalidate specific position
-    invalidatePosition: (positionId: string) => {
-      return queryClient.invalidateQueries({ queryKey: QUERY_KEYS.positionDetails(positionId) });
-    },
+    // Note: Individual position invalidation handled by NFT-specific hooks
     
     // Invalidate positions list only
     invalidateList: (params?: PositionListParams) => {

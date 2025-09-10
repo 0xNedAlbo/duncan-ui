@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { ArrowLeft, RefreshCw, Copy, ExternalLink } from "lucide-react";
+import { ArrowLeft, RefreshCw, Copy, ExternalLink, Loader2 } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ChainConfig } from "@/config/chains";
+import { useNFTPosition, useRefreshNFTPosition } from "@/hooks/api/usePositions";
+import { handleApiError } from "@/lib/api/apiError";
 
 interface PositionHeaderProps {
     chainSlug: string;
@@ -18,31 +20,18 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
     const t = useTranslations();
     const router = useRouter();
     const [copied, setCopied] = useState(false);
-    const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // TODO: Fetch actual position data based on chain and NFT ID
-    // For now using mock data for layout
-    const mockPosition = {
-        tokenPair: "WETH/USDC",
-        chain: chainSlug,
-        fee: 3000, // 0.30%
-        nftId: nftId,
-        status: "active",
-        token0: {
-            symbol: "WETH",
-            logoUrl: "https://tokens.1inch.io/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2.png"
-        },
-        token1: {
-            symbol: "USDC",
-            logoUrl: "https://tokens.1inch.io/0xa0b86a33e6441df2a4a12e2d442c4f38c4c4b7c8.png"
-        },
-        lastUpdated: new Date()
-    };
+    // Fetch position data using the NFT-specific hook
+    const { data: position, error, isLoading } = useNFTPosition(chainSlug, nftId);
+    const refreshPosition = useRefreshNFTPosition();
 
     const handleRefresh = async () => {
-        setIsRefreshing(true);
-        // TODO: Implement refresh logic for specific NFT position
-        setTimeout(() => setIsRefreshing(false), 2000);
+        try {
+            await refreshPosition.mutateAsync({ chain: chainSlug, nftId });
+        } catch (error) {
+            console.error("Failed to refresh position:", error);
+            // Error handling is managed by the hook's onError callback
+        }
     };
 
     const copyNftId = async () => {
@@ -83,6 +72,89 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
         }
     };
 
+    // Show loading state
+    if (isLoading) {
+        return (
+            <div className="mb-8">
+                {/* Back Navigation */}
+                <div className="mb-6">
+                    <Link 
+                        href="/dashboard"
+                        className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                        {t("positionDetails.header.backToDashboard")}
+                    </Link>
+                </div>
+
+                {/* Loading Header */}
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-8 py-6">
+                    <div className="flex items-center justify-center py-12">
+                        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                        <span className="ml-3 text-slate-400">{t("common.loading")}</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show error state
+    if (error) {
+        return (
+            <div className="mb-8">
+                {/* Back Navigation */}
+                <div className="mb-6">
+                    <Link 
+                        href="/dashboard"
+                        className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                        {t("positionDetails.header.backToDashboard")}
+                    </Link>
+                </div>
+
+                {/* Error Header */}
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-8 py-6">
+                    <div className="flex items-center justify-center py-12">
+                        <div className="text-center">
+                            <div className="text-red-400 mb-2">{t("common.error")}</div>
+                            <div className="text-slate-400 text-sm">
+                                {handleApiError(error, "Failed to load position")}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show position not found state
+    if (!position) {
+        return (
+            <div className="mb-8">
+                {/* Back Navigation */}
+                <div className="mb-6">
+                    <Link 
+                        href="/dashboard"
+                        className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                        {t("positionDetails.header.backToDashboard")}
+                    </Link>
+                </div>
+
+                {/* Not Found Header */}
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-8 py-6">
+                    <div className="flex items-center justify-center py-12">
+                        <div className="text-center">
+                            <div className="text-slate-400">{t("positionDetails.header.positionNotFound")}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="mb-8">
             {/* Back Navigation */}
@@ -104,15 +176,15 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
                         {/* Token Logos */}
                         <div className="flex items-center -space-x-3">
                             <Image
-                                src={mockPosition.token0.logoUrl}
-                                alt={mockPosition.token0.symbol}
+                                src={position.pool.token0.logoUrl || '/images/tokens/default.png'}
+                                alt={position.pool.token0.symbol}
                                 width={48}
                                 height={48}
                                 className="w-12 h-12 rounded-full border-3 border-slate-800 bg-slate-700 z-10"
                             />
                             <Image
-                                src={mockPosition.token1.logoUrl}
-                                alt={mockPosition.token1.symbol}
+                                src={position.pool.token1.logoUrl || '/images/tokens/default.png'}
+                                alt={position.pool.token1.symbol}
                                 width={48}
                                 height={48}
                                 className="w-12 h-12 rounded-full border-3 border-slate-800 bg-slate-700"
@@ -123,10 +195,10 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
                         <div>
                             <div className="flex items-center gap-3 mb-2">
                                 <h1 className="text-2xl font-bold text-white">
-                                    {mockPosition.tokenPair}
+                                    {position.tokenPair}
                                 </h1>
-                                <span className={`px-3 py-1 rounded-lg text-sm font-medium border ${getStatusColor(mockPosition.status)}`}>
-                                    {t(`positionDetails.status.${mockPosition.status}`)}
+                                <span className={`px-3 py-1 rounded-lg text-sm font-medium border ${getStatusColor(position.status)}`}>
+                                    {t(`positionDetails.status.${position.status}`)}
                                 </span>
                             </div>
                             
@@ -138,7 +210,7 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
                                 
                                 {/* Fee */}
                                 <span>
-                                    {t("positionDetails.header.fee")}: {(mockPosition.fee / 10000).toFixed(2)}%
+                                    {t("positionDetails.header.fee")}: {(position.pool.fee / 10000).toFixed(2)}%
                                 </span>
                                 
                                 {/* NFT ID */}
@@ -178,17 +250,17 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
                         {/* Last Updated */}
                         <div className="text-right text-sm text-slate-400">
                             <div>{t("positionDetails.header.lastUpdated")}</div>
-                            <div>{mockPosition.lastUpdated.toLocaleString()}</div>
+                            <div>{position.lastUpdated ? new Date(position.lastUpdated).toLocaleString() : '-'}</div>
                         </div>
 
                         {/* Refresh Button */}
                         <button
                             onClick={handleRefresh}
-                            disabled={isRefreshing}
+                            disabled={refreshPosition.isPending}
                             className="p-3 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors disabled:opacity-50"
                             title={t("positionDetails.header.refresh")}
                         >
-                            <RefreshCw className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`} />
+                            <RefreshCw className={`w-5 h-5 ${refreshPosition.isPending ? "animate-spin" : ""}`} />
                         </button>
                     </div>
                 </div>
