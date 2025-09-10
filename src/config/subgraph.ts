@@ -9,19 +9,19 @@ export interface SubgraphConfig {
 
 export const SUBGRAPH_ENDPOINTS: Record<string, SubgraphConfig> = {
   ethereum: {
-    endpoint: 'https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3',
+    endpoint: 'https://gateway.thegraph.com/api/[api-key]/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV',
     chainId: 1,
     available: true,
     name: 'Uniswap V3 (Ethereum)'
   },
   arbitrum: {
-    endpoint: 'https://gateway.thegraph.com/api/[api-key]/subgraphs/id/HyW7A86UEdYVt5b9Lrw8W2F98yKecerHKutZTRbSCX27',
+    endpoint: 'https://gateway.thegraph.com/api/[api-key]/subgraphs/id/3V7ZY6muhxaQL5qvntX1CFXJ32W7BxXZTGTwmpH5J4t3',
     chainId: 42161,
     available: true,
     name: 'Uniswap V3 (Arbitrum)'
   },
   base: {
-    endpoint: 'https://api.studio.thegraph.com/query/48211/uniswap-v3-base/version/latest',
+    endpoint: 'https://gateway.thegraph.com/api/[api-key]/subgraphs/id/HMuAwufqZ1YCRmzL2SfHTVkzZovC9VL2UAKhjvRqKiR1',
     chainId: 8453,
     available: true,
     name: 'Uniswap V3 (Base)'
@@ -36,7 +36,7 @@ export function getSubgraphEndpoint(chain: string, apiKey?: string): string {
   }
 
   // Mit API Key (höhere Rate Limits)
-  if (apiKey && chain !== 'base') { // Base ist Studio, braucht keinen API Key
+  if (apiKey) {
     // Handle different URL formats
     if (config.endpoint.includes('[api-key]')) {
       // New gateway format with subgraph ID
