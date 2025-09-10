@@ -3,9 +3,15 @@ import {
   SubgraphResponse, 
   PositionQueryData, 
   PositionsQueryData,
+  Position,
+  BigDecimal
+} from '@/types/subgraph.generated';
+import { 
   InitialValueData,
+  SubgraphError,
+  convertToLegacyPosition,
   SubgraphPosition 
-} from '@/types/subgraph';
+} from '@/types/subgraph.custom';
 import { POSITION_QUERY, POSITIONS_BY_OWNER_QUERY, buildQuery } from './queries';
 
 export class SubgraphService {
@@ -36,7 +42,9 @@ export class SubgraphService {
         return null; // Position nicht im Subgraph gefunden
       }
 
-      return this.parseInitialValue(response.data.position);
+      // Convert to legacy format for parsing (maintains existing logic)
+      const legacyPosition = convertToLegacyPosition(response.data.position);
+      return this.parseInitialValue(legacyPosition);
     } catch (error) {
       console.error(`Subgraph error for position ${nftId} on ${chain}:`, error);
       return null; // Fallback zu Snapshot
@@ -66,7 +74,9 @@ export class SubgraphService {
         })
       );
 
-      return response.data?.positions ?? [];
+      // Convert modern Position types to legacy SubgraphPosition for backward compatibility
+      const positions = response.data?.positions ?? [];
+      return positions.map(convertToLegacyPosition);
     } catch (error) {
       console.error(`Error fetching positions for owner ${owner} on ${chain}:`, error);
       return [];
