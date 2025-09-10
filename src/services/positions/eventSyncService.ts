@@ -164,19 +164,26 @@ export class EventSyncService {
         const owner = position.owner?.toLowerCase();
         const nftId = position.nftId;
 
-        // Construct where clause for position identification
-        let positionFilter = `
-            pool: "${poolAddress}",
-            tickLower: ${tickLower},
-            tickUpper: ${tickUpper}
-        `;
-
-        // Add owner or NFT ID filter if available
-        if (owner) {
-            positionFilter += `, owner: "${owner}"`;
-        }
+        // Construct where clause for event filtering
+        let positionFilter = '';
+        
         if (nftId) {
-            positionFilter += `, tokenId: "${nftId}"`;
+            // Filter by position ID (NFT ID) - most reliable for subgraph events
+            positionFilter = `position: "${nftId}"`;
+        } else {
+            // Fallback: filter by position attributes (may not work on all subgraphs)
+            positionFilter = `
+                position_: {
+                    pool: "${poolAddress}",
+                    tickLower: ${tickLower},
+                    tickUpper: ${tickUpper}
+                }
+            `;
+            
+            // Add owner filter if available
+            if (owner) {
+                positionFilter += `, position_: { owner: "${owner}" }`;
+            }
         }
 
         // Add timestamp filter for incremental sync
@@ -186,10 +193,10 @@ export class EventSyncService {
             timeFilter = `, timestamp_gt: "${timestamp}"`;
         }
 
-        // Query for IncreaseLiquidity events (CREATE/INCREASE)
-        const increaseLiquidityQuery = `
-            query GetIncreaseLiquidityEvents($first: Int!, $skip: Int!) {
-                increaseLiquidityEvents(
+        // Query for Mint events (CREATE/INCREASE liquidity)
+        const mintEventsQuery = `
+            query GetMintEvents($first: Int!, $skip: Int!) {
+                mints(
                     first: $first,
                     skip: $skip,
                     orderBy: timestamp,
@@ -207,14 +214,15 @@ export class EventSyncService {
                     liquidity
                     amount0
                     amount1
+                    logIndex
                 }
             }
         `;
 
-        // Query for DecreaseLiquidity events (DECREASE/CLOSE)
-        const decreaseLiquidityQuery = `
-            query GetDecreaseLiquidityEvents($first: Int!, $skip: Int!) {
-                decreaseLiquidityEvents(
+        // Query for Burn events (DECREASE/CLOSE liquidity)
+        const burnEventsQuery = `
+            query GetBurnEvents($first: Int!, $skip: Int!) {
+                burns(
                     first: $first,
                     skip: $skip,
                     orderBy: timestamp,
@@ -229,17 +237,18 @@ export class EventSyncService {
                     transaction {
                         id
                     }
-                    liquidityAmount
-                    amount0Removed
-                    amount1Removed
+                    amount
+                    amount0
+                    amount1
+                    logIndex
                 }
             }
         `;
 
-        // Query for Collect events (COLLECT)
-        const collectQuery = `
+        // Query for Collect events (fee collection)
+        const collectEventsQuery = `
             query GetCollectEvents($first: Int!, $skip: Int!) {
-                collectEvents(
+                collects(
                     first: $first,
                     skip: $skip,
                     orderBy: timestamp,
@@ -254,8 +263,9 @@ export class EventSyncService {
                     transaction {
                         id
                     }
-                    amount0Collected
-                    amount1Collected
+                    amount0
+                    amount1
+                    logIndex
                 }
             }
         `;
@@ -264,13 +274,13 @@ export class EventSyncService {
 
         // Fetch all event types
         try {
-            const [increaseEvents, decreaseEvents, collectEvents] = await Promise.all([
-                this.fetchAllPaginatedEvents(position.pool.chain, increaseLiquidityQuery),
-                this.fetchAllPaginatedEvents(position.pool.chain, decreaseLiquidityQuery),
-                this.fetchAllPaginatedEvents(position.pool.chain, collectQuery)
+            const [mintEvents, burnEvents, collectEvents] = await Promise.all([
+                this.fetchAllPaginatedEvents(position.pool.chain, mintEventsQuery),
+                this.fetchAllPaginatedEvents(position.pool.chain, burnEventsQuery),
+                this.fetchAllPaginatedEvents(position.pool.chain, collectEventsQuery)
             ]);
 
-            allEvents.push(...increaseEvents, ...decreaseEvents, ...collectEvents);
+            allEvents.push(...mintEvents, ...burnEvents, ...collectEvents);
         } catch (error) {
             console.error('Error fetching events from subgraph:', error);
             throw new Error(`Failed to fetch position events: ${error.message}`);
@@ -295,9 +305,9 @@ export class EventSyncService {
                 const response = await this.subgraphService.query(chain, query, { first, skip });
                 
                 // Extract events from response (adapt based on query type)
-                const events = response.data?.increaseLiquidityEvents || 
-                              response.data?.decreaseLiquidityEvents || 
-                              response.data?.collectEvents || [];
+                const events = response.data?.mints || 
+                              response.data?.burns || 
+                              response.data?.collects || [];
 
                 if (events.length === 0) {
                     break; // No more events

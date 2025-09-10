@@ -92,10 +92,19 @@ export function PositionCard({
         }
     };
 
+    // Check if position is stale (not refreshed for more than 30 minutes)
+    const isStalePosition = () => {
+        if (!position.lastUpdated) return true;
+        const lastUpdatedTime = new Date(position.lastUpdated).getTime();
+        const now = Date.now();
+        const thirtyMinutesInMs = 30 * 60 * 1000;
+        return (now - lastUpdatedTime) > thirtyMinutesInMs;
+    };
+
     return (
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-6 py-4 hover:border-slate-600/50 transition-all duration-200">
             {/* Header - Always Visible */}
-            <div className="flex items-start justify-between">
+            <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     {/* Token Logos */}
                     <div className="flex items-center -space-x-2">
@@ -203,35 +212,23 @@ export function PositionCard({
                             )}
                         </div>
                     </div>
-                    {/* Current Value, Mini Curve & PnL */}
+                    {/* Current Value & PnL */}
                     <div className="flex items-start gap-6 ml-6">
                         <div className="text-right">
                             <div className="text-xs text-slate-400 mb-0.5">
-                                {t("dashboard.positions.currentValue")}
+                                {t("dashboard.positions.currentValue")} ({position.quoteSymbol})
                             </div>
                             <div className="text-lg font-semibold text-white">
                                 {formatCompactValue(
                                     BigInt(position.currentValue),
                                     quoteTokenDecimals
-                                )}{" "}
-                                {position.quoteSymbol}
+                                )}
                             </div>
-                        </div>
-                        
-                        {/* Mini PnL Curve */}
-                        <div className="flex items-center">
-                            <MiniPnLCurveLazy 
-                                position={position}
-                                width={120}
-                                height={60}
-                                showTooltip={true}
-                                className="rounded border border-slate-700/30 bg-slate-800/20"
-                            />
                         </div>
                         
                         <div className="text-right">
                             <div className="text-xs text-slate-400 mb-0.5">
-                                {t("dashboard.positions.pnl")}
+                                {t("dashboard.positions.pnl")} ({position.quoteSymbol})
                             </div>
                             <div
                                 className={`text-lg font-semibold ${
@@ -252,8 +249,7 @@ export function PositionCard({
                                         {formatCompactValue(
                                             BigInt(position.pnl),
                                             quoteTokenDecimals
-                                        )}{" "}
-                                        {position.quoteSymbol}
+                                        )}
                                     </span>
                                 </div>
                                 <div className="text-xs text-slate-400 mt-0.5">
@@ -261,41 +257,76 @@ export function PositionCard({
                                 </div>
                             </div>
                         </div>
+                        
+                        {/* Mini PnL Curve */}
+                        <div className="flex items-center">
+                            <MiniPnLCurveLazy 
+                                position={position}
+                                width={120}
+                                height={60}
+                                showTooltip={true}
+                                className="rounded border border-slate-700/30 bg-slate-800/20"
+                            />
+                        </div>
+                        
+                        {/* Uncollected Fees */}
+                        <div className="text-right">
+                            <div className="text-xs text-slate-400 mb-0.5">
+                                {t("dashboard.positions.unclaimedFees")} ({position.quoteSymbol})
+                            </div>
+                            <div className="text-lg font-semibold text-amber-400">
+                                {position.pnlBreakdown?.unclaimedFees 
+                                    ? formatCompactValue(
+                                        BigInt(position.pnlBreakdown.unclaimedFees),
+                                        quoteTokenDecimals
+                                    )
+                                    : "0"
+                                }
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
                     {/* Details Button */}
                     {position.nftId ? (
                         <Link
                             href={`/position/uniswapv3/nft/${position.pool.chain}/${position.nftId}`}
-                            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
+                            className="p-3 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
                             title={t("dashboard.positions.viewDetails")}
                         >
-                            <Search className="w-4 h-4" />
+                            <Search className="w-5 h-5" />
                         </Link>
                     ) : (
                         <button
                             disabled
-                            className="p-2 text-slate-600 cursor-not-allowed rounded-lg opacity-50"
+                            className="p-3 text-slate-600 cursor-not-allowed rounded-lg opacity-50"
                             title={t("dashboard.positions.noNftId")}
                         >
-                            <Search className="w-4 h-4" />
+                            <Search className="w-5 h-5" />
                         </button>
                     )}
                     
                     {/* Refresh Button */}
-                    <button
-                        onClick={() => onRefresh?.(position)}
-                        disabled={isRefreshing}
-                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors disabled:opacity-50"
-                        title={t("dashboard.positions.refresh")}
-                    >
-                        <RefreshCw
-                            className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-                        />
-                    </button>
+                    <div className="relative">
+                        <button
+                            onClick={() => onRefresh?.(position)}
+                            disabled={isRefreshing}
+                            className="p-3 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors disabled:opacity-50"
+                            title={t("dashboard.positions.refresh")}
+                        >
+                            <RefreshCw
+                                className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`}
+                            />
+                        </button>
+                        {/* Stale Position Indicator */}
+                        {isStalePosition() && !isRefreshing && (
+                            <div className="absolute -top-1 -right-1 bg-yellow-500 text-yellow-900 rounded-full w-4 h-4 flex items-center justify-center text-xs font-bold">
+                                !
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

@@ -156,7 +156,8 @@
       },
       "loadMore": "Mehr laden ({count} verbleibend)",
       "showing": "Zeige {current} von {total} Positionen",
-      "upgraded": "{count} auf exakte Daten aktualisiert"
+      "upgraded": "{count} auf exakte Daten aktualisiert",
+      "unclaimedFees": "Nicht abgeholte Gebühren"
     }
   },
   "auth": {
