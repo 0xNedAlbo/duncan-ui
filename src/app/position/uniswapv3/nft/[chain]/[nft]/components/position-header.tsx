@@ -241,7 +241,7 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
                                     <span>{t("positionDetails.header.nftId")}: #{nftId}</span>
                                     <button
                                         onClick={copyNftId}
-                                        className="p-1 text-slate-400 hover:text-white transition-colors"
+                                        className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
                                         title={t("positionDetails.header.copyId")}
                                     >
                                         <Copy className="w-3 h-3" />
@@ -251,7 +251,7 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
                                             href={getChainExplorerUrl(nftId)!}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="p-1 text-slate-400 hover:text-white transition-colors"
+                                            className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
                                             title={t("positionDetails.header.viewOnExplorer")}
                                         >
                                             <ExternalLink className="w-3 h-3" />
@@ -279,7 +279,7 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
                         <button
                             onClick={handleRefresh}
                             disabled={refreshPosition.isPending}
-                            className="p-3 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors disabled:opacity-50"
+                            className="p-3 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                             title={t("positionDetails.header.refresh")}
                         >
                             <RefreshCw className={`w-5 h-5 ${refreshPosition.isPending ? "animate-spin" : ""}`} />
