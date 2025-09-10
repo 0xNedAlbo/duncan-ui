@@ -1,6 +1,6 @@
 # GraphQL Query definitions for Uniswap V3 Subgraph
 
-query GetPosition($tokenId: String!) {
+query GetPosition($tokenId: ID!) {
   position(id: $tokenId) {
     id
     liquidity
@@ -41,7 +41,7 @@ query GetPosition($tokenId: String!) {
   }
 }
 
-query GetPositionsByOwner($owner: String!, $first: Int!, $skip: Int!) {
+query GetPositionsByOwner($owner: Bytes!, $first: Int!, $skip: Int!) {
   positions(
     where: { owner: $owner }
     first: $first
@@ -83,7 +83,7 @@ query GetPositionsByOwner($owner: String!, $first: Int!, $skip: Int!) {
   }
 }
 
-query GetPool($poolId: String!) {
+query GetPool($poolId: ID!) {
   pool(id: $poolId) {
     id
     createdAtTimestamp
@@ -129,7 +129,7 @@ query GetPool($poolId: String!) {
   }
 }
 
-query GetFactory($factoryId: String!) {
+query GetFactory($factoryId: ID!) {
   factory(id: $factoryId) {
     id
     poolCount
@@ -144,7 +144,7 @@ query GetFactory($factoryId: String!) {
   }
 }
 
-query GetToken($tokenId: String!) {
+query GetToken($tokenId: ID!) {
   token(id: $tokenId) {
     id
     symbol

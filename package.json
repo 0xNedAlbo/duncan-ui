@@ -4,15 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run generate:types && next build",
+    "build": "npm run graphql:codegen && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:run": "vitest run",
-    "generate:types": "graphql-codegen",
-    "generate:types:watch": "graphql-codegen --watch"
+    "graphql:codegen": "graphql-codegen"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",

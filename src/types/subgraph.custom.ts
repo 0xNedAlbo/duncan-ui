@@ -1,7 +1,11 @@
 // Custom domain-specific types for Duncan's Subgraph integration
 // These are not generated and contain our business logic types
 
-import type { Position, Transaction, Pool, Token } from './subgraph.generated';
+import type { GetPositionQuery, GetPositionsByOwnerQuery } from '@/graphql/types.generated';
+
+// Extract Position type from the generated query types  
+type GeneratedPosition = NonNullable<GetPositionQuery['position']>;
+type GeneratedPositionFromList = GetPositionsByOwnerQuery['positions'][0];
 
 // Legacy compatibility types (maintain existing API)
 export interface SubgraphToken {
@@ -65,8 +69,8 @@ export interface SubgraphError {
   variables?: Record<string, any>;
 }
 
-// Type conversion utilities
-export function convertToLegacyPosition(position: Position): SubgraphPosition {
+// Type conversion utilities  
+export function convertToLegacyPosition(position: GeneratedPosition | GeneratedPositionFromList): SubgraphPosition {
   return {
     id: position.id,
     liquidity: position.liquidity,
@@ -80,8 +84,8 @@ export function convertToLegacyPosition(position: Position): SubgraphPosition {
       id: position.transaction.id,
       timestamp: position.transaction.timestamp,
       blockNumber: position.transaction.blockNumber,
-      gasUsed: position.transaction.gasUsed,
-      gasPrice: position.transaction.gasPrice,
+      gasUsed: 'gasUsed' in position.transaction ? position.transaction.gasUsed : '0',
+      gasPrice: 'gasPrice' in position.transaction ? position.transaction.gasPrice : '0',
     },
     pool: {
       id: position.pool.id,
@@ -100,8 +104,8 @@ export function convertToLegacyPosition(position: Position): SubgraphPosition {
       feeTier: parseInt(position.pool.feeTier),
       token0Price: position.pool.token0Price,
       token1Price: position.pool.token1Price,
-      liquidity: position.pool.liquidity,
-      sqrtPrice: position.pool.sqrtPrice,
+      liquidity: 'liquidity' in position.pool ? position.pool.liquidity : '0',
+      sqrtPrice: 'sqrtPrice' in position.pool ? position.pool.sqrtPrice : '0',
       tick: position.pool.tick ? parseInt(position.pool.tick) : 0,
     }
   };

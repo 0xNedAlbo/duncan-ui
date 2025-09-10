@@ -1,16 +1,14 @@
 // Legacy compatibility - Re-export from new standardized files
 // This file maintains backward compatibility while transitioning to the new schema
 
-// Re-export generated types
+// Re-export generated types from new graphql codegen
 export type {
-  Position,
-  Pool,
-  Token,
-  Transaction,
-  SubgraphResponse,
-  PositionQueryData,
-  PositionsQueryData
-} from './subgraph.generated';
+  GetPositionQuery,
+  GetPositionsByOwnerQuery,
+  GetPoolQuery,
+  GetFactoryQuery,
+  GetTokenQuery
+} from '@/graphql/types.generated';
 
 // Re-export custom types  
 export type {

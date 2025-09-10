@@ -1,11 +1,8 @@
 import { getSubgraphEndpoint, isSubgraphAvailable } from '@/config/subgraph';
 import { 
-  SubgraphResponse, 
-  PositionQueryData, 
-  PositionsQueryData,
-  Position,
-  BigDecimal
-} from '@/types/subgraph.generated';
+  GetPositionQuery,
+  GetPositionsByOwnerQuery
+} from '@/graphql/types.generated';
 import { 
   InitialValueData,
   SubgraphError,
@@ -13,6 +10,12 @@ import {
   SubgraphPosition 
 } from '@/types/subgraph.custom';
 import { POSITION_QUERY, POSITIONS_BY_OWNER_QUERY, buildQuery } from './queries';
+
+// Generic SubgraphResponse for API responses
+interface SubgraphResponse<T> {
+  data?: T;
+  errors?: Array<{ message: string; path?: string[]; extensions?: any }>;
+}
 
 export class SubgraphService {
   private readonly timeout = 10000; // 10 Sekunden
@@ -33,7 +36,7 @@ export class SubgraphService {
     }
 
     try {
-      const response = await this.querySubgraph<PositionQueryData>(
+      const response = await this.querySubgraph<GetPositionQuery>(
         chain,
         buildQuery(POSITION_QUERY, { tokenId: nftId })
       );
@@ -65,7 +68,7 @@ export class SubgraphService {
     }
 
     try {
-      const response = await this.querySubgraph<PositionsQueryData>(
+      const response = await this.querySubgraph<GetPositionsByOwnerQuery>(
         chain,
         buildQuery(POSITIONS_BY_OWNER_QUERY, {
           owner: owner.toLowerCase(),
