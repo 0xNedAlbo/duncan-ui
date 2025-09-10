@@ -76,8 +76,8 @@ export function useNFTPosition(
     // Only run query if chain and nftId are provided
     enabled: !!chain && !!nftId,
     
-    // Transform response
-    select: (response) => response.data,
+    // Transform response - extract position from data
+    select: (response) => response.data.position,
     
     ...options,
   });

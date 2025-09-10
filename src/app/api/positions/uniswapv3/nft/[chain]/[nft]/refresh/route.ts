@@ -22,7 +22,7 @@ export const clearRefreshCache = () => refreshCache.clear();
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { chain: string; nft: string } }
+  { params }: { params: Promise<{ chain: string; nft: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -33,7 +33,7 @@ export async function POST(
       );
     }
 
-    const { chain: chainSlug, nft: nftId } = params;
+    const { chain: chainSlug, nft: nftId } = await params;
 
     // Validate chain
     if (!isValidChainSlug(chainSlug)) {

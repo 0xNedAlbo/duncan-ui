@@ -18,7 +18,7 @@ const GetEventsSchema = z.object({
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { chain: string; nft: string } }
+  { params }: { params: Promise<{ chain: string; nft: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -29,7 +29,7 @@ export async function GET(
       );
     }
 
-    const { chain: chainSlug, nft: nftId } = params;
+    const { chain: chainSlug, nft: nftId } = await params;
 
     // Validate chain
     if (!isValidChainSlug(chainSlug)) {

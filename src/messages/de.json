@@ -191,7 +191,8 @@
       "copyId": "ID kopieren",
       "viewOnExplorer": "Im Explorer anzeigen",
       "lastUpdated": "Zuletzt aktualisiert",
-      "refresh": "Position aktualisieren"
+      "refresh": "Position aktualisieren",
+      "positionNotFound": "Position nicht gefunden"
     },
     "tabs": {
       "overview": "Übersicht",
@@ -203,6 +204,7 @@
     "status": {
       "active": "Aktiv",
       "closed": "Geschlossen",
+      "archived": "Archiviert",
       "liquidated": "Liquidiert"
     },
     "overview": {

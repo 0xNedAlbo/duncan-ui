@@ -348,6 +348,19 @@ export class PositionService {
         const { token0Data, token1Data } = this.getUnifiedTokenData(
             position.pool
         );
+
+        // Add defensive checks for token data
+        if (!token0Data.symbol || !token1Data.symbol) {
+            console.error(`Missing token symbols for position ${positionId}:`, {
+                token0Symbol: token0Data.symbol,
+                token1Symbol: token1Data.symbol,
+                poolAddress: position.pool.poolAddress,
+                token0Address: position.pool.token0Address,
+                token1Address: position.pool.token1Address
+            });
+            throw new Error(`Missing token data for position ${positionId}`);
+        }
+
         const quoteConfig = determineQuoteToken(
             token0Data.symbol,
             token0Data.address,
@@ -480,6 +493,18 @@ export class PositionService {
         const { token0Data, token1Data } = this.getUnifiedTokenData(
             position.pool
         );
+
+        // Add defensive checks for token data
+        if (!token0Data.symbol || !token1Data.symbol) {
+            console.error(`Missing token symbols for position ${positionId} (legacy):`, {
+                token0Symbol: token0Data.symbol,
+                token1Symbol: token1Data.symbol,
+                poolAddress: position.pool.poolAddress,
+                token0Address: position.pool.token0Address,
+                token1Address: position.pool.token1Address
+            });
+            throw new Error(`Missing token data for position ${positionId}`);
+        }
 
         // 2. Quote Token bestimmen
         const quoteConfig = determineQuoteToken(

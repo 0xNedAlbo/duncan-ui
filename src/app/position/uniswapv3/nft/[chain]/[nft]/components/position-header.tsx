@@ -16,6 +16,19 @@ interface PositionHeaderProps {
     chainConfig: ChainConfig;
 }
 
+// Helper function to get token data from PositionWithPnL structure
+function getTokenData(token: any) {
+    if (!token) return null;
+    
+    return {
+        symbol: token.symbol,
+        name: token.name,
+        logoUrl: token.logoUrl,
+        address: token.address || token.id,
+        decimals: token.decimals
+    };
+}
+
 export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeaderProps) {
     const t = useTranslations();
     const router = useRouter();
@@ -175,30 +188,39 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
                     <div className="flex items-center gap-6">
                         {/* Token Logos */}
                         <div className="flex items-center -space-x-3">
-                            <Image
-                                src={position.pool.token0.logoUrl || '/images/tokens/default.png'}
-                                alt={position.pool.token0.symbol}
-                                width={48}
-                                height={48}
-                                className="w-12 h-12 rounded-full border-3 border-slate-800 bg-slate-700 z-10"
-                            />
-                            <Image
-                                src={position.pool.token1.logoUrl || '/images/tokens/default.png'}
-                                alt={position.pool.token1.symbol}
-                                width={48}
-                                height={48}
-                                className="w-12 h-12 rounded-full border-3 border-slate-800 bg-slate-700"
-                            />
+                            {(() => {
+                                const token0 = getTokenData(position.pool?.token0);
+                                const token1 = getTokenData(position.pool?.token1);
+                                
+                                return (
+                                    <>
+                                        <Image
+                                            src={token0?.logoUrl || '/images/tokens/default.png'}
+                                            alt={token0?.symbol || 'Token 0'}
+                                            width={48}
+                                            height={48}
+                                            className="w-12 h-12 rounded-full border-3 border-slate-800 bg-slate-700 z-10"
+                                        />
+                                        <Image
+                                            src={token1?.logoUrl || '/images/tokens/default.png'}
+                                            alt={token1?.symbol || 'Token 1'}
+                                            width={48}
+                                            height={48}
+                                            className="w-12 h-12 rounded-full border-3 border-slate-800 bg-slate-700"
+                                        />
+                                    </>
+                                );
+                            })()}
                         </div>
 
                         {/* Position Info */}
                         <div>
                             <div className="flex items-center gap-3 mb-2">
                                 <h1 className="text-2xl font-bold text-white">
-                                    {position.tokenPair}
+                                    {position.tokenPair || 'Unknown Pair'}
                                 </h1>
-                                <span className={`px-3 py-1 rounded-lg text-sm font-medium border ${getStatusColor(position.status)}`}>
-                                    {t(`positionDetails.status.${position.status}`)}
+                                <span className={`px-3 py-1 rounded-lg text-sm font-medium border ${getStatusColor(position.status || 'active')}`}>
+                                    {t(`positionDetails.status.${position.status || 'active'}`)}
                                 </span>
                             </div>
                             
@@ -210,7 +232,7 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
                                 
                                 {/* Fee */}
                                 <span>
-                                    {t("positionDetails.header.fee")}: {(position.pool.fee / 10000).toFixed(2)}%
+                                    {t("positionDetails.header.fee")}: {position.pool?.fee ? (position.pool.fee / 10000).toFixed(2) : '0.00'}%
                                 </span>
                                 
                                 {/* NFT ID */}
