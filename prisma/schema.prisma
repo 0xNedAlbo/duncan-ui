@@ -265,18 +265,8 @@ model Position {
   // Position State
   status        String   @default("active") // "active", "closed", "archived"
   
-  // Initial Value Tracking (minimal - 5 fields)
-  initialValue        String?   // Wert in Quote Asset bei Erstellung
-  initialToken0Amount String?   // Token0 Menge bei Erstellung  
-  initialToken1Amount String?   // Token1 Menge bei Erstellung
-  initialTimestamp    DateTime? // Wann die Position erstellt wurde
-  initialSource       String?   // "subgraph" oder "snapshot"
-  
-  // Event Ledger Tracking
+  // Relations
   events              PositionEvent[]
-  lastEventSync       DateTime?
-  totalEventsCount    Int     @default(0)
-  totalFeesCollected  String  @default("0") // BigInt: Sum of all COLLECT events in quote token
   
   // Timestamps
   createdAt     DateTime @default(now())
@@ -287,7 +277,7 @@ model Position {
   @@map("positions")
 }
 
-// Position Event Model - Event-driven position tracking
+// Position Event Model - Stateful event ledger with proper ordering and caching
 model PositionEvent {
   id              String   @id @default(cuid())
   
@@ -295,40 +285,43 @@ model PositionEvent {
   positionId      String
   position        Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
   
-  // Event Type & Identity
-  eventType       String   // "CREATE", "INCREASE", "DECREASE", "COLLECT", "CLOSE"
-  timestamp       DateTime
-  blockNumber     Int
-  transactionHash String
+  // Blockchain Ordering (CRITICAL for proper event sequencing)
+  blockNumber     BigInt   // Ethereum block number
+  transactionIndex Int     // Transaction index within block
+  logIndex        Int      // Log index within transaction
+  blockTimestamp  DateTime // Block timestamp (not event processing time)
+  transactionHash String   // For deduplication and verification
+  
+  // Event Classification
+  eventType       String   // "INCREASE", "DECREASE", "COLLECT"
   
   // Liquidity Changes
-  liquidityDelta  String   // BigInt as String: +/- liquidity change
+  deltaL          String   // BigInt: +/- liquidity change (can be negative for DECREASE)
   
-  // Token Amount Changes (BigInt as String)
-  token0Delta     String   // Amount of token0 added/removed
-  token1Delta     String   // Amount of token1 added/removed
+  // Token Amounts (in smallest units)
+  amountBase      String   // BigInt: Base token amount added/removed
+  amountQuote     String   // BigInt: Quote token amount added/removed
   
-  // Fee Collection (COLLECT events only)
-  collectedFee0   String?  // BigInt: fee collected in token0
-  collectedFee1   String?  // BigInt: fee collected in token1
+  // Price Information
+  poolPrice       String   // BigInt: Quote tokens per 1 Base token (in smallest units)
   
-  // Historical Pricing at Event Time
-  poolPrice       String   // BigInt: token0/token1 price at event time
-  tick            Int      // Pool tick at event time
+  // State Caching (BEFORE this event)
+  liquidityBefore String   // BigInt: Total position liquidity before this event
+  costBasisBefore String   // BigInt: Total cost basis before this event (in quote token smallest units)
+  realizedPnLBefore String // BigInt: Accumulated realized PnL before this event
   
-  // Valuations in Quote Token (BigInt as String, smallest unit)
-  valueInQuote    String   // Total position value change in quote token
-  feeValueInQuote String?  // Fee value in quote token (for COLLECT events)
+  // State Caching (AFTER this event)
+  liquidityAfter  String   // BigInt: Total position liquidity after this event
+  costBasisAfter  String   // BigInt: Total cost basis after this event
+  realizedPnLAfter String  // BigInt: Accumulated realized PnL after this event
   
   // Metadata
   source          String   // "subgraph", "onchain", "manual"
-  confidence      String   // "exact", "estimated"
   createdAt       DateTime @default(now())
   
-  // Indexes for performance
-  @@index([positionId, timestamp])
-  @@index([positionId, eventType])
-  @@index([transactionHash]) // For deduplication
-  @@unique([transactionHash, positionId, eventType]) // Prevent duplicates
+  // Indexes for performance and ordering
+  @@index([positionId, blockNumber, transactionIndex, logIndex]) // Proper chronological ordering
+  @@index([blockNumber, transactionIndex, logIndex]) // Global event ordering
+  @@unique([transactionHash, logIndex, positionId]) // Prevent exact duplicates
   @@map("position_events")
 }

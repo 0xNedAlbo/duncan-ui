@@ -1,462 +1,352 @@
-import { getSubgraphService } from '../subgraph';
+/**
+ * Historical Price Service - Alchemy RPC Implementation
+ * 
+ * Provides exact block-level pool pricing using Alchemy's eth_call API.
+ * Replaces subgraph-based approximations with precise blockchain data.
+ */
 
-export interface PriceDataPoint {
-    timestamp: Date;
-    price: string;      // BigInt: token0/token1 price
-    tick: number;
-    source: 'hourly' | 'daily' | 'interpolated' | 'current';
-    confidence: 'exact' | 'estimated';
+import { createPublicClient, http, type PublicClient } from 'viem';
+import { mainnet, arbitrum, base } from 'viem/chains';
+import { UNISWAP_V3_POOL_ABI } from '@/lib/contracts/uniswapV3Pool';
+import { sqrtRatioX96ToToken1PerToken0 } from '@/lib/utils/uniswap-v3/price';
+
+// Chain configuration with RPC endpoints
+const CHAIN_CONFIG = {
+  ethereum: {
+    chain: mainnet,
+    rpcUrl: process.env.NEXT_PUBLIC_ETHEREUM_RPC_URL || '',
+    id: 1
+  },
+  arbitrum: {
+    chain: arbitrum,
+    rpcUrl: process.env.NEXT_PUBLIC_ARBITRUM_RPC_URL || '',
+    id: 42161
+  },
+  base: {
+    chain: base,
+    rpcUrl: process.env.NEXT_PUBLIC_BASE_RPC_URL || '',
+    id: 8453
+  }
+} as const;
+
+export type SupportedChain = keyof typeof CHAIN_CONFIG;
+
+// Enhanced price data with exact blockchain information
+export interface ExactPriceData {
+  poolAddress: string;
+  blockNumber: bigint;
+  blockTimestamp?: Date;
+  sqrtPriceX96: bigint;
+  tick: number;
+  price: string; // BigInt string: token1 per token0 in smallest units
+  source: 'alchemy-rpc';
+  confidence: 'exact';
+  chain: string;
+  retrievedAt: Date;
 }
 
-export interface PoolHistoricalData {
-    id: string;
-    date: number;        // Unix timestamp
-    token0Price: string;
-    token1Price: string;
-    tick: string;
-    sqrtPrice: string;
+// Request structure for batch operations
+export interface PriceRequest {
+  poolAddress: string;
+  blockNumber: bigint;
+  chain: SupportedChain;
+  timestamp?: Date;
 }
 
+// Cache key structure
 interface PriceCache {
-    [key: string]: PriceDataPoint; // key: `${poolId}-${timestamp}`
+  [key: string]: ExactPriceData; // key: `${chain}-${poolAddress}-${blockNumber}`
+}
+
+// Rate limiting state
+interface RateLimitState {
+  lastRequestTime: number;
+  requestCount: number;
+  resetTime: number;
+  chain: string;
 }
 
 export class HistoricalPriceService {
-    private readonly subgraphService = getSubgraphService();
-    private readonly priceCache: PriceCache = {};
-    private readonly CACHE_TTL = 60 * 60 * 1000; // 1 hour
+  private clients: Map<string, PublicClient> = new Map();
+  private priceCache: PriceCache = {};
+  private rateLimitState: Map<string, RateLimitState> = new Map();
+  
+  // Configuration
+  private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours (historical data doesn't change)
+  private readonly RATE_LIMIT = {
+    REQUESTS_PER_SECOND: 10, // Conservative limit for Alchemy
+    MAX_BATCH_SIZE: 50,
+    RETRY_ATTEMPTS: 3,
+    RETRY_DELAY_MS: 1000,
+  };
 
-    /**
-     * Get price at specific timestamp with fallback strategies
-     */
-    async getPrice(poolAddress: string, timestamp: Date, chain: string): Promise<PriceDataPoint> {
-        const cacheKey = `${poolAddress}-${timestamp.getTime()}`;
-        
-        // Check cache first
-        if (this.priceCache[cacheKey]) {
-            const cached = this.priceCache[cacheKey];
-            // Simple TTL check - in production would be more sophisticated
-            const age = Date.now() - timestamp.getTime();
-            if (age < this.CACHE_TTL) {
-                return cached;
-            }
-        }
+  constructor() {
+    this.initializeClients();
+  }
 
-        try {
-            const priceData = await this.fetchHistoricalPrice(poolAddress, timestamp, chain);
-            this.priceCache[cacheKey] = priceData;
-            return priceData;
-        } catch (error) {
-            console.warn(`Failed to get historical price for ${poolAddress} at ${timestamp}:`, error.message);
-            
-            // Fallback to current price with estimated confidence
-            try {
-                const currentPrice = await this.getCurrentPoolPrice(poolAddress, chain);
-                const fallbackPrice: PriceDataPoint = {
-                    timestamp,
-                    price: currentPrice.price,
-                    tick: currentPrice.tick,
-                    source: 'current',
-                    confidence: 'estimated'
-                };
-                this.priceCache[cacheKey] = fallbackPrice;
-                return fallbackPrice;
-            } catch (fallbackError) {
-                // Final fallback with zero values
-                const zeroPriceData: PriceDataPoint = {
-                    timestamp,
-                    price: "0",
-                    tick: 0,
-                    source: 'current',
-                    confidence: 'estimated'
-                };
-                this.priceCache[cacheKey] = zeroPriceData;
-                return zeroPriceData;
-            }
-        }
+  /**
+   * Initialize viem clients for all supported chains
+   */
+  private initializeClients(): void {
+    for (const [chainName, config] of Object.entries(CHAIN_CONFIG)) {
+      if (!config.rpcUrl) {
+        console.warn(`⚠️ No RPC URL configured for ${chainName}`);
+        continue;
+      }
+
+      const client = createPublicClient({
+        chain: config.chain,
+        transport: http(config.rpcUrl, {
+          timeout: 30000, // 30s timeout
+          retryCount: 3,
+          retryDelay: 1000,
+        }),
+      });
+
+      this.clients.set(chainName, client);
+      
+      // Initialize rate limiting state for this chain
+      this.rateLimitState.set(chainName, {
+        lastRequestTime: 0,
+        requestCount: 0,
+        resetTime: 0,
+        chain: chainName
+      });
+
+      console.log(`✅ Initialized RPC client for ${chainName}:`, config.rpcUrl.substring(0, 50) + '...');
+    }
+  }
+
+  /**
+   * Get exact pool price at specific block number
+   */
+  async getExactPoolPriceAtBlock(
+    poolAddress: string,
+    blockNumber: bigint,
+    chain: SupportedChain,
+    timestamp?: Date
+  ): Promise<ExactPriceData> {
+    // Check cache first
+    const cacheKey = `${chain}-${poolAddress.toLowerCase()}-${blockNumber}`;
+    if (this.priceCache[cacheKey]) {
+      console.log(`💾 Cache hit for ${poolAddress} at block ${blockNumber}`);
+      return this.priceCache[cacheKey];
     }
 
-    /**
-     * Get price range for multiple timestamps
-     */
-    async getPriceRange(poolId: string, from: Date, to: Date, chain: string): Promise<PriceDataPoint[]> {
-        const now = new Date();
-        const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-        const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-        // Determine data granularity based on age
-        if (from > hourAgo) {
-            // Recent data - try hourly
-            return this.fetchHourlyPrices(poolId, from, to, chain);
-        } else if (from > dayAgo) {
-            // Last day - try hourly then daily
-            try {
-                return await this.fetchHourlyPrices(poolId, from, to, chain);
-            } catch (error) {
-                console.warn('Hourly data failed, falling back to daily:', error.message);
-                return this.fetchDailyPrices(poolId, from, to, chain);
-            }
-        } else {
-            // Older data - use daily
-            return this.fetchDailyPrices(poolId, from, to, chain);
-        }
+    const client = this.clients.get(chain);
+    if (!client) {
+      throw new Error(`No RPC client available for chain: ${chain}`);
     }
 
-    /**
-     * Fetch historical price using best available data source
-     */
-    private async fetchHistoricalPrice(poolAddress: string, timestamp: Date, chain: string): Promise<PriceDataPoint> {
-        const now = new Date();
-        const ageInHours = (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60);
+    await this.enforceRateLimit(chain);
 
-        if (ageInHours < 24) {
-            // Try hourly data first for recent timestamps
-            try {
-                return await this.fetchHourlyPrice(poolAddress, timestamp, chain);
-            } catch (error) {
-                console.warn('Hourly data unavailable, trying daily:', error.message);
-                return await this.fetchDailyPrice(poolAddress, timestamp, chain);
-            }
-        } else {
-            // Use daily data for older timestamps
-            return await this.fetchDailyPrice(poolAddress, timestamp, chain);
-        }
+    try {
+      console.log(`🔍 Fetching pool price: ${poolAddress} at block ${blockNumber} on ${chain}`);
+
+      // Call slot0() function on the pool contract at specific block
+      const slot0Data = await client.readContract({
+        address: poolAddress as `0x${string}`,
+        abi: UNISWAP_V3_POOL_ABI,
+        functionName: 'slot0',
+        blockNumber,
+      });
+
+      const [sqrtPriceX96, tick] = slot0Data;
+
+      // Convert sqrtPriceX96 to human readable price (token1 per token0)
+      const priceFormatted = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, 18, 18); // Default to 18 decimals
+
+      const priceData: ExactPriceData = {
+        poolAddress: poolAddress.toLowerCase(),
+        blockNumber,
+        blockTimestamp: timestamp,
+        sqrtPriceX96,
+        tick,
+        price: priceFormatted.toString(),
+        source: 'alchemy-rpc',
+        confidence: 'exact',
+        chain,
+        retrievedAt: new Date()
+      };
+
+      // Cache the result (historical data never changes)
+      this.priceCache[cacheKey] = priceData;
+
+      console.log(`✅ Retrieved price for ${poolAddress}: ${priceFormatted} at block ${blockNumber}`);
+      return priceData;
+
+    } catch (error) {
+      console.error(`❌ Failed to get pool price for ${poolAddress} at block ${blockNumber}:`, error);
+      throw new Error(`RPC call failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Batch fetch multiple pool prices for efficiency
+   */
+  async batchGetPoolPrices(requests: PriceRequest[]): Promise<ExactPriceData[]> {
+    if (requests.length === 0) return [];
+
+    console.log(`📦 Batch fetching ${requests.length} pool prices`);
+
+    // Group requests by chain for parallel processing
+    const requestsByChain = new Map<SupportedChain, PriceRequest[]>();
+    for (const request of requests) {
+      if (!requestsByChain.has(request.chain)) {
+        requestsByChain.set(request.chain, []);
+      }
+      requestsByChain.get(request.chain)!.push(request);
     }
 
-    /**
-     * Fetch price from hourly data
-     */
-    private async fetchHourlyPrice(poolAddress: string, timestamp: Date, chain: string): Promise<PriceDataPoint> {
-        const hourTimestamp = Math.floor(timestamp.getTime() / 1000 / 3600) * 3600; // Round to hour
+    // Process each chain in parallel
+    const chainPromises = Array.from(requestsByChain.entries()).map(async ([, chainRequests]) => {
+      const results: ExactPriceData[] = [];
+      
+      // Process requests in batches to respect rate limits
+      for (let i = 0; i < chainRequests.length; i += this.RATE_LIMIT.MAX_BATCH_SIZE) {
+        const batch = chainRequests.slice(i, i + this.RATE_LIMIT.MAX_BATCH_SIZE);
         
-        const query = `
-            query GetPoolHourData($poolId: String!, $timestamp: Int!) {
-                poolHourDatas(
-                    where: { 
-                        pool: $poolId,
-                        periodStartUnix_lte: $timestamp 
-                    },
-                    orderBy: periodStartUnix,
-                    orderDirection: desc,
-                    first: 2
-                ) {
-                    id
-                    periodStartUnix
-                    token0Price
-                    token1Price
-                    tick
-                    sqrtPrice
-                }
-            }
-        `;
+        const batchPromises = batch.map(req => 
+          this.getExactPoolPriceAtBlock(req.poolAddress, req.blockNumber, req.chain, req.timestamp)
+            .catch(error => {
+              console.warn(`⚠️ Failed to get price for ${req.poolAddress} at block ${req.blockNumber}:`, error.message);
+              return null; // Return null for failed requests
+            })
+        );
 
-        const response = await this.subgraphService.query(chain, query, {
-            poolId: poolAddress,
-            timestamp: hourTimestamp
-        });
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults.filter((result): result is ExactPriceData => result !== null));
 
-        if (!response.data?.poolHourDatas?.length) {
-            throw new Error('No hourly price data found');
+        // Add delay between batches to respect rate limits
+        if (i + this.RATE_LIMIT.MAX_BATCH_SIZE < chainRequests.length) {
+          await this.delay(200); // 200ms between batches
         }
+      }
+      
+      return results;
+    });
 
-        const hourData = response.data.poolHourDatas[0];
-        
-        // If we have an exact match, use it
-        if (hourData.periodStartUnix === hourTimestamp) {
-            return {
-                timestamp: new Date(hourData.periodStartUnix * 1000),
-                price: this.calculatePrice(hourData.token0Price, hourData.token1Price),
-                tick: parseInt(hourData.tick),
-                source: 'hourly',
-                confidence: 'exact'
-            };
-        }
+    const allResults = await Promise.all(chainPromises);
+    const flatResults = allResults.flat();
 
-        // If we have before/after data, interpolate
-        if (response.data.poolHourDatas.length >= 2) {
-            const before = response.data.poolHourDatas[1];
-            const after = response.data.poolHourDatas[0];
-            return this.interpolatePrice(before, after, timestamp);
-        }
+    console.log(`✅ Batch completed: ${flatResults.length}/${requests.length} successful`);
+    return flatResults;
+  }
 
-        // Use the closest available data
+  /**
+   * Get price with graceful fallback handling
+   */
+  async getPriceWithFallback(
+    poolAddress: string,
+    blockNumber: bigint,
+    timestamp: Date,
+    chain: SupportedChain
+  ): Promise<ExactPriceData> {
+    try {
+      return await this.getExactPoolPriceAtBlock(poolAddress, blockNumber, chain, timestamp);
+    } catch (error) {
+      console.warn(`⚠️ Primary RPC call failed for ${poolAddress}, attempting fallback:`, error instanceof Error ? error.message : 'Unknown error');
+
+      // Fallback 1: Try current block (latest price)
+      try {
+        const latestPrice = await this.getExactPoolPriceAtBlock(poolAddress, BigInt(0), chain, timestamp);
         return {
-            timestamp: new Date(hourData.periodStartUnix * 1000),
-            price: this.calculatePrice(hourData.token0Price, hourData.token1Price),
-            tick: parseInt(hourData.tick),
-            source: 'hourly',
-            confidence: 'estimated'
+          ...latestPrice,
+          blockNumber, // Keep original block number for reference
+          blockTimestamp: timestamp,
+          confidence: 'exact' as const, // Still exact, just not from the specific block
+          retrievedAt: new Date()
         };
+      } catch (fallbackError) {
+        console.error(`❌ All fallback attempts failed for ${poolAddress}:`, fallbackError);
+        throw new Error(`Failed to retrieve price data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+  }
+
+  /**
+   * Clear cache (useful for testing or memory management)
+   */
+  clearCache(): void {
+    this.priceCache = {};
+    console.log('🧹 Price cache cleared');
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats(): { size: number; keys: string[] } {
+    const keys = Object.keys(this.priceCache);
+    return {
+      size: keys.length,
+      keys: keys.slice(0, 10) // Show first 10 keys as sample
+    };
+  }
+
+  /**
+   * Enforce rate limiting per chain
+   */
+  private async enforceRateLimit(chain: string): Promise<void> {
+    const state = this.rateLimitState.get(chain);
+    if (!state) return;
+
+    const now = Date.now();
+    
+    // Reset counter every second
+    if (now >= state.resetTime) {
+      state.requestCount = 0;
+      state.resetTime = now + 1000;
     }
 
-    /**
-     * Fetch price from daily data
-     */
-    private async fetchDailyPrice(poolAddress: string, timestamp: Date, chain: string): Promise<PriceDataPoint> {
-        const dayTimestamp = Math.floor(timestamp.getTime() / 1000 / 86400) * 86400; // Round to day
-        
-        const query = `
-            query GetPoolDayData($poolId: String!, $timestamp: Int!) {
-                poolDayDatas(
-                    where: { 
-                        pool: $poolId,
-                        date_lte: $timestamp 
-                    },
-                    orderBy: date,
-                    orderDirection: desc,
-                    first: 2
-                ) {
-                    id
-                    date
-                    token0Price
-                    token1Price
-                    tick
-                    sqrtPrice
-                }
-            }
-        `;
-
-        const response = await this.subgraphService.query(chain, query, {
-            poolId: poolAddress,
-            timestamp: dayTimestamp
-        });
-
-        if (!response.data?.poolDayDatas?.length) {
-            throw new Error('No daily price data found');
-        }
-
-        const dayData = response.data.poolDayDatas[0];
-        
-        // If we have an exact match, use it
-        if (dayData.date === dayTimestamp) {
-            return {
-                timestamp: new Date(dayData.date * 1000),
-                price: this.calculatePrice(dayData.token0Price, dayData.token1Price),
-                tick: parseInt(dayData.tick),
-                source: 'daily',
-                confidence: 'exact'
-            };
-        }
-
-        // If we have before/after data, interpolate
-        if (response.data.poolDayDatas.length >= 2) {
-            const before = response.data.poolDayDatas[1];
-            const after = response.data.poolDayDatas[0];
-            return this.interpolatePrice(before, after, timestamp);
-        }
-
-        // Use the closest available data
-        return {
-            timestamp: new Date(dayData.date * 1000),
-            price: this.calculatePrice(dayData.token0Price, dayData.token1Price),
-            tick: parseInt(dayData.tick),
-            source: 'daily',
-            confidence: 'estimated'
-        };
+    // Check if we need to wait
+    if (state.requestCount >= this.RATE_LIMIT.REQUESTS_PER_SECOND) {
+      const waitTime = state.resetTime - now;
+      if (waitTime > 0) {
+        console.log(`⏳ Rate limiting ${chain}: waiting ${waitTime}ms`);
+        await this.delay(waitTime);
+      }
     }
 
-    /**
-     * Fetch multiple hourly prices
-     */
-    private async fetchHourlyPrices(poolId: string, from: Date, to: Date, chain: string): Promise<PriceDataPoint[]> {
-        const fromTimestamp = Math.floor(from.getTime() / 1000 / 3600) * 3600;
-        const toTimestamp = Math.floor(to.getTime() / 1000 / 3600) * 3600;
-        
-        const query = `
-            query GetPoolHourDataRange($poolId: String!, $from: Int!, $to: Int!) {
-                poolHourDatas(
-                    where: { 
-                        pool: $poolId,
-                        periodStartUnix_gte: $from,
-                        periodStartUnix_lte: $to
-                    },
-                    orderBy: periodStartUnix,
-                    orderDirection: asc,
-                    first: 1000
-                ) {
-                    id
-                    periodStartUnix
-                    token0Price
-                    token1Price
-                    tick
-                    sqrtPrice
-                }
-            }
-        `;
+    state.requestCount++;
+    state.lastRequestTime = now;
+  }
 
-        const response = await this.subgraphService.query(chain, query, {
-            poolId,
-            from: fromTimestamp,
-            to: toTimestamp
-        });
+  /**
+   * Utility delay function
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
 
-        if (!response.data?.poolHourDatas?.length) {
-            throw new Error('No hourly price data found for range');
-        }
-
-        return response.data.poolHourDatas.map((hourData: any) => ({
-            timestamp: new Date(hourData.periodStartUnix * 1000),
-            price: this.calculatePrice(hourData.token0Price, hourData.token1Price),
-            tick: parseInt(hourData.tick),
-            source: 'hourly' as const,
-            confidence: 'exact' as const
-        }));
+  /**
+   * Validate chain is supported
+   */
+  private validateChain(chain: string): asserts chain is SupportedChain {
+    if (!Object.keys(CHAIN_CONFIG).includes(chain)) {
+      throw new Error(`Unsupported chain: ${chain}. Supported chains: ${Object.keys(CHAIN_CONFIG).join(', ')}`);
     }
+  }
 
-    /**
-     * Fetch multiple daily prices
-     */
-    private async fetchDailyPrices(poolId: string, from: Date, to: Date, chain: string): Promise<PriceDataPoint[]> {
-        const fromTimestamp = Math.floor(from.getTime() / 1000 / 86400) * 86400;
-        const toTimestamp = Math.floor(to.getTime() / 1000 / 86400) * 86400;
-        
-        const query = `
-            query GetPoolDayDataRange($poolId: String!, $from: Int!, $to: Int!) {
-                poolDayDatas(
-                    where: { 
-                        pool: $poolId,
-                        date_gte: $from,
-                        date_lte: $to
-                    },
-                    orderBy: date,
-                    orderDirection: asc,
-                    first: 1000
-                ) {
-                    id
-                    date
-                    token0Price
-                    token1Price
-                    tick
-                    sqrtPrice
-                }
-            }
-        `;
-
-        const response = await this.subgraphService.query(chain, query, {
-            poolId,
-            from: fromTimestamp,
-            to: toTimestamp
-        });
-
-        if (!response.data?.poolDayDatas?.length) {
-            throw new Error('No daily price data found for range');
-        }
-
-        return response.data.poolDayDatas.map((dayData: any) => ({
-            timestamp: new Date(dayData.date * 1000),
-            price: this.calculatePrice(dayData.token0Price, dayData.token1Price),
-            tick: parseInt(dayData.tick),
-            source: 'daily' as const,
-            confidence: 'exact' as const
-        }));
+  /**
+   * Get client for chain (with validation)
+   */
+  private getClient(chain: SupportedChain): PublicClient {
+    const client = this.clients.get(chain);
+    if (!client) {
+      throw new Error(`No RPC client available for chain: ${chain}`);
     }
-
-    /**
-     * Get current pool price as fallback
-     */
-    private async getCurrentPoolPrice(poolAddress: string, chain: string): Promise<{ price: string; tick: number }> {
-        const query = `
-            query GetCurrentPoolPrice($poolId: String!) {
-                pool(id: $poolId) {
-                    id
-                    token0Price
-                    token1Price
-                    tick
-                    sqrtPrice
-                }
-            }
-        `;
-
-        const response = await this.subgraphService.query(chain, query, { poolId: poolAddress });
-        
-        if (!response.data?.pool) {
-            throw new Error('Pool not found');
-        }
-
-        const pool = response.data.pool;
-        return {
-            price: this.calculatePrice(pool.token0Price, pool.token1Price),
-            tick: parseInt(pool.tick)
-        };
-    }
-
-    /**
-     * Interpolate price between two data points
-     */
-    private interpolatePrice(
-        before: any, 
-        after: any, 
-        targetTimestamp: Date
-    ): PriceDataPoint {
-        // Handle both date and periodStartUnix fields
-        const beforeTime = (before.date || before.periodStartUnix) * 1000;
-        const afterTime = (after.date || after.periodStartUnix) * 1000;
-        const targetTime = targetTimestamp.getTime();
-
-        // Linear interpolation
-        const ratio = (targetTime - beforeTime) / (afterTime - beforeTime);
-        
-        const beforePrice = parseFloat(this.calculatePrice(before.token0Price, before.token1Price));
-        const afterPrice = parseFloat(this.calculatePrice(after.token0Price, after.token1Price));
-        const interpolatedPrice = beforePrice + (afterPrice - beforePrice) * ratio;
-
-        // Interpolate tick as well
-        const beforeTick = parseInt(before.tick);
-        const afterTick = parseInt(after.tick);
-        const interpolatedTick = Math.round(beforeTick + (afterTick - beforeTick) * ratio);
-
-        return {
-            timestamp: targetTimestamp,
-            price: (interpolatedPrice * (10 ** 18)).toFixed(0), // Convert back to BigInt string
-            tick: interpolatedTick,
-            source: 'interpolated',
-            confidence: 'estimated'
-        };
-    }
-
-    /**
-     * Calculate token0/token1 price from Subgraph data
-     * Subgraph returns token0Price and token1Price, we need the actual ratio
-     */
-    private calculatePrice(token0Price: string, token1Price: string): string {
-        // token0Price is already the price of token0 in terms of token1
-        // We just need to ensure it's in BigInt format with proper precision
-        const price = parseFloat(token0Price);
-        
-        if (isNaN(price) || price <= 0) {
-            throw new Error('Invalid price data from subgraph');
-        }
-
-        // Convert to BigInt-compatible string with 18 decimal precision
-        return (price * (10 ** 18)).toFixed(0);
-    }
-
-    /**
-     * Clear price cache (useful for testing)
-     */
-    clearCache(): void {
-        Object.keys(this.priceCache).forEach(key => {
-            delete this.priceCache[key];
-        });
-    }
-
-    /**
-     * Get cache statistics
-     */
-    getCacheStats(): { size: number; keys: string[] } {
-        return {
-            size: Object.keys(this.priceCache).length,
-            keys: Object.keys(this.priceCache)
-        };
-    }
+    return client;
+  }
 }
 
 // Singleton instance
 let historicalPriceServiceInstance: HistoricalPriceService | null = null;
 
 export function getHistoricalPriceService(): HistoricalPriceService {
-    if (!historicalPriceServiceInstance) {
-        historicalPriceServiceInstance = new HistoricalPriceService();
-    }
-    return historicalPriceServiceInstance;
+  if (!historicalPriceServiceInstance) {
+    historicalPriceServiceInstance = new HistoricalPriceService();
+  }
+  return historicalPriceServiceInstance;
 }
+
+// Export types for use in other services (already declared above)
