@@ -633,6 +633,11 @@ export class EventSyncService {
 
         const token0IsQuote = quoteConfig.token0IsQuote;
         const price = BigInt(priceData.price);
+        
+        // Get correct token decimals
+        const token0Decimals = token0Data.decimals;
+        const token1Decimals = token1Data.decimals;
+        const baseTokenDecimals = token0IsQuote ? token1Decimals : token0Decimals;
 
         // For COLLECT events, calculate fee value
         if (event.eventType === 'COLLECT' && (event.collectedFee0 || event.collectedFee1)) {
@@ -641,11 +646,11 @@ export class EventSyncService {
 
             let feeValueInQuote: bigint;
             if (token0IsQuote) {
-                // Quote token is token0: value = fee0 + (fee1 * price)
-                feeValueInQuote = fee0 + (fee1 * price) / (10n ** 18n);
+                // Quote token is token0: value = fee0 + (fee1 * price) / baseTokenDecimals
+                feeValueInQuote = fee0 + (fee1 * price) / (10n ** BigInt(baseTokenDecimals));
             } else {
-                // Quote token is token1: value = (fee0 * price) + fee1
-                feeValueInQuote = (fee0 * price) / (10n ** 18n) + fee1;
+                // Quote token is token1: value = (fee0 * price) / baseTokenDecimals + fee1
+                feeValueInQuote = (fee0 * price) / (10n ** BigInt(baseTokenDecimals)) + fee1;
             }
 
             return {
@@ -660,11 +665,11 @@ export class EventSyncService {
 
         let valueInQuote: bigint;
         if (token0IsQuote) {
-            // Quote token is token0: value = token0Delta + (token1Delta * price)
-            valueInQuote = token0Delta + (token1Delta * price) / (10n ** 18n);
+            // Quote token is token0: value = token0Delta + (token1Delta * price) / baseTokenDecimals
+            valueInQuote = token0Delta + (token1Delta * price) / (10n ** BigInt(baseTokenDecimals));
         } else {
-            // Quote token is token1: value = (token0Delta * price) + token1Delta
-            valueInQuote = (token0Delta * price) / (10n ** 18n) + token1Delta;
+            // Quote token is token1: value = (token0Delta * price) / baseTokenDecimals + token1Delta
+            valueInQuote = (token0Delta * price) / (10n ** BigInt(baseTokenDecimals)) + token1Delta;
         }
 
         return {

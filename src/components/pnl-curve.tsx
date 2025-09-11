@@ -2,11 +2,29 @@
 
 import { useMemo } from 'react'
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area, Tooltip } from 'recharts'
-import { generatePnLCurve, PositionParams, PnLPoint } from '@/lib/calculations/pnl'
+import { generatePnLCurve, PnLPoint } from '@/lib/utils/uniswap-v3/position'
 import { useTranslations } from '@/i18n/client'
+import { formatFractionHuman } from '@/lib/utils/fraction-format'
+
+interface ModernPositionParams {
+  liquidity: bigint;
+  tickLower: number;
+  tickUpper: number;
+  initialValue: bigint;
+  baseTokenAddress: string;
+  quoteTokenAddress: string;
+  baseTokenDecimals: number;
+  tickSpacing: number;
+  priceRange: { min: bigint; max: bigint };
+  currentPrice: bigint;
+  // For display purposes
+  entryPrice: number;
+  lowerPrice: number;
+  upperPrice: number;
+}
 
 interface PnLCurveProps {
-  params: PositionParams
+  params: ModernPositionParams
   width?: number
   height?: number
   className?: string
@@ -16,13 +34,33 @@ export function PnLCurve({ params, width, height = 400, className }: PnLCurvePro
   const t = useTranslations()
   
   const curveData = useMemo(() => {
-    const data = generatePnLCurve(params)
-    // Add background color data based on profit/loss
-    return data.map(point => ({
-      ...point,
-      profitZone: point.pnl > 0 ? point.pnl : null,
-      lossZone: point.pnl < 0 ? point.pnl : null
-    }))
+    const data = generatePnLCurve(
+      params.liquidity,
+      params.tickLower,
+      params.tickUpper,
+      params.initialValue,
+      params.baseTokenAddress,
+      params.quoteTokenAddress,
+      params.baseTokenDecimals,
+      params.tickSpacing,
+      params.priceRange
+    )
+    
+    // Convert BigInt values to numbers for display and add background color data
+    return data.map(point => {
+      const priceDisplay = Number(point.price) / Math.pow(10, params.baseTokenDecimals);
+      const pnlDisplay = Number(point.pnl) / Math.pow(10, params.baseTokenDecimals); // Assuming quote token has same decimals
+      
+      return {
+        price: priceDisplay,
+        positionValue: Number(point.positionValue) / Math.pow(10, params.baseTokenDecimals),
+        pnl: pnlDisplay,
+        pnlPercent: point.pnlPercent,
+        phase: point.phase,
+        profitZone: pnlDisplay > 0 ? pnlDisplay : null,
+        lossZone: pnlDisplay < 0 ? pnlDisplay : null
+      }
+    })
   }, [params])
 
   const { entryPrice, lowerPrice, upperPrice } = params
@@ -50,7 +88,7 @@ export function PnLCurve({ params, width, height = 400, className }: PnLCurvePro
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null
     
-    const data = payload[0].payload as PnLPoint
+    const data = payload[0].payload
     // Handle scatter points that might not have all properties
     if (!data.hasOwnProperty('positionValue')) return null
     
@@ -62,7 +100,7 @@ export function PnLCurve({ params, width, height = 400, className }: PnLCurvePro
     return (
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl backdrop-blur-sm">
         <p className="text-slate-300 text-sm">
-          <strong>{t('pnlCurve.price')}:</strong> ${Number(label).toLocaleString()} USDC
+          <strong>{t('pnlCurve.price')}:</strong> ${Number(label).toLocaleString()}
         </p>
         <p className="text-slate-300 text-sm">
           <strong>{t('pnlCurve.positionValue')}:</strong> ${data.positionValue.toLocaleString()}

@@ -1,30 +1,81 @@
 /**
- * EtherscanEventService
- * Query Uniswap V3 NFT Position Manager events via Etherscan API
- * Provides precise event filtering by tokenId for position event sync
+ * Etherscan Event Service
+ * 
+ * Fetches Uniswap V3 NFT Position Manager events using Etherscan API
+ * Compatible with EventStateCalculator for exact blockchain event data.
  */
 
-import { decodeAbiParameters, parseAbiParameters } from 'viem';
-import { 
-  NFT_POSITION_MANAGER_ADDRESSES, 
-  CHAIN_IDS, 
-  EVENT_SIGNATURES,
-  RATE_LIMIT,
-  ETHERSCAN_API,
-  type ChainSlug
-} from './constants';
-import {
-  type EtherscanLogResponse,
-  type EtherscanLog,
-  type ParsedNftEvent,
-  type ParsedIncreaseLiquidityEvent,
-  type ParsedDecreaseLiquidityEvent,
-  type ParsedCollectEvent,
-  type ParsedTransferEvent,
-  type EventQueryParams,
-  type EventFetchResult,
-  type RateLimitState
-} from './types';
+import { SupportedChainsType } from '@/config/chains';
+import type { RawPositionEvent } from '../positions/eventStateCalculator';
+
+// Uniswap V3 NFT Position Manager event signatures
+const EVENT_SIGNATURES = {
+  INCREASE_LIQUIDITY: '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f',
+  DECREASE_LIQUIDITY: '0x26f6a048ee9138f2c0ce266f322cb99228e8d619ae2bff30c67f8dcf9d2377b4', 
+  COLLECT: '0x40d0efd1a53d60ecbf40971b9daf7dc90178c3aadc7aab1765632738fa8b8f01'
+} as const;
+
+// Chain configurations for Etherscan v2 unified API
+const CHAIN_CONFIG = {
+  ethereum: {
+    chainId: 1,
+    nftManagerAddress: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88'
+  },
+  arbitrum: {
+    chainId: 42161,
+    nftManagerAddress: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88'
+  },
+  base: {
+    chainId: 8453,
+    nftManagerAddress: '0x03a520b32C04BF3bEEf7BF5d8b4B9d7e0e5d25F1' // Base has different address
+  }
+} as const;
+
+// Etherscan v2 unified API base URL
+const API_BASE_URL = 'https://api.etherscan.io/v2/api';
+
+// Etherscan API response types
+interface EtherscanLog {
+  address: string;
+  topics: string[];
+  data: string;
+  blockNumber: string;
+  blockHash: string;
+  timeStamp: string;
+  gasPrice: string;
+  gasUsed: string;
+  logIndex: string;
+  transactionHash: string;
+  transactionIndex: string;
+}
+
+interface EtherscanResponse {
+  status: string;
+  message: string;
+  result: EtherscanLog[];
+}
+
+// Service options
+interface FetchOptions {
+  fromBlock?: string | number;
+  toBlock?: string | number;
+  eventTypes?: Array<keyof typeof EVENT_SIGNATURES>;
+}
+
+// Service result
+interface FetchResult {
+  events: RawPositionEvent[];
+  errors: string[];
+  totalFetched: number;
+  duplicatesRemoved: number;
+}
+
+// Rate limiting state
+interface RateLimitState {
+  lastRequestTime: number;
+  requestCount: number;
+  resetTime: number;
+}
 
 export class EtherscanEventService {
   private rateLimitState: RateLimitState = {
@@ -32,344 +83,308 @@ export class EtherscanEventService {
     requestCount: 0,
     resetTime: 0
   };
-
+  
+  private readonly rateLimitDelay = 200; // 200ms between requests (5 req/sec)
+  
   /**
-   * Fetch all events for a specific NFT position
+   * Fetch position events for a specific NFT token ID
    */
   async fetchPositionEvents(
-    chain: ChainSlug,
+    chain: SupportedChainsType,
     tokenId: string,
-    params: Partial<EventQueryParams> = {}
-  ): Promise<EventFetchResult> {
-    const startTime = Date.now();
-    const errors: string[] = [];
-    const allEvents: ParsedNftEvent[] = [];
-
-    const queryParams = {
-      tokenId,
-      fromBlock: params.fromBlock || 'earliest',
-      toBlock: params.toBlock || 'latest',
-      eventTypes: params.eventTypes || ['INCREASE_LIQUIDITY', 'DECREASE_LIQUIDITY', 'COLLECT']
-    };
-
-    try {
-      // Query each event type
-      for (const eventType of queryParams.eventTypes) {
-        try {
-          const events = await this.fetchEventsByType(chain, tokenId, eventType, queryParams);
-          allEvents.push(...events);
-        } catch (error) {
-          errors.push(`Error fetching ${eventType} events: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          console.error(`Etherscan ${eventType} events error:`, error);
-        }
-      }
-
-      // Sort events chronologically
-      allEvents.sort((a, b) => {
-        if (a.blockNumber !== b.blockNumber) {
-          return a.blockNumber - b.blockNumber;
-        }
-        return a.logIndex - b.logIndex;
-      });
-
-    } catch (error) {
-      errors.push(`Event fetching error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      console.error('Etherscan event fetching error:', error);
-    }
-
-    return {
-      events: allEvents,
-      totalEvents: allEvents.length,
-      fromBlock: typeof queryParams.fromBlock === 'number' ? queryParams.fromBlock : 0,
-      toBlock: typeof queryParams.toBlock === 'number' ? queryParams.toBlock : 999999999,
-      queryDuration: Date.now() - startTime,
-      errors
-    };
-  }
-
-  /**
-   * Fetch events by specific type
-   */
-  private async fetchEventsByType(
-    chain: ChainSlug,
-    tokenId: string,
-    eventType: string,
-    params: EventQueryParams
-  ): Promise<ParsedNftEvent[]> {
-    const contractAddress = NFT_POSITION_MANAGER_ADDRESSES[chain];
-    const eventSignature = EVENT_SIGNATURES[eventType as keyof typeof EVENT_SIGNATURES];
+    options: FetchOptions = {}
+  ): Promise<FetchResult> {
+    console.log(`🔍 Fetching events for token ${tokenId} on ${chain}...`);
     
-    if (!contractAddress || !eventSignature) {
-      throw new Error(`Unsupported chain or event type: ${chain}, ${eventType}`);
+    const config = CHAIN_CONFIG[chain];
+    if (!config) {
+      throw new Error(`Unsupported chain: ${chain}`);
     }
-
-    // Convert tokenId to hex topic format (padded to 32 bytes)
-    const tokenIdHex = `0x${BigInt(tokenId).toString(16).padStart(64, '0')}`;
-
-    // Query Etherscan API with tokenId filtering via topic1
-    const logs = await this.queryEtherscanLogs({
-      address: contractAddress,
-      topic0: eventSignature,
-      topic1: tokenIdHex, // Filter by tokenId directly in API call
-      fromBlock: params.fromBlock,
-      toBlock: params.toBlock,
-      chainId: CHAIN_IDS[chain]
-    });
-
-    // Parse events (no need to filter by tokenId since API already filtered)
-    const parsedEvents: ParsedNftEvent[] = [];
-    for (const log of logs) {
-      try {
-        const parsedEvent = this.parseEventLog(log, eventType);
-        if (parsedEvent) {
-          parsedEvents.push(parsedEvent);
-        }
-      } catch (error) {
-        console.warn(`Failed to parse event log:`, error, log);
-      }
-    }
-
-    console.log(`🔍 Etherscan ${eventType} events found for tokenId ${tokenId}:`, parsedEvents.length);
-    return parsedEvents;
-  }
-
-  /**
-   * Query Etherscan API for logs
-   */
-  private async queryEtherscanLogs(params: {
-    address: string;
-    topic0: string;
-    topic1?: string;
-    fromBlock: number | string;
-    toBlock: number | string;
-    chainId: number;
-  }): Promise<EtherscanLog[]> {
-    await this.enforceRateLimit();
 
     const apiKey = process.env.ETHERSCAN_API_KEY;
     if (!apiKey) {
-      throw new Error('ETHERSCAN_API_KEY environment variable not set');
+      throw new Error('Missing API key: ETHERSCAN_API_KEY not found in environment');
     }
 
-    const queryParams = new URLSearchParams({
+    const eventTypes = options.eventTypes || ['INCREASE_LIQUIDITY', 'DECREASE_LIQUIDITY', 'COLLECT'];
+    const fromBlock = options.fromBlock || 'earliest';
+    const toBlock = options.toBlock || 'latest';
+
+    const result: FetchResult = {
+      events: [],
+      errors: [],
+      totalFetched: 0,
+      duplicatesRemoved: 0
+    };
+
+    // Fetch events for each event type
+    for (const eventType of eventTypes) {
+      try {
+        console.log(`  📥 Fetching ${eventType} events...`);
+        
+        const logs = await this.fetchEventLogs(
+          config.chainId,
+          apiKey,
+          config.nftManagerAddress,
+          EVENT_SIGNATURES[eventType],
+          tokenId,
+          fromBlock,
+          toBlock
+        );
+
+        console.log(`  ✅ Found ${logs.length} ${eventType} logs`);
+
+        // Parse each log into structured event data
+        for (const log of logs) {
+          try {
+            const parsed = this.parseEventLog(log, eventType, chain);
+            if (parsed) {
+              result.events.push(parsed);
+              result.totalFetched++;
+            }
+          } catch (error) {
+            const errorMsg = `Failed to parse ${eventType} log ${log.transactionHash}:${log.logIndex}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            result.errors.push(errorMsg);
+            console.warn(`⚠️ ${errorMsg}`);
+          }
+        }
+
+        // Rate limiting between requests
+        if (eventTypes.indexOf(eventType) < eventTypes.length - 1) {
+          await this.delay(this.rateLimitDelay);
+        }
+
+      } catch (error) {
+        const errorMsg = `Failed to fetch ${eventType} events: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        result.errors.push(errorMsg);
+        console.error(`❌ ${errorMsg}`);
+      }
+    }
+
+    // Remove duplicates and sort by blockchain order
+    const beforeDedup = result.events.length;
+    result.events = this.deduplicateAndSort(result.events);
+    result.duplicatesRemoved = beforeDedup - result.events.length;
+
+    console.log(`📊 Fetch complete: ${result.events.length} events (${result.duplicatesRemoved} duplicates removed, ${result.errors.length} errors)`);
+    
+    return result;
+  }
+
+  /**
+   * Fetch event logs from Etherscan v2 unified API
+   */
+  private async fetchEventLogs(
+    chainId: number,
+    apiKey: string,
+    contractAddress: string,
+    eventSignature: string,
+    tokenId: string,
+    fromBlock: string | number,
+    toBlock: string | number
+  ): Promise<EtherscanLog[]> {
+    await this.enforceRateLimit();
+
+    // Create topic filter for tokenId (topic[1] for most events)
+    const tokenIdHex = '0x' + BigInt(tokenId).toString(16).padStart(64, '0');
+    
+    const params = new URLSearchParams({
+      chainid: chainId.toString(), // v2 API uses chainid parameter
       module: 'logs',
       action: 'getLogs',
-      address: params.address,
-      topic0: params.topic0,
-      fromBlock: params.fromBlock.toString(),
-      toBlock: params.toBlock.toString(),
-      chainid: params.chainId.toString(),
+      address: contractAddress,
+      fromBlock: fromBlock.toString(),
+      toBlock: toBlock.toString(),
+      topic0: eventSignature,
+      topic1: tokenIdHex, // Filter by tokenId
       apikey: apiKey
     });
 
-    // Add topic1 filter if provided (for tokenId filtering)
-    if (params.topic1) {
-      queryParams.set('topic1', params.topic1);
-      queryParams.set('topic0_1_opr', 'and');
-    }
-
-    const url = `${ETHERSCAN_API.BASE_URL}?${queryParams.toString()}`;
+    const url = `${API_BASE_URL}?${params.toString()}`;
     
-    console.log(`🔍 Querying Etherscan API:`, {
-      chain: params.chainId,
-      address: params.address,
-      topic0: params.topic0,
-      fromBlock: params.fromBlock,
-      toBlock: params.toBlock
-    });
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), ETHERSCAN_API.TIMEOUT_MS);
-
     try {
       const response = await fetch(url, {
-        signal: controller.signal,
         headers: {
           'User-Agent': 'Duncan-UI/1.0'
         }
       });
 
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data: EtherscanLogResponse = await response.json();
-
+      const data: EtherscanResponse = await response.json();
+      
       if (data.status !== '1') {
         if (data.message === 'No records found') {
-          return [];
+          return []; // Normal case - no events for this filter
         }
         throw new Error(`Etherscan API error: ${data.message}`);
       }
 
-      console.log(`✅ Etherscan API returned ${data.result.length} logs`);
-      return data.result;
+      return Array.isArray(data.result) ? data.result : [];
 
     } catch (error) {
-      clearTimeout(timeoutId);
-      
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('Etherscan API request timeout');
-      }
+      console.error(`🔥 API request failed:`, { url, error });
       throw error;
     }
   }
 
   /**
-   * Parse event log based on event type
+   * Parse raw Etherscan log into RawPositionEvent format
    */
-  private parseEventLog(log: EtherscanLog, eventType: string): ParsedNftEvent | null {
-    const timestamp = new Date(parseInt(log.timeStamp) * 1000);
-    const blockNumber = parseInt(log.blockNumber);
-    const logIndex = parseInt(log.logIndex);
-
+  private parseEventLog(
+    log: EtherscanLog,
+    eventType: keyof typeof EVENT_SIGNATURES,
+    chain: SupportedChainsType
+  ): RawPositionEvent | null {
     try {
+      const blockNumber = BigInt(log.blockNumber);
+      const blockTimestamp = new Date(parseInt(log.timeStamp) * 1000);
+      const transactionIndex = parseInt(log.transactionIndex);
+      const logIndex = parseInt(log.logIndex);
+
+      // Extract tokenId from topic[1]
+      const tokenId = BigInt(log.topics[1]).toString();
+
+      const baseEvent: Omit<RawPositionEvent, 'liquidity' | 'amount0' | 'amount1' | 'recipient'> = {
+        eventType: eventType as RawPositionEvent['eventType'],
+        tokenId,
+        transactionHash: log.transactionHash,
+        blockNumber,
+        transactionIndex,
+        logIndex,
+        blockTimestamp,
+        chain
+      };
+
+      // Parse event-specific data from log.data
       switch (eventType) {
-        case 'INCREASE_LIQUIDITY':
-          return this.parseIncreaseLiquidityEvent(log, timestamp, blockNumber, logIndex);
-          
-        case 'DECREASE_LIQUIDITY':
-          return this.parseDecreaseLiquidityEvent(log, timestamp, blockNumber, logIndex);
-          
-        case 'COLLECT':
-          return this.parseCollectEvent(log, timestamp, blockNumber, logIndex);
-          
-        case 'TRANSFER':
-          return this.parseTransferEvent(log, timestamp, blockNumber, logIndex);
-          
+        case 'INCREASE_LIQUIDITY': {
+          // IncreaseLiquidity(uint256 indexed tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)
+          const { liquidity, amount0, amount1 } = this.decodeIncreaseLiquidityData(log.data);
+          return {
+            ...baseEvent,
+            liquidity: liquidity.toString(),
+            amount0: amount0.toString(),
+            amount1: amount1.toString()
+          } as RawPositionEvent;
+        }
+
+        case 'DECREASE_LIQUIDITY': {
+          // DecreaseLiquidity(uint256 indexed tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)
+          const { liquidity, amount0, amount1 } = this.decodeDecreaseLiquidityData(log.data);
+          return {
+            ...baseEvent,
+            liquidity: liquidity.toString(),
+            amount0: amount0.toString(),
+            amount1: amount1.toString()
+          } as RawPositionEvent;
+        }
+
+        case 'COLLECT': {
+          // Collect(uint256 indexed tokenId, address recipient, uint256 amount0, uint256 amount1)
+          const { recipient, amount0, amount1 } = this.decodeCollectData(log.data);
+          return {
+            ...baseEvent,
+            amount0: amount0.toString(),
+            amount1: amount1.toString(),
+            recipient
+          } as RawPositionEvent;
+        }
+
         default:
-          console.warn(`Unknown event type: ${eventType}`);
+          console.warn(`🤷 Unknown event type: ${eventType}`);
           return null;
       }
+
     } catch (error) {
-      console.warn(`Failed to parse ${eventType} event:`, error, log);
-      return null;
+      console.error(`💥 Failed to parse log:`, { log, eventType, error });
+      throw error;
     }
   }
 
   /**
-   * Parse IncreaseLiquidity event
-   * IncreaseLiquidity(uint256 indexed tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)
+   * Decode IncreaseLiquidity event data
    */
-  private parseIncreaseLiquidityEvent(
-    log: EtherscanLog, 
-    timestamp: Date, 
-    blockNumber: number, 
-    logIndex: number
-  ): ParsedIncreaseLiquidityEvent {
-    // tokenId is indexed (topic1)
-    const tokenId = BigInt(log.topics[1]).toString();
+  private decodeIncreaseLiquidityData(data: string): { liquidity: bigint; amount0: bigint; amount1: bigint } {
+    // Remove 0x prefix and split into 32-byte chunks
+    const hex = data.slice(2);
+    const chunks = hex.match(/.{64}/g) || [];
     
-    // Decode non-indexed parameters from data
-    const decoded = decodeAbiParameters(
-      parseAbiParameters('uint128 liquidity, uint256 amount0, uint256 amount1'),
-      log.data as `0x${string}`
-    );
+    if (chunks.length < 3) {
+      throw new Error(`Invalid IncreaseLiquidity data: expected 3 chunks, got ${chunks.length}`);
+    }
 
     return {
-      eventType: 'INCREASE_LIQUIDITY',
-      tokenId,
-      liquidity: decoded[0].toString(),
-      amount0: decoded[1].toString(),
-      amount1: decoded[2].toString(),
-      blockNumber,
-      timestamp,
-      transactionHash: log.transactionHash,
-      logIndex
+      liquidity: BigInt('0x' + chunks[0]),
+      amount0: BigInt('0x' + chunks[1]),
+      amount1: BigInt('0x' + chunks[2])
     };
   }
 
   /**
-   * Parse DecreaseLiquidity event
-   * DecreaseLiquidity(uint256 indexed tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)
+   * Decode DecreaseLiquidity event data
    */
-  private parseDecreaseLiquidityEvent(
-    log: EtherscanLog, 
-    timestamp: Date, 
-    blockNumber: number, 
-    logIndex: number
-  ): ParsedDecreaseLiquidityEvent {
-    // tokenId is indexed (topic1)
-    const tokenId = BigInt(log.topics[1]).toString();
+  private decodeDecreaseLiquidityData(data: string): { liquidity: bigint; amount0: bigint; amount1: bigint } {
+    // Same structure as IncreaseLiquidity
+    return this.decodeIncreaseLiquidityData(data);
+  }
+
+  /**
+   * Decode Collect event data
+   */
+  private decodeCollectData(data: string): { recipient: string; amount0: bigint; amount1: bigint } {
+    // Collect(uint256 indexed tokenId, address recipient, uint256 amount0, uint256 amount1)
+    // topic[0] = event signature
+    // topic[1] = tokenId (indexed)
+    // data contains: recipient (32 bytes) + amount0 (32 bytes) + amount1 (32 bytes)
     
-    // Decode non-indexed parameters from data
-    const decoded = decodeAbiParameters(
-      parseAbiParameters('uint128 liquidity, uint256 amount0, uint256 amount1'),
-      log.data as `0x${string}`
-    );
+    const hex = data.slice(2);
+    const chunks = hex.match(/.{64}/g) || [];
+    
+    if (chunks.length < 3) {
+      throw new Error(`Invalid Collect data: expected 3 chunks, got ${chunks.length}`);
+    }
+
+    // Extract recipient address (last 20 bytes of first chunk)
+    const recipientHex = chunks[0]?.slice(24); // Remove first 12 bytes (padding)
+    if (!recipientHex) {
+      throw new Error('Missing recipient data in Collect event');
+    }
+    const recipient = '0x' + recipientHex;
 
     return {
-      eventType: 'DECREASE_LIQUIDITY',
-      tokenId,
-      liquidity: decoded[0].toString(),
-      amount0: decoded[1].toString(),
-      amount1: decoded[2].toString(),
-      blockNumber,
-      timestamp,
-      transactionHash: log.transactionHash,
-      logIndex
+      recipient,
+      amount0: BigInt('0x' + chunks[1]),
+      amount1: BigInt('0x' + chunks[2])
     };
   }
 
   /**
-   * Parse Collect event
-   * Collect(uint256 indexed tokenId, address recipient, uint256 amount0, uint256 amount1)
+   * Remove duplicates and sort events by blockchain order
    */
-  private parseCollectEvent(
-    log: EtherscanLog, 
-    timestamp: Date, 
-    blockNumber: number, 
-    logIndex: number
-  ): ParsedCollectEvent {
-    // tokenId is indexed (topic1)
-    const tokenId = BigInt(log.topics[1]).toString();
+  private deduplicateAndSort(events: RawPositionEvent[]): RawPositionEvent[] {
+    // Create unique key for deduplication
+    const uniqueEvents = new Map<string, RawPositionEvent>();
     
-    // Decode non-indexed parameters from data
-    const decoded = decodeAbiParameters(
-      parseAbiParameters('address recipient, uint256 amount0, uint256 amount1'),
-      log.data as `0x${string}`
-    );
+    for (const event of events) {
+      const key = `${event.transactionHash}-${event.logIndex}`;
+      if (!uniqueEvents.has(key)) {
+        uniqueEvents.set(key, event);
+      }
+    }
 
-    return {
-      eventType: 'COLLECT',
-      tokenId,
-      recipient: decoded[0],
-      amount0: decoded[1].toString(),
-      amount1: decoded[2].toString(),
-      blockNumber,
-      timestamp,
-      transactionHash: log.transactionHash,
-      logIndex
-    };
-  }
-
-  /**
-   * Parse Transfer event
-   * Transfer(address indexed from, address indexed to, uint256 indexed tokenId)
-   */
-  private parseTransferEvent(
-    log: EtherscanLog, 
-    timestamp: Date, 
-    blockNumber: number, 
-    logIndex: number
-  ): ParsedTransferEvent {
-    // All parameters are indexed for Transfer event
-    const from = `0x${log.topics[1].slice(26)}`; // Remove padding
-    const to = `0x${log.topics[2].slice(26)}`; // Remove padding  
-    const tokenId = BigInt(log.topics[3]).toString();
-
-    return {
-      eventType: 'TRANSFER',
-      tokenId,
-      from,
-      to,
-      blockNumber,
-      timestamp,
-      transactionHash: log.transactionHash,
-      logIndex
-    };
+    // Sort by blockchain order
+    return Array.from(uniqueEvents.values()).sort((a, b) => {
+      if (a.blockNumber !== b.blockNumber) {
+        return Number(a.blockNumber - b.blockNumber);
+      }
+      if (a.transactionIndex !== b.transactionIndex) {
+        return a.transactionIndex - b.transactionIndex;
+      }
+      return a.logIndex - b.logIndex;
+    });
   }
 
   /**
@@ -385,16 +400,37 @@ export class EtherscanEventService {
     }
 
     // Check if we need to wait
-    if (this.rateLimitState.requestCount >= RATE_LIMIT.REQUESTS_PER_SECOND) {
+    if (this.rateLimitState.requestCount >= 5) { // 5 requests per second
       const waitTime = this.rateLimitState.resetTime - now;
       if (waitTime > 0) {
         console.log(`⏳ Rate limiting: waiting ${waitTime}ms`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
+        await this.delay(waitTime);
       }
     }
 
     this.rateLimitState.requestCount++;
     this.rateLimitState.lastRequestTime = now;
+  }
+
+  /**
+   * Utility delay function for rate limiting
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Get supported chains
+   */
+  getSupportedChains(): SupportedChainsType[] {
+    return Object.keys(CHAIN_CONFIG) as SupportedChainsType[];
+  }
+
+  /**
+   * Validate API key availability (unified key for all chains)
+   */
+  validateApiKey(_chain: SupportedChainsType): boolean {
+    return !!process.env.ETHERSCAN_API_KEY;
   }
 }
 
