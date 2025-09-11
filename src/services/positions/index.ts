@@ -1,9 +1,23 @@
 // Position Services Exports
-export { getPositionService, PositionService } from './positionService';
-export { getInitialValueService, InitialValueService } from './initialValueService';
-export { determineQuoteToken, formatTokenPair, QUOTE_TOKEN_EXAMPLES } from './quoteTokenService';
+export { 
+    getPositionService, 
+    PositionService 
+} from './positionService';
 
-// Types
-export type { PositionWithPnL, PositionListOptions } from './positionService';
-export type { InitialValueResult } from './initialValueService';
+export { 
+    determineQuoteToken, 
+    formatTokenPair, 
+    QUOTE_TOKEN_EXAMPLES 
+} from './quoteTokenService';
+
+// New clean interfaces (no PnL data)
+export type { 
+    BasicPosition,
+    TokenData,
+    PoolData,
+    CreatePositionData,
+    UpdatePositionData,
+    PositionListOptions 
+} from './positionService';
+
 export type { QuoteTokenResult } from './quoteTokenService';

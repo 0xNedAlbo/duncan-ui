@@ -232,7 +232,7 @@ async function testSimpleIntegration() {
                         
                         // Calculated values (simplified without price service)
                         valueInQuote: rawEvent.eventType !== 'COLLECT' ? (rawEvent.amount1 || '0') : null,
-                        feeValueInQuote: rawEvent.eventType === 'COLLECT' ? calculateSimpleFeeValue(rawEvent) : null,
+                        feeValueInQuote: rawEvent.eventType === 'COLLECT' ? (rawEvent.amount1 || '0') : null,
                         source: 'etherscan'
                     }
                 });

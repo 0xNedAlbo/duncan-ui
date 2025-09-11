@@ -58,23 +58,25 @@ export class PositionFactory {
         importType: data.importType || 'nft',
         userId,
         poolId,
-        initialValue: data.initialValue || '10000.00',
-        currentValue: data.currentValue || '10500.00',
-        pnl: data.pnl || '500.00',
-        pnlPercent: data.pnlPercent || 5.0,
-        initialSource: data.initialSource || 'subgraph',
-        confidence: data.confidence || 'exact',
-        lastUpdated: data.lastUpdated || new Date(),
-        dataUpdated: data.dataUpdated ?? true,
-        rangeStatus: data.rangeStatus || 'in-range',
+        token0IsQuote: false, // WETH/USDC pool, USDC is quote
         createdAt: new Date(),
         updatedAt: new Date()
       },
       include: {
         pool: {
           include: {
-            token0: true,
-            token1: true
+            token0Ref: {
+              include: {
+                globalToken: true,
+                userToken: true
+              }
+            },
+            token1Ref: {
+              include: {
+                globalToken: true,
+                userToken: true
+              }
+            }
           }
         }
       }

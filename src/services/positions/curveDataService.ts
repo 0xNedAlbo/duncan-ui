@@ -1,7 +1,31 @@
-import type { PositionWithPnL } from "./positionService";
+// Remove dependency on PositionWithPnL - define local interface for curve calculations
 import { calculatePositionValue } from "@/lib/utils/uniswap-v3/liquidity";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 import type { CurvePoint, CurveData } from "@/components/charts/mini-pnl-curve";
+
+// Enhanced position interface for curve calculations (includes PnL data)
+export interface PositionWithPnL {
+    id: string;
+    liquidity: string;
+    tickLower: number;
+    tickUpper: number;
+    token0IsQuote: boolean;
+    initialValue: string;
+    pool: {
+        token0: {
+            id: string;
+            decimals: number;
+        };
+        token1: {
+            id: string;
+            decimals: number;
+        };
+        token0Address: string;
+        token1Address: string;
+        fee: number;
+        currentPrice?: string;
+    };
+}
 
 export interface PositionParams {
     liquidity: bigint;

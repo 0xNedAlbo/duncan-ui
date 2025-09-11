@@ -6,7 +6,6 @@ import {
 } from '../fixtures/alchemy'
 import { TOKEN_ADDRESSES } from '../fixtures/tokens'
 import { poolHandlers } from './poolHandlers'
-import { subgraphHandlers } from './subgraphHandlers'
 
 export const handlers = [
   // Alchemy API mocks
@@ -143,7 +142,4 @@ export const handlers = [
   
   // Include pool-specific handlers
   ...poolHandlers,
-  
-  // Include subgraph-specific handlers
-  ...subgraphHandlers,
 ]

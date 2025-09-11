@@ -4,8 +4,20 @@
  * Shared types for API requests and responses across the application
  */
 
-import type { PositionWithPnL } from '@/services/positions/positionService';
+import type { BasicPosition } from '@/services/positions/positionService';
 import type { ParsedNFTPosition } from '@/services/uniswap/nftPosition';
+
+// Enhanced position interface for API responses (includes PnL data)
+export interface PositionWithPnL extends BasicPosition {
+  initialValue: string;
+  currentValue: string;
+  unrealizedPnL: string;
+  realizedPnL: string;
+  totalPnL: string;
+  feesCollected0: string;
+  feesCollected1: string;
+  feeValueInQuote: string;
+}
 
 // Generic API response wrapper
 export interface ApiResponse<T = any> {

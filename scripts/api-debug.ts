@@ -117,8 +117,8 @@ class ApiDebugger {
           'Cookie': this.getCookieHeader()
         },
         body: new URLSearchParams({
-          email: TEST_USER,
-          password: TEST_PASSWORD,
+          email: TEST_USER || '',
+          password: TEST_PASSWORD || '',
           csrfToken: csrfData.csrfToken,
           callbackUrl: BASE_URL,
           json: 'true'

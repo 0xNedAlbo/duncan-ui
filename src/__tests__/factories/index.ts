@@ -56,8 +56,8 @@ export class TestFactorySuite {
       pool,
       position,
       tokens: {
-        WETH: pool.token0,
-        USDC: pool.token1
+        WETH: pool.token0Ref.globalToken || pool.token0Ref.userToken,
+        USDC: pool.token1Ref.globalToken || pool.token1Ref.userToken
       }
     };
   }

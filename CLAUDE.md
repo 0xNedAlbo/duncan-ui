@@ -116,6 +116,12 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - **Rationale:** Prevents precision loss, maintains compatibility with smart contract values, enables exact BigInt calculations throughout entire system
 
 
+**Script Organization:**
+- **Always place debug, test, and verification scripts under `scripts/debug/` directory, never in project root**
+- Keep project root clean with only configuration files
+- Use `scripts/` for essential operational scripts (like api-debug.ts)
+- Examples: `scripts/debug/debug-*.ts`, `scripts/debug/test-*.ts`, `scripts/debug/verify-*.ts`
+
 **Additional Coding Guidelines for Claude:**
 - use formatFractionHuman() or other functions from fraction-formats.ts when displaying bigint values
 - use scripts/api-debug.ts when testing API behaviour because it contains proper authentication
