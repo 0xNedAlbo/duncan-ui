@@ -8,7 +8,6 @@
 import { createPublicClient, http, type PublicClient } from 'viem';
 import { mainnet, arbitrum, base } from 'viem/chains';
 import { UNISWAP_V3_POOL_ABI } from '@/lib/contracts/uniswapV3Pool';
-import { sqrtRatioX96ToToken1PerToken0 } from '@/lib/utils/uniswap-v3/price';
 
 // Chain configuration with RPC endpoints
 const CHAIN_CONFIG = {
@@ -101,7 +100,7 @@ export class HistoricalPriceService {
           retryCount: 3,
           retryDelay: 1000,
         }),
-      });
+      }) as any;
 
       this.clients.set(chainName, client);
       
@@ -153,16 +152,13 @@ export class HistoricalPriceService {
 
       const [sqrtPriceX96, tick] = slot0Data;
 
-      // Convert sqrtPriceX96 to human readable price (token1 per token0)
-      const priceFormatted = sqrtRatioX96ToToken1PerToken0(sqrtPriceX96, 18, 18); // Default to 18 decimals
-
       const priceData: ExactPriceData = {
         poolAddress: poolAddress.toLowerCase(),
         blockNumber,
         blockTimestamp: timestamp,
         sqrtPriceX96,
         tick,
-        price: priceFormatted.toString(),
+        price: sqrtPriceX96.toString(), // Raw sqrtPriceX96 - let higher level functions handle decimal conversion
         source: 'alchemy-rpc',
         confidence: 'exact',
         chain,
@@ -172,7 +168,7 @@ export class HistoricalPriceService {
       // Cache the result (historical data never changes)
       this.priceCache[cacheKey] = priceData;
 
-      console.log(`✅ Retrieved price for ${poolAddress}: ${priceFormatted} at block ${blockNumber}`);
+      console.log(`✅ Retrieved price for ${poolAddress} at block ${blockNumber}`);
       return priceData;
 
     } catch (error) {

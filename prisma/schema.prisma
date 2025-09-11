@@ -299,21 +299,29 @@ model PositionEvent {
   deltaL          String   // BigInt: +/- liquidity change (can be negative for DECREASE)
   
   // Token Amounts (in smallest units)
-  amountBase      String   // BigInt: Base token amount added/removed
-  amountQuote     String   // BigInt: Quote token amount added/removed
+  token0Amount    String   // BigInt: Token0 amount added/removed
+  token1Amount    String   // BigInt: Token1 amount added/removed
   
   // Price Information
   poolPrice       String   // BigInt: Quote tokens per 1 Base token (in smallest units)
   
   // State Caching (BEFORE this event)
-  liquidityBefore String   // BigInt: Total position liquidity before this event
-  costBasisBefore String   // BigInt: Total cost basis before this event (in quote token smallest units)
-  realizedPnLBefore String // BigInt: Accumulated realized PnL before this event
+  liquidityBefore      String   // BigInt: Total position liquidity before this event
+  costBasisBefore      String   // BigInt: Total cost basis before this event (in quote token smallest units)
+  realizedPnLBefore    String   // BigInt: Realized PnL from position changes only (INCREASE/DECREASE)
+  feesCollected0Before String   // BigInt: Accumulated token0 fees collected via COLLECT events
+  feesCollected1Before String   // BigInt: Accumulated token1 fees collected via COLLECT events
   
   // State Caching (AFTER this event)
-  liquidityAfter  String   // BigInt: Total position liquidity after this event
-  costBasisAfter  String   // BigInt: Total cost basis after this event
-  realizedPnLAfter String  // BigInt: Accumulated realized PnL after this event
+  liquidityAfter       String   // BigInt: Total position liquidity after this event
+  costBasisAfter       String   // BigInt: Total cost basis after this event
+  realizedPnLAfter     String   // BigInt: Realized PnL from position changes only (INCREASE/DECREASE)
+  feesCollected0After  String   // BigInt: Accumulated token0 fees collected via COLLECT events
+  feesCollected1After  String   // BigInt: Accumulated token1 fees collected via COLLECT events
+  
+  // Event-specific value calculations
+  valueInQuote         String?  // BigInt: Position value change in quote token (INCREASE/DECREASE only)
+  feeValueInQuote      String?  // BigInt: Total fee value in quote token (COLLECT events only)
   
   // Metadata
   source          String   // "subgraph", "onchain", "manual"
