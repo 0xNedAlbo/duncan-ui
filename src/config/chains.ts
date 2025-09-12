@@ -5,6 +5,7 @@ export interface ChainConfig {
     name: string;
     shortName: string;
     slug: string;
+    rpcUrl?: string;
     wrappedNativeToken: {
         address: string;
         symbol: string;
@@ -15,7 +16,7 @@ export interface ChainConfig {
 }
 
 // Wrapped Native Token Adressen für unterstützte Chains
-export const CHAIN_CONFIG: Record<string, ChainConfig> = {
+const CHAIN_CONFIG: Record<string, ChainConfig> = {
     ethereum: {
         chainId: 1,
         name: "Ethereum Mainnet",
@@ -57,8 +58,35 @@ export const CHAIN_CONFIG: Record<string, ChainConfig> = {
     },
 };
 
+let isInitialized = false;
+
 // Helper Functions
-export function getChainConfig(chain: string): ChainConfig | null {
+export function getChainConfig(chain: string): ChainConfig {
+    if (!isInitialized) {
+        Object.keys(CHAIN_CONFIG).forEach((chainName) => {
+            switch (chainName) {
+                case "ethereum":
+                    CHAIN_CONFIG[chainName].rpcUrl =
+                        process.env.NEXT_PUBLIC_ETHEREUM_RPC_URL;
+                    break;
+                case "arbitrum":
+                    CHAIN_CONFIG[chainName].rpcUrl =
+                        process.env.NEXT_PUBLIC_ARBITRUM_RPC_URL;
+                    break;
+                case "base":
+                    CHAIN_CONFIG[chainName].rpcUrl =
+                        process.env.NEXT_PUBLIC_BASE_RPC_URL;
+                    break;
+                default:
+                    throw new Error("Unknown chain name: " + chainName);
+            }
+            if (!CHAIN_CONFIG[chainName])
+                throw new Error(
+                    `Missing NEXT_PUBLIC_[chainName]_RPC_URL for chain: ${chainName}`
+                );
+            isInitialized = true;
+        });
+    }
     return CHAIN_CONFIG[chain.toLowerCase()] || null;
 }
 

@@ -122,6 +122,13 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - Use `scripts/` for essential operational scripts (like api-debug.ts)
 - Examples: `scripts/debug/debug-*.ts`, `scripts/debug/test-*.ts`, `scripts/debug/verify-*.ts`
 
+**EVM Chain Configuration:**
+- **Always use centralized chain configuration from `src/config/chains.ts`**
+- Import `getChainConfig()`, `SUPPORTED_CHAINS`, and `SupportedChainsType` from `@/config/chains`
+- Never hardcode chain configurations, RPC URLs, or chain IDs in services
+- Use `getChainConfig(chainName)` to get chain configuration including RPC URLs
+- This ensures consistent chain configuration across all services and prevents environment variable issues
+
 **Additional Coding Guidelines for Claude:**
 - use formatFractionHuman() or other functions from fraction-formats.ts when displaying bigint values
 - use scripts/api-debug.ts when testing API behaviour because it contains proper authentication
