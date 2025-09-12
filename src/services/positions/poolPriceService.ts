@@ -1,7 +1,7 @@
 /**
- * Historical Price Service - Alchemy RPC Implementation
+ * Pool Price Service - Alchemy RPC Implementation
  *
- * Provides exact block-level pool pricing using Alchemy's eth_call API.
+ * Provides exact pool pricing using Alchemy's eth_call API for both current and historical data.
  * Replaces subgraph-based approximations with precise blockchain data.
  */
 
@@ -47,7 +47,7 @@ interface RateLimitState {
     chain: string;
 }
 
-export class HistoricalPriceService {
+export class PoolPriceService {
     private clients: Map<string, PublicClient> = new Map();
     private priceCache: PriceCache = {};
     private rateLimitState: Map<string, RateLimitState> = new Map();
@@ -68,7 +68,7 @@ export class HistoricalPriceService {
     /**
      * Initialize viem clients for all supported chains
      */
-    private initializeClients(): HistoricalPriceService {
+    private initializeClients(): PoolPriceService {
         SUPPORTED_CHAINS.forEach((chainName) => {
             const config = getChainConfig(chainName);
             const client = createPublicClient({
@@ -94,12 +94,22 @@ export class HistoricalPriceService {
     }
 
     /**
+     * Get current exact pool price (latest block)
+     */
+    async getCurrentExactPoolPrice(
+        poolAddress: string,
+        chain: SupportedChainsType
+    ): Promise<ExactPriceData> {
+        return this.getExactPoolPriceAtBlock(poolAddress, chain);
+    }
+
+    /**
      * Get exact pool price at specific block number
      */
     async getExactPoolPriceAtBlock(
         poolAddress: string,
-        blockNumber: bigint,
         chain: SupportedChainsType,
+        blockNumber?: bigint,
         timestamp?: Date
     ): Promise<ExactPriceData> {
         // Check cache first
@@ -118,9 +128,10 @@ export class HistoricalPriceService {
         try {
             // Get block timestamp if not provided
             let blockTimestamp = timestamp;
-            if (!blockTimestamp) {
+            if (!blockNumber || !blockTimestamp) {
                 const block = await client.getBlock({ blockNumber });
                 blockTimestamp = new Date(Number(block.timestamp) * 1000);
+                blockNumber = block.number;
             }
 
             // Call slot0() function on the pool contract at specific block
@@ -194,8 +205,8 @@ export class HistoricalPriceService {
                     const batchPromises = batch.map((req) =>
                         this.getExactPoolPriceAtBlock(
                             req.poolAddress,
-                            req.blockNumber,
                             req.chain,
+                            req.blockNumber,
                             req.timestamp
                         ).catch(() => {
                             return null; // Return null for failed requests
@@ -283,11 +294,16 @@ export class HistoricalPriceService {
 }
 
 // Singleton instance
-let historicalPriceServiceInstance: HistoricalPriceService | null = null;
+let poolPriceServiceInstance: PoolPriceService | null = null;
 
-export function getHistoricalPriceService(): HistoricalPriceService {
-    if (!historicalPriceServiceInstance) {
-        historicalPriceServiceInstance = new HistoricalPriceService();
+export function getPoolPriceService(): PoolPriceService {
+    if (!poolPriceServiceInstance) {
+        poolPriceServiceInstance = new PoolPriceService();
     }
-    return historicalPriceServiceInstance;
+    return poolPriceServiceInstance;
+}
+
+// Legacy export for backward compatibility
+export function getHistoricalPriceService(): PoolPriceService {
+    return getPoolPriceService();
 }

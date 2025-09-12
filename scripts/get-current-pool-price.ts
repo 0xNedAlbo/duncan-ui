@@ -1,40 +1,40 @@
 #!/usr/bin/env tsx
 
-/**
- * Historical Price Retrieval Script
- *
- * Retrieves exact pool price data at a specific block number using the HistoricalPriceService.
- * Outputs results as formatted JSON for easy consumption.
- *
- * Usage:
- *   npx tsx scripts/get-historical-price.ts <poolAddress> <blockNumber> [chain]
- *
- * Examples:
- *   npx tsx scripts/get-historical-price.ts 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 18800000
- *   npx tsx scripts/get-historical-price.ts 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 18800000 ethereum
- */
-
 // Load environment variables FIRST, before any other imports
 import { SupportedChainsType } from "@/config/chains";
-import { getHistoricalPriceService } from "@/services/positions/historicalPriceService";
+import { getPoolPriceService } from "@/services/positions/poolPriceService";
 import { config } from "dotenv";
 import { resolve } from "path";
 config({ path: resolve(process.cwd(), ".env.local") });
 config({ path: resolve(process.cwd(), ".env") });
 
+/**
+ * Current Pool Price Retrieval Script
+ *
+ * Retrieves current (latest block) pool price data using the PoolPriceService.
+ * Outputs results as formatted JSON for easy consumption.
+ *
+ * Usage:
+ *   npx tsx scripts/get-current-pool-price.ts <poolAddress> [chain]
+ *
+ * Examples:
+ *   npx tsx scripts/get-current-pool-price.ts 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640
+ *   npx tsx scripts/get-current-pool-price.ts 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 ethereum
+ *   npx tsx scripts/get-current-pool-price.ts 0xc6962004f452be9203591991d15f6b388e09e8d0 arbitrum
+ */
+
 // Parse command line arguments
 const args = process.argv.slice(2);
 
-if (args.length < 2 || args.length > 3) {
+if (args.length < 1 || args.length > 2) {
     console.error(
-        "Usage: npx tsx scripts/get-historical-price.ts <poolAddress> <blockNumber> [chain]"
+        "Usage: npx tsx scripts/get-current-pool-price.ts <poolAddress> [chain]"
     );
     console.error("");
     console.error("Arguments:");
     console.error(
         "  poolAddress  - Uniswap V3 pool contract address (e.g., 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640)"
     );
-    console.error("  blockNumber  - Block number to query (e.g., 18800000)");
     console.error(
         "  chain        - Chain name (optional, defaults to ethereum)"
     );
@@ -43,28 +43,25 @@ if (args.length < 2 || args.length > 3) {
     console.error("");
     console.error("Examples:");
     console.error(
-        "  npx tsx scripts/get-historical-price.ts 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 18800000"
+        "  npx tsx scripts/get-current-pool-price.ts 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640"
     );
     console.error(
-        "  npx tsx scripts/get-historical-price.ts 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 18800000 ethereum"
+        "  npx tsx scripts/get-current-pool-price.ts 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 ethereum"
+    );
+    console.error(
+        "  npx tsx scripts/get-current-pool-price.ts 0xc6962004f452be9203591991d15f6b388e09e8d0 arbitrum"
     );
     process.exit(1);
 }
 
 const poolAddress = args[0];
-const blockNumber = BigInt(args[1]);
-const chain = (args[2] || "ethereum") as SupportedChainsType;
+const chain = (args[1] || "ethereum") as SupportedChainsType;
 
 // Validate inputs
 if (!poolAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
     console.error(
         "Error: Invalid pool address format. Must be a valid Ethereum address (0x followed by 40 hex characters)"
     );
-    process.exit(1);
-}
-
-if (blockNumber <= 0n) {
-    console.error("Error: Block number must be a positive integer");
     process.exit(1);
 }
 
@@ -80,11 +77,10 @@ if (!supportedChains.includes(chain)) {
 
 async function main() {
     try {
-        const service = getHistoricalPriceService();
+        const service = getPoolPriceService();
 
-        const priceData = await service.getExactPoolPriceAtBlock(
+        const priceData = await service.getCurrentExactPoolPrice(
             poolAddress,
-            blockNumber,
             chain
         );
 
