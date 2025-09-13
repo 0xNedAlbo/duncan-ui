@@ -1,12 +1,13 @@
 #!/usr/bin/env tsx
 
 // Load environment variables FIRST, before any other imports
-import { SupportedChainsType } from "@/config/chains";
-import { getPoolPriceService } from "@/services/positions/poolPriceService";
 import { config } from "dotenv";
 import { resolve } from "path";
 config({ path: resolve(process.cwd(), ".env.local") });
 config({ path: resolve(process.cwd(), ".env") });
+
+import { SupportedChainsType } from "@/config/chains";
+import { DefaultServiceFactory } from "@/services/ServiceFactory";
 
 /**
  * Current Pool Price Retrieval Script
@@ -77,9 +78,10 @@ if (!supportedChains.includes(chain)) {
 
 async function main() {
     try {
-        const service = getPoolPriceService();
+        const serviceFactory = DefaultServiceFactory.getInstance();
+        const { poolPriceService } = serviceFactory.getServices();
 
-        const priceData = await service.getCurrentExactPoolPrice(
+        const priceData = await poolPriceService.getCurrentExactPoolPrice(
             poolAddress,
             chain
         );

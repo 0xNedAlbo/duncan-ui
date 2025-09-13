@@ -15,12 +15,13 @@
  */
 
 // Load environment variables FIRST, before any other imports
-import { SupportedChainsType } from "@/config/chains";
-import { getPoolPriceService } from "@/services/positions/poolPriceService";
 import { config } from "dotenv";
 import { resolve } from "path";
 config({ path: resolve(process.cwd(), ".env.local") });
 config({ path: resolve(process.cwd(), ".env") });
+
+import { SupportedChainsType } from "@/config/chains";
+import { DefaultServiceFactory } from "@/services/ServiceFactory";
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -80,9 +81,10 @@ if (!supportedChains.includes(chain)) {
 
 async function main() {
     try {
-        const service = getPoolPriceService();
+        const serviceFactory = DefaultServiceFactory.getInstance();
+        const { poolPriceService } = serviceFactory.getServices();
 
-        const priceData = await service.getExactPoolPriceAtBlock(
+        const priceData = await poolPriceService.getExactPoolPriceAtBlock(
             poolAddress,
             chain,
             blockNumber
