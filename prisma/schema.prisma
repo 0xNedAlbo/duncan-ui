@@ -315,6 +315,10 @@ model PositionEvent {
   feesCollected1  String @default("0") // BigInt: Collected token1 fees from this event
   feeValueInQuote String @default("0") // BigInt: Fee value in quote token (COLLECT events only)
 
+  // Uncollected Principal Tracking
+  uncollectedPrincipal0 String @default("0") // BigInt: Token0 principal waiting to be collected (DECREASE events add, COLLECT events subtract)
+  uncollectedPrincipal1 String @default("0") // BigInt: Token1 principal waiting to be collected (DECREASE events add, COLLECT events subtract)
+
   // Cost Basis
   deltaCostBasis String // BigInt: Cost Basis Change
   costBasisAfter String // BigInt: Total cost basis after this event

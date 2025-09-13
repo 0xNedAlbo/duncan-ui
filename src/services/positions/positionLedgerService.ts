@@ -157,6 +157,8 @@ export class PositionLedgerService {
             liquidityAfter: "0",
             costBasisAfter: "0",
             realizedPnLAfter: "0",
+            uncollectedPrincipal0: "0",
+            uncollectedPrincipal1: "0",
         };
 
         // Get all events (manual + new onchain) in natural blockchain order
@@ -207,19 +209,61 @@ export class PositionLedgerService {
                     );
                 }
             } else {
-                // Update ledger state and save to DB
-                const newState = this.calculateNewState(currentState, event);
+                // Calculate token value for this event
+                let tokenValueInQuote = "0";
+                let poolPrice = 0n;
+                let calculatedDeltaCostBasis = "0";
+                let calculatedFeeValue = "0";
+
+                if (event.rawEvent) {
+                    // For new onchain events, calculate values
+                    const priceData = await this.poolPriceService.getExactPoolPriceAtBlock(
+                        positionInfo.pool.poolAddress,
+                        positionInfo.pool.chain as any,
+                        event.rawEvent.blockNumber,
+                        event.rawEvent.blockTimestamp
+                    );
+                    poolPrice = this.calculatePoolPriceInQuoteToken(
+                        priceData.sqrtPriceX96,
+                        positionInfo.token0IsQuote,
+                        positionInfo.pool.token0.decimals,
+                        positionInfo.pool.token1.decimals
+                    );
+                    tokenValueInQuote = this.calculateTokenValueInQuote(
+                        event.rawEvent.amount0 || "0",
+                        event.rawEvent.amount1 || "0",
+                        poolPrice,
+                        positionInfo.token0IsQuote,
+                        positionInfo.pool.token0.decimals,
+                        positionInfo.pool.token1.decimals
+                    ).toString();
+                } else if (event.dbEvent) {
+                    // For existing DB events, use stored values
+                    tokenValueInQuote = event.dbEvent.tokenValueInQuote;
+                }
+
+                // Update ledger state and get deltaCostBasis from the calculation
+                const stateResult = this.calculateNewState(currentState, event, tokenValueInQuote, poolPrice, positionInfo);
+                const newState = stateResult.state;
+                calculatedDeltaCostBasis = stateResult.deltaCostBasis || "0";
+                const calculatedDeltaPnL = stateResult.deltaPnL || "0";
+                calculatedFeeValue = stateResult.feeValue || "0";
                 console.log(
                     `  → Processing for ledger state: L ${currentState.liquidityAfter} → ${newState.liquidityAfter}`
                 );
 
                 // Save event with calculated state
                 if (event.rawEvent) {
-                    // Create new onchain event in DB
+                    // Create new onchain event in DB with pre-calculated values
                     await this.createPositionEventFromRaw(
                         event.rawEvent,
                         positionInfo,
-                        newState
+                        newState,
+                        tokenValueInQuote,
+                        poolPrice,
+                        calculatedDeltaCostBasis,
+                        calculatedFeeValue,
+                        calculatedDeltaPnL
                     );
                 } else if (event.dbEvent) {
                     // Update existing manual event with new state
@@ -229,6 +273,8 @@ export class PositionLedgerService {
                             liquidityAfter: newState.liquidityAfter,
                             costBasisAfter: newState.costBasisAfter,
                             realizedPnLAfter: newState.realizedPnLAfter,
+                            uncollectedPrincipal0: newState.uncollectedPrincipal0,
+                            uncollectedPrincipal1: newState.uncollectedPrincipal1,
                         },
                     });
                 }
@@ -362,21 +408,23 @@ export class PositionLedgerService {
             liquidityAfter: string;
             costBasisAfter: string;
             realizedPnLAfter: string;
-        }
+            uncollectedPrincipal0: string;
+            uncollectedPrincipal1: string;
+        },
+        tokenValueInQuote: string,
+        poolPrice: bigint,
+        deltaCostBasis: string,
+        calculatedFeeValue?: string,
+        calculatedDeltaPnL?: string
     ): Promise<void> {
-        // Retrieve pool price at the event block using position info
-        const priceData = await this.poolPriceService.getExactPoolPriceAtBlock(
-            positionInfo.pool.poolAddress,
-            positionInfo.pool.chain as any, // Cast to SupportedChainsType
-            rawEvent.blockNumber,
-            rawEvent.blockTimestamp
-        );
-
         const inputHash = this.generateOnchainInputHash(
             rawEvent.blockNumber,
             rawEvent.transactionIndex,
             rawEvent.logIndex
         );
+
+        // Use calculated deltaPnL
+        const deltaPnL = calculatedDeltaPnL || "0";
 
         await this.prisma.positionEvent.create({
             data: {
@@ -393,22 +441,17 @@ export class PositionLedgerService {
                 // Event classification
                 eventType: rawEvent.eventType,
 
-                // Liquidity changes (will be calculated properly later)
+                // Liquidity changes
                 deltaL: rawEvent.liquidity || "0",
                 liquidityAfter: state.liquidityAfter,
 
-                // Price information - convert sqrtPriceX96 to quote token price
-                poolPrice: this.calculatePoolPriceInQuoteToken(
-                    priceData.sqrtPriceX96,
-                    positionInfo.token0IsQuote,
-                    positionInfo.pool.token0.decimals,
-                    positionInfo.pool.token1.decimals
-                ).toString(),
+                // Price information
+                poolPrice: poolPrice.toString(),
 
                 // Token amounts
                 token0Amount: rawEvent.amount0 || "0",
                 token1Amount: rawEvent.amount1 || "0",
-                tokenValueInQuote: "0", // TODO: Calculate using proper token values
+                tokenValueInQuote,
 
                 // Fees (for COLLECT events)
                 feesCollected0:
@@ -419,12 +462,18 @@ export class PositionLedgerService {
                     rawEvent.eventType === "COLLECT"
                         ? rawEvent.amount1 || "0"
                         : "0",
-                feeValueInQuote: "0", // TODO: Calculate
+                feeValueInQuote: rawEvent.eventType === "COLLECT"
+                    ? calculatedFeeValue || "0"
+                    : "0",
+
+                // Uncollected principal tracking
+                uncollectedPrincipal0: state.uncollectedPrincipal0,
+                uncollectedPrincipal1: state.uncollectedPrincipal1,
 
                 // Cost basis and PnL
-                deltaCostBasis: "0", // TODO: Calculate
+                deltaCostBasis,
                 costBasisAfter: state.costBasisAfter,
-                deltaPnL: "0", // TODO: Calculate
+                deltaPnL,
                 realizedPnLAfter: state.realizedPnLAfter,
 
                 // Metadata
@@ -445,12 +494,17 @@ export class PositionLedgerService {
             liquidityAfter: string;
             costBasisAfter: string;
             realizedPnLAfter: string;
+            uncollectedPrincipal0: string;
+            uncollectedPrincipal1: string;
         },
-        event: ProcessableEvent
+        event: ProcessableEvent,
+        tokenValueInQuote: string
     ): {
         liquidityAfter: string;
         costBasisAfter: string;
         realizedPnLAfter: string;
+        uncollectedPrincipal0: string;
+        uncollectedPrincipal1: string;
     } {
         const deltaL =
             event.rawEvent?.liquidity || event.dbEvent?.deltaL || "0";
@@ -458,9 +512,9 @@ export class PositionLedgerService {
             BigInt(currentState.liquidityAfter) + BigInt(deltaL)
         ).toString();
 
-        // TODO: Calculate proper cost basis based on token amounts and price
-        // For now, approximate as tokenValueInQuote
-        const deltaCostBasis = "0"; // TODO: Implement proper calculation
+        // Calculate cost basis from token amounts invested
+        // For INCREASE_LIQUIDITY, the cost basis is the value of tokens invested
+        const deltaCostBasis = tokenValueInQuote;
         const newCostBasisAfter = (
             BigInt(currentState.costBasisAfter) + BigInt(deltaCostBasis)
         ).toString();
@@ -468,10 +522,16 @@ export class PositionLedgerService {
         // INCREASE events don't realize PnL, they add to the position
         const realizedPnLAfter = currentState.realizedPnLAfter;
 
+        // INCREASE events don't affect uncollected principal (no tokens made available for collection)
+        const uncollectedPrincipal0 = currentState.uncollectedPrincipal0;
+        const uncollectedPrincipal1 = currentState.uncollectedPrincipal1;
+
         return {
             liquidityAfter: newLiquidityAfter,
             costBasisAfter: newCostBasisAfter,
             realizedPnLAfter,
+            uncollectedPrincipal0,
+            uncollectedPrincipal1,
         };
     }
 
@@ -484,35 +544,108 @@ export class PositionLedgerService {
             liquidityAfter: string;
             costBasisAfter: string;
             realizedPnLAfter: string;
+            uncollectedPrincipal0: string;
+            uncollectedPrincipal1: string;
         },
-        event: ProcessableEvent
+        event: ProcessableEvent,
+        tokenValueInQuote: string
     ): {
         liquidityAfter: string;
         costBasisAfter: string;
         realizedPnLAfter: string;
+        uncollectedPrincipal0: string;
+        uncollectedPrincipal1: string;
     } {
         const deltaL =
             event.rawEvent?.liquidity || event.dbEvent?.deltaL || "0";
-        const newLiquidityAfter = (
-            BigInt(currentState.liquidityAfter) - BigInt(deltaL)
-        ).toString();
+        const currentLiquidity = BigInt(currentState.liquidityAfter);
+        const newLiquidityAfter = (currentLiquidity - BigInt(deltaL)).toString();
 
-        // TODO: Calculate proper PnL realization based on proportional cost basis and current value
-        const deltaPnL = "0"; // TODO: Implement proper calculation
+        // Calculate proportional cost basis being removed
+        const currentCostBasis = BigInt(currentState.costBasisAfter);
+        let deltaCostBasis = "0";
+        let deltaPnL = "0";
+
+        if (currentLiquidity > 0n) {
+            // Calculate proportion of liquidity being removed
+            const proportionalCostBasis = (currentCostBasis * BigInt(deltaL)) / currentLiquidity;
+            deltaCostBasis = proportionalCostBasis.toString();
+
+            // Calculate current value of tokens received
+            const currentValue = BigInt(tokenValueInQuote);
+
+            // PnL = Current Value - Proportional Cost Basis
+            const realizedPnL = currentValue - proportionalCostBasis;
+            deltaPnL = realizedPnL.toString();
+        }
+
+        const newCostBasisAfter = (currentCostBasis - BigInt(deltaCostBasis)).toString();
         const newRealizedPnLAfter = (
             BigInt(currentState.realizedPnLAfter) + BigInt(deltaPnL)
         ).toString();
 
-        // TODO: Reduce cost basis proportionally to liquidity removed
-        const deltaCostBasis = "0"; // TODO: Implement proper calculation
-        const newCostBasisAfter = (
-            BigInt(currentState.costBasisAfter) - BigInt(deltaCostBasis)
+        // DECREASE events add tokens to uncollected principal
+        const token0Amount = event.rawEvent?.amount0 || event.dbEvent?.token0Amount || "0";
+        const token1Amount = event.rawEvent?.amount1 || event.dbEvent?.token1Amount || "0";
+        const newUncollectedToken0Amount = (
+            BigInt(currentState.uncollectedPrincipal0) + BigInt(token0Amount)
+        ).toString();
+        const newUncollectedToken1Amount = (
+            BigInt(currentState.uncollectedPrincipal1) + BigInt(token1Amount)
         ).toString();
 
         return {
             liquidityAfter: newLiquidityAfter,
             costBasisAfter: newCostBasisAfter,
             realizedPnLAfter: newRealizedPnLAfter,
+            uncollectedPrincipal0: newUncollectedToken0Amount,
+            uncollectedPrincipal1: newUncollectedToken1Amount,
+        };
+    }
+
+    /**
+     * Update state for COLLECT events
+     * Separates fee collection from principal collection
+     */
+    private updateStateForCollect(
+        currentState: {
+            liquidityAfter: string;
+            costBasisAfter: string;
+            realizedPnLAfter: string;
+            uncollectedPrincipal0: string;
+            uncollectedPrincipal1: string;
+        },
+        event: ProcessableEvent
+    ): {
+        liquidityAfter: string;
+        costBasisAfter: string;
+        realizedPnLAfter: string;
+        uncollectedPrincipal0: string;
+        uncollectedPrincipal1: string;
+    } {
+        // Get token amounts from the COLLECT event
+        const collectedToken0 = BigInt(event.rawEvent?.amount0 || event.dbEvent?.token0Amount || "0");
+        const collectedToken1 = BigInt(event.rawEvent?.amount1 || event.dbEvent?.token1Amount || "0");
+
+        // Get current uncollected principal amounts
+        const currentUncollectedToken0 = BigInt(currentState.uncollectedPrincipal0);
+        const currentUncollectedToken1 = BigInt(currentState.uncollectedPrincipal1);
+
+        // Separate principal collection from fee collection
+        const principalToken0 = collectedToken0 <= currentUncollectedToken0 ? collectedToken0 : currentUncollectedToken0;
+        const principalToken1 = collectedToken1 <= currentUncollectedToken1 ? collectedToken1 : currentUncollectedToken1;
+
+        // Calculate new uncollected amounts (reduce by principal collected)
+        const newUncollectedToken0Amount = (currentUncollectedToken0 - principalToken0).toString();
+        const newUncollectedToken1Amount = (currentUncollectedToken1 - principalToken1).toString();
+
+        // COLLECT events don't change liquidity, cost basis, or realized PnL
+        return {
+            liquidityAfter: currentState.liquidityAfter,
+            costBasisAfter: currentState.costBasisAfter,
+            realizedPnLAfter: currentState.realizedPnLAfter,
+            uncollectedPrincipal0: newUncollectedToken0Amount,
+            uncollectedPrincipal1: newUncollectedToken1Amount,
         };
     }
 
@@ -544,6 +677,86 @@ export class PositionLedgerService {
     }
 
     /**
+     * Calculate the total value of token amounts in quote token units
+     * @param token0Amount - Token0 amount in smallest units
+     * @param token1Amount - Token1 amount in smallest units
+     * @param poolPrice - Pool price in quote token units (from calculatePoolPriceInQuoteToken)
+     * @param token0IsQuote - Whether token0 is the quote token
+     * @param token0Decimals - Decimals of token0
+     * @param token1Decimals - Decimals of token1
+     * @returns Total value in quote token smallest units
+     */
+    private calculateTokenValueInQuote(
+        token0Amount: string,
+        token1Amount: string,
+        poolPrice: bigint,
+        token0IsQuote: boolean,
+        token0Decimals: number,
+        token1Decimals: number
+    ): bigint {
+        const token0Amt = BigInt(token0Amount);
+        const token1Amt = BigInt(token1Amount);
+
+        if (token0IsQuote) {
+            // Quote = token0, Base = token1
+            // token0Amount is already in quote units
+            // Convert token1Amount to quote using price
+            const token1ValueInQuote = (token1Amt * poolPrice) / (10n ** BigInt(token1Decimals));
+            return token0Amt + token1ValueInQuote;
+        } else {
+            // Quote = token1, Base = token0
+            // token1Amount is already in quote units
+            // Convert token0Amount to quote using price
+            const token0ValueInQuote = (token0Amt * poolPrice) / (10n ** BigInt(token0Decimals));
+            return token1Amt + token0ValueInQuote;
+        }
+    }
+
+
+    /**
+     * Calculate the pure fee value for COLLECT events (excluding principal collection)
+     */
+    private calculatePureFeeValue(
+        rawEvent: RawPositionEvent,
+        currentState: {
+            liquidityAfter: string;
+            costBasisAfter: string;
+            realizedPnLAfter: string;
+            uncollectedPrincipal0: string;
+            uncollectedPrincipal1: string;
+        },
+        poolPrice: bigint,
+        positionInfo: PositionSyncInfo
+    ): string {
+        // Get token amounts from the COLLECT event
+        const collectedToken0 = BigInt(rawEvent.amount0 || "0");
+        const collectedToken1 = BigInt(rawEvent.amount1 || "0");
+
+        // Get uncollected principal amounts BEFORE this collect event
+        const uncollectedToken0 = BigInt(currentState.uncollectedPrincipal0);
+        const uncollectedToken1 = BigInt(currentState.uncollectedPrincipal1);
+
+        // Separate principal from fees
+        // Principal collected = min(tokens collected, available uncollected principal)
+        const principalCollectedToken0 = collectedToken0 <= uncollectedToken0 ? collectedToken0 : uncollectedToken0;
+        const principalCollectedToken1 = collectedToken1 <= uncollectedToken1 ? collectedToken1 : uncollectedToken1;
+
+        const feeToken0 = collectedToken0 - principalCollectedToken0;
+        const feeToken1 = collectedToken1 - principalCollectedToken1;
+
+        // Calculate fee value in quote token using current price
+        return this.calculateTokenValueInQuote(
+            feeToken0.toString(),
+            feeToken1.toString(),
+            poolPrice,
+            positionInfo.token0IsQuote,
+            positionInfo.pool.token0.decimals,
+            positionInfo.pool.token1.decimals
+        ).toString();
+    }
+
+
+    /**
      * Calculate new state based on event type
      * COLLECT events don't change state (fees are not part of realized PnL)
      */
@@ -552,35 +765,88 @@ export class PositionLedgerService {
             liquidityAfter: string;
             costBasisAfter: string;
             realizedPnLAfter: string;
+            uncollectedPrincipal0: string;
+            uncollectedPrincipal1: string;
         },
-        event: ProcessableEvent
+        event: ProcessableEvent,
+        tokenValueInQuote: string,
+        poolPrice: bigint,
+        positionInfo: PositionSyncInfo
     ): {
-        liquidityAfter: string;
-        costBasisAfter: string;
-        realizedPnLAfter: string;
+        state: {
+            liquidityAfter: string;
+            costBasisAfter: string;
+            realizedPnLAfter: string;
+            uncollectedPrincipal0: string;
+            uncollectedPrincipal1: string;
+        };
+        deltaCostBasis?: string;
+        deltaPnL?: string;
+        feeValue?: string;
     } {
         switch (event.eventType) {
             case "INCREASE_LIQUIDITY":
-                return this.updateStateForIncreaseLiquidity(
-                    currentState,
-                    event
-                );
+                return {
+                    state: this.updateStateForIncreaseLiquidity(
+                        currentState,
+                        event,
+                        tokenValueInQuote
+                    ),
+                    deltaCostBasis: tokenValueInQuote // Positive for INCREASE
+                };
 
             case "DECREASE_LIQUIDITY":
-                return this.updateStateForDecreaseLiquidity(
+                const decreaseResult = this.updateStateForDecreaseLiquidity(
+                    currentState,
+                    event,
+                    tokenValueInQuote
+                );
+                // Calculate the deltaCostBasis as the difference
+                const originalCostBasis = BigInt(currentState.costBasisAfter);
+                const newCostBasis = BigInt(decreaseResult.costBasisAfter);
+                const deltaCostBasis = newCostBasis - originalCostBasis; // Will be negative
+
+                // Calculate the deltaPnL as the difference in realized PnL
+                const originalRealizedPnL = BigInt(currentState.realizedPnLAfter);
+                const newRealizedPnL = BigInt(decreaseResult.realizedPnLAfter);
+                const deltaPnL = newRealizedPnL - originalRealizedPnL;
+
+                return {
+                    state: decreaseResult,
+                    deltaCostBasis: deltaCostBasis.toString(),
+                    deltaPnL: deltaPnL.toString()
+                };
+
+            case "COLLECT":
+                // COLLECT events need special handling to separate fees from principal collection
+                const collectState = this.updateStateForCollect(
                     currentState,
                     event
                 );
-
-            case "COLLECT":
-                // COLLECT events don't change the ledger state (fees are separate from realized PnL)
-                return currentState;
+                const feeValue = this.calculatePureFeeValue(
+                    event.rawEvent!,
+                    currentState,
+                    poolPrice,
+                    positionInfo
+                );
+                return {
+                    state: collectState,
+                    deltaCostBasis: "0", // COLLECT events don't affect cost basis
+                    feeValue
+                };
 
             default:
                 console.warn(
                     `Unknown event type: ${event.eventType}, keeping state unchanged`
                 );
-                return currentState;
+                return {
+                    state: {
+                        ...currentState,
+                        uncollectedPrincipal0: currentState.uncollectedPrincipal0,
+                        uncollectedPrincipal1: currentState.uncollectedPrincipal1
+                    },
+                    deltaCostBasis: "0"
+                };
         }
     }
 
