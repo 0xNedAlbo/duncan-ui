@@ -335,3 +335,34 @@ model PositionEvent {
   @@index([positionId, blockNumber, transactionIndex, logIndex]) // Natural blockchain ordering
   @@map("position_events")
 }
+
+// Pool Price Cache Model - Database-backed price caching for PoolPriceService
+model PoolPriceCache {
+  id String @id @default(cuid())
+
+  // Cache Key Components
+  chain       String // "ethereum", "arbitrum", "base"
+  poolAddress String // Lowercase pool address
+  blockNumber BigInt // Block number for historical data
+
+  // Price Data (BigInt as String for precision)
+  sqrtPriceX96 String // Uniswap V3 price format
+  tick         Int    // Current tick
+
+  // Block Information
+  blockTimestamp DateTime // Block timestamp
+
+  // Metadata
+  source      String   @default("alchemy-rpc") // Always "alchemy-rpc"
+  confidence  String   @default("exact")       // Always "exact"
+  retrievedAt DateTime @default(now())         // When cached
+
+  // TTL Management
+  expiresAt DateTime? // For future TTL implementation
+
+  // Performance Indexes
+  @@unique([chain, poolAddress, blockNumber]) // Natural cache key
+  @@index([chain, poolAddress]) // Pool-specific queries
+  @@index([expiresAt]) // TTL cleanup queries
+  @@map("pool_price_cache")
+}

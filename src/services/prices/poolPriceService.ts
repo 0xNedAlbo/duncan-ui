@@ -5,13 +5,11 @@
  * Replaces subgraph-based approximations with precise blockchain data.
  */
 
-import { createPublicClient, http, type PublicClient } from "viem";
+import { type PublicClient } from "viem";
 import { UNISWAP_V3_POOL_ABI } from "@/lib/contracts/uniswapV3Pool";
-import {
-    getChainConfig,
-    SUPPORTED_CHAINS,
-    SupportedChainsType,
-} from "@/config/chains";
+import { SupportedChainsType } from "@/config/chains";
+import type { Clients } from "../ClientsFactory";
+import { PrismaClient } from "@prisma/client";
 
 // Enhanced price data with exact blockchain information
 export interface ExactPriceData {
@@ -34,11 +32,6 @@ export interface PriceRequest {
     timestamp?: Date;
 }
 
-// Cache key structure
-interface PriceCache {
-    [key: string]: ExactPriceData; // key: `${chain}-${poolAddress}-${blockNumber}`
-}
-
 // Rate limiting state
 interface RateLimitState {
     lastRequestTime: number;
@@ -48,12 +41,11 @@ interface RateLimitState {
 }
 
 export class PoolPriceService {
-    private clients: Map<string, PublicClient> = new Map();
-    private priceCache: PriceCache = {};
+    private clients: Map<SupportedChainsType, PublicClient>;
+    private prisma: PrismaClient;
     private rateLimitState: Map<string, RateLimitState> = new Map();
 
     // Configuration
-    private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours (historical data doesn't change)
     private readonly RATE_LIMIT = {
         REQUESTS_PER_SECOND: 10, // Conservative limit for Alchemy
         MAX_BATCH_SIZE: 50,
@@ -61,28 +53,17 @@ export class PoolPriceService {
         RETRY_DELAY_MS: 1000,
     };
 
-    constructor() {
-        this.initializeClients();
+    constructor(requiredClients: Pick<Clients, "rpcClients" | "prisma">) {
+        this.clients = requiredClients.rpcClients;
+        this.prisma = requiredClients.prisma;
+        this.initializeRateLimitStates();
     }
 
     /**
-     * Initialize viem clients for all supported chains
+     * Initialize rate limiting state for all available chains
      */
-    private initializeClients(): PoolPriceService {
-        SUPPORTED_CHAINS.forEach((chainName) => {
-            const config = getChainConfig(chainName);
-            const client = createPublicClient({
-                chain: config as any,
-                transport: http(config.rpcUrl, {
-                    timeout: 30000, // 30s timeout
-                    retryCount: 3,
-                    retryDelay: 1000,
-                }),
-            }) as any;
-
-            this.clients.set(chainName, client);
-
-            // Initialize rate limiting state for this chain
+    private initializeRateLimitStates(): void {
+        Array.from(this.clients.keys()).forEach((chainName) => {
             this.rateLimitState.set(chainName, {
                 lastRequestTime: 0,
                 requestCount: 0,
@@ -90,7 +71,100 @@ export class PoolPriceService {
                 chain: chainName,
             });
         });
-        return this;
+    }
+
+    /**
+     * Get cached price data from database
+     * Parses cache key and queries PoolPriceCache table
+     */
+    private async getCachedPrice(
+        cacheKey: string
+    ): Promise<ExactPriceData | null> {
+        try {
+            // Parse cache key: ${chain}-${poolAddress}-${blockNumber}
+            const parts = cacheKey.split("-");
+            if (parts.length < 3) return null;
+
+            const chain = parts[0];
+            const poolAddress = parts[1];
+            const blockNumber = BigInt(parts.slice(2).join("-")); // Handle addresses with dashes
+
+            const cached = await this.prisma.poolPriceCache.findUnique({
+                where: {
+                    chain_poolAddress_blockNumber: {
+                        chain,
+                        poolAddress,
+                        blockNumber,
+                    },
+                },
+            });
+
+            if (!cached) return null;
+
+            // Convert database record back to ExactPriceData format
+            return {
+                poolAddress: cached.poolAddress,
+                blockNumber: cached.blockNumber,
+                blockTimestamp: cached.blockTimestamp,
+                sqrtPriceX96: BigInt(cached.sqrtPriceX96),
+                tick: cached.tick,
+                source: cached.source as "alchemy-rpc",
+                confidence: cached.confidence as "exact",
+                chain: cached.chain,
+                retrievedAt: cached.retrievedAt,
+            };
+        } catch (error) {
+            // Log error but don't throw - cache miss is acceptable
+            console.error("Cache lookup failed:", error);
+            return null;
+        }
+    }
+
+    /**
+     * Store price data in database cache
+     * Uses upsert to handle conflicts gracefully
+     */
+    private async setCachedPrice(
+        cacheKey: string,
+        priceData: ExactPriceData
+    ): Promise<void> {
+        try {
+            // Parse cache key for database storage
+            const parts = cacheKey.split("-");
+            if (parts.length < 3) return;
+
+            const chain = parts[0];
+            const poolAddress = parts[1];
+            const blockNumber = BigInt(parts.slice(2).join("-"));
+
+            await this.prisma.poolPriceCache.upsert({
+                where: {
+                    chain_poolAddress_blockNumber: {
+                        chain,
+                        poolAddress,
+                        blockNumber,
+                    },
+                },
+                update: {
+                    // Update retrieved timestamp on cache hit
+                    retrievedAt: new Date(),
+                },
+                create: {
+                    chain,
+                    poolAddress,
+                    blockNumber,
+                    sqrtPriceX96: priceData.sqrtPriceX96.toString(),
+                    tick: priceData.tick,
+                    blockTimestamp: priceData.blockTimestamp,
+                    source: priceData.source,
+                    confidence: priceData.confidence,
+                    retrievedAt: priceData.retrievedAt,
+                },
+            });
+        } catch (error) {
+            // Log error but don't throw - cache failure shouldn't block price retrieval
+            console.error("Cache storage failed:", error);
+        }
     }
 
     /**
@@ -114,8 +188,9 @@ export class PoolPriceService {
     ): Promise<ExactPriceData> {
         // Check cache first
         const cacheKey = `${chain}-${poolAddress.toLowerCase()}-${blockNumber}`;
-        if (this.priceCache[cacheKey]) {
-            return this.priceCache[cacheKey];
+        const cachedData = await this.getCachedPrice(cacheKey);
+        if (cachedData) {
+            return cachedData;
         }
 
         const client = this.clients.get(chain);
@@ -157,7 +232,7 @@ export class PoolPriceService {
             };
 
             // Cache the result (historical data never changes)
-            this.priceCache[cacheKey] = priceData;
+            await this.setCachedPrice(cacheKey, priceData);
 
             return priceData;
         } catch (error) {
@@ -242,20 +317,52 @@ export class PoolPriceService {
 
     /**
      * Clear cache (useful for testing or memory management)
+     * Clears database cache
      */
-    clearCache(): void {
-        this.priceCache = {};
+    async clearCache(): Promise<void> {
+        try {
+            await this.prisma.poolPriceCache.deleteMany({});
+        } catch (error) {
+            console.error("Cache clear failed:", error);
+            throw error;
+        }
     }
 
     /**
-     * Get cache statistics
+     * Get cache statistics from database
      */
-    getCacheStats(): { size: number; keys: string[] } {
-        const keys = Object.keys(this.priceCache);
-        return {
-            size: keys.length,
-            keys: keys.slice(0, 10), // Show first 10 keys as sample
-        };
+    async getCacheStats(): Promise<{ size: number; keys: string[] }> {
+        try {
+            // Get total count
+            const size = await this.prisma.poolPriceCache.count();
+
+            // Get sample keys (first 10)
+            const sampleRecords = await this.prisma.poolPriceCache.findMany({
+                take: 10,
+                select: {
+                    chain: true,
+                    poolAddress: true,
+                    blockNumber: true,
+                },
+                orderBy: {
+                    retrievedAt: "desc",
+                },
+            });
+
+            const keys = sampleRecords.map(
+                (record) =>
+                    `${record.chain}-${record.poolAddress}-${record.blockNumber}`
+            );
+
+            return { size, keys };
+        } catch (error) {
+            console.error("Cache stats failed:", error);
+            // Return empty stats if database fails
+            return {
+                size: 0,
+                keys: [],
+            };
+        }
     }
 
     /**
@@ -291,19 +398,4 @@ export class PoolPriceService {
     private delay(ms: number): Promise<void> {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
-}
-
-// Singleton instance
-let poolPriceServiceInstance: PoolPriceService | null = null;
-
-export function getPoolPriceService(): PoolPriceService {
-    if (!poolPriceServiceInstance) {
-        poolPriceServiceInstance = new PoolPriceService();
-    }
-    return poolPriceServiceInstance;
-}
-
-// Legacy export for backward compatibility
-export function getHistoricalPriceService(): PoolPriceService {
-    return getPoolPriceService();
 }

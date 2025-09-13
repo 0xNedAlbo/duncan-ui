@@ -4,6 +4,7 @@ import { PoolService } from "./pools/poolService";
 import { PoolPriceService } from "./prices/poolPriceService";
 import { QuoteTokenService } from "./positions/quoteTokenService";
 import { PositionImportService } from "./positions/positionImportService";
+import { PositionLedgerService } from "./positions/positionLedgerService";
 import { PositionService } from "./positions/positionService";
 import { TokenService } from "./tokens/tokenService";
 import { TokenReferenceService } from "./tokens/tokenReferenceService";
@@ -17,6 +18,7 @@ export interface Services {
     poolPriceService: PoolPriceService;
     quoteTokenService: QuoteTokenService;
     positionImportService: PositionImportService;
+    positionLedgerService: PositionLedgerService;
     positionService: PositionService;
     tokenService: TokenService;
     tokenReferenceService: TokenReferenceService;
@@ -39,7 +41,7 @@ export class DefaultServiceFactory implements ServiceFactory {
         const etherscanEventService = new EtherscanEventService(
             { etherscanClient }
         );
-        const poolPriceService = new PoolPriceService();
+        const poolPriceService = new PoolPriceService({ rpcClients, prisma });
         const quoteTokenService = new QuoteTokenService();
         const positionService = new PositionService(prisma);
 
@@ -63,6 +65,11 @@ export class DefaultServiceFactory implements ServiceFactory {
             { tokenResolutionService, tokenReferenceService }
         );
 
+        const positionLedgerService = new PositionLedgerService(
+            { prisma, etherscanClient },
+            { tokenService, poolPriceService }
+        );
+
         const positionImportService = new PositionImportService(
             { prisma, rpcClients, etherscanClient },
             { positionService, poolService }
@@ -75,6 +82,7 @@ export class DefaultServiceFactory implements ServiceFactory {
             poolPriceService,
             quoteTokenService,
             positionImportService,
+            positionLedgerService,
             positionService,
             tokenService,
             tokenReferenceService,
