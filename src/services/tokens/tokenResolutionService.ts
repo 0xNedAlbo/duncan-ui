@@ -3,6 +3,8 @@ import { createPublicClient, http } from "viem";
 import { mainnet, arbitrum, base } from "viem/chains";
 import { AlchemyTokenService } from "../alchemy/tokenMetadata";
 import { TokenService } from "./tokenService";
+import type { Services } from "../ServiceFactory";
+import type { Clients } from "../ClientsFactory";
 import {
     ERC20_ABI,
     TokenMetadata,
@@ -38,10 +40,13 @@ export class TokenResolutionService {
     private tokenService: TokenService;
     private alchemyService: AlchemyTokenService;
 
-    constructor(prisma?: PrismaClient) {
-        this.prisma = prisma || new PrismaClient();
-        this.tokenService = new TokenService(this.prisma);
-        this.alchemyService = new AlchemyTokenService();
+    constructor(
+        requiredClients: Pick<Clients, 'prisma'>,
+        requiredServices: Pick<Services, 'tokenService' | 'alchemyTokenService'>
+    ) {
+        this.prisma = requiredClients.prisma;
+        this.tokenService = requiredServices.tokenService;
+        this.alchemyService = requiredServices.alchemyTokenService;
     }
 
     /**
@@ -267,7 +272,6 @@ export class TokenResolutionService {
      * Get user's custom tokens
      */
     async getUserTokens(userId: string, chain?: string): Promise<UserToken[]> {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const where: any = { userId };
         if (chain) {
             where.chain = chain;
@@ -295,7 +299,6 @@ export class TokenResolutionService {
             notes?: string;
         }
     ): Promise<UserToken> {
-        
         const normalizedAddress = normalizeAddress(tokenData.address);
 
         // Check if already exists

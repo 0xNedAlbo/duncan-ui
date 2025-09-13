@@ -1,5 +1,7 @@
 import { PrismaClient, Token } from "@prisma/client";
 import { AlchemyTokenService } from "../alchemy/tokenMetadata";
+import type { Services } from "../ServiceFactory";
+import type { Clients } from "../ClientsFactory";
 
 export interface TokenSearchOptions {
     chain?: string;
@@ -23,9 +25,12 @@ export class TokenService {
     private prisma: PrismaClient;
     private alchemyService: AlchemyTokenService;
 
-    constructor(prisma?: PrismaClient) {
-        this.prisma = prisma || new PrismaClient();
-        this.alchemyService = new AlchemyTokenService();
+    constructor(
+        requiredClients: Pick<Clients, 'prisma'>,
+        requiredServices: Pick<Services, 'alchemyTokenService'>
+    ) {
+        this.prisma = requiredClients.prisma;
+        this.alchemyService = requiredServices.alchemyTokenService;
     }
 
     /**
@@ -173,7 +178,6 @@ export class TokenService {
             verifiedOnly = false,
         } = options;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const where: any = {};
 
         if (chain) {
@@ -376,7 +380,6 @@ export class TokenService {
      * Refresh stale token metadata
      */
     async refreshStaleTokens(chain?: string): Promise<void> {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const where: any = {
             verified: true, // Only refresh verified tokens
         };

@@ -1,12 +1,12 @@
 /**
  * Position Service - Clean Rewrite
- * 
+ *
  * Focused on essential database operations for Uniswap V3 positions.
  * PnL calculations and complex analytics are handled by separate services.
  */
 
-import { prisma } from "@/lib/prisma";
 import { SupportedChainsType } from "@/config/chains";
+import { PrismaClient } from "@prisma/client";
 
 // Token data interface
 export interface TokenData {
@@ -57,7 +57,7 @@ export interface CreatePositionData {
     liquidity: string;
     token0IsQuote: boolean;
     owner?: string;
-    importType: 'manual' | 'wallet' | 'nft';
+    importType: "manual" | "wallet" | "nft";
     nftId?: string;
     status?: string;
 }
@@ -79,16 +79,21 @@ export interface PositionListOptions {
     status?: string;
     limit?: number;
     offset?: number;
-    sortBy?: 'createdAt' | 'updatedAt' | 'liquidity';
-    sortOrder?: 'asc' | 'desc';
+    sortBy?: "createdAt" | "updatedAt" | "liquidity";
+    sortOrder?: "asc" | "desc";
 }
 
 export class PositionService {
+    private prisma: PrismaClient;
+    constructor(prisma: PrismaClient) {
+        this.prisma = prisma;
+    }
+
     /**
      * Get a single position by ID
      */
     async getPosition(positionId: string): Promise<BasicPosition | null> {
-        const position = await prisma.position.findUnique({
+        const position = await this.prisma.position.findUnique({
             where: { id: positionId },
             include: {
                 pool: {
@@ -96,18 +101,18 @@ export class PositionService {
                         token0Ref: {
                             include: {
                                 globalToken: true,
-                                userToken: true
-                            }
+                                userToken: true,
+                            },
                         },
                         token1Ref: {
                             include: {
                                 globalToken: true,
-                                userToken: true
-                            }
-                        }
-                    }
-                }
-            }
+                                userToken: true,
+                            },
+                        },
+                    },
+                },
+            },
         });
 
         if (!position) {
@@ -120,19 +125,21 @@ export class PositionService {
     /**
      * List positions with filtering and pagination
      */
-    async listPositions(options: PositionListOptions = {}): Promise<BasicPosition[]> {
+    async listPositions(
+        options: PositionListOptions = {}
+    ): Promise<BasicPosition[]> {
         const {
             userId,
             chain,
-            status = 'active',
+            status = "active",
             limit = 50,
             offset = 0,
-            sortBy = 'createdAt',
-            sortOrder = 'desc'
+            sortBy = "createdAt",
+            sortOrder = "desc",
         } = options;
 
         const whereClause: any = {
-            status
+            status,
         };
 
         if (userId) {
@@ -141,11 +148,11 @@ export class PositionService {
 
         if (chain) {
             whereClause.pool = {
-                chain
+                chain,
             };
         }
 
-        const positions = await prisma.position.findMany({
+        const positions = await this.prisma.position.findMany({
             where: whereClause,
             include: {
                 pool: {
@@ -153,26 +160,26 @@ export class PositionService {
                         token0Ref: {
                             include: {
                                 globalToken: true,
-                                userToken: true
-                            }
+                                userToken: true,
+                            },
                         },
                         token1Ref: {
                             include: {
                                 globalToken: true,
-                                userToken: true
-                            }
-                        }
-                    }
-                }
+                                userToken: true,
+                            },
+                        },
+                    },
+                },
             },
             orderBy: {
-                [sortBy]: sortOrder
+                [sortBy]: sortOrder,
             },
             take: limit,
-            skip: offset
+            skip: offset,
         });
 
-        return positions.map(position => this.mapToBasicPosition(position));
+        return positions.map((position) => this.mapToBasicPosition(position));
     }
 
     /**
@@ -190,10 +197,10 @@ export class PositionService {
             owner: data.owner,
             importType: data.importType,
             nftId: data.nftId,
-            status: data.status || 'active'
+            status: data.status || "active",
         };
 
-        const position = await prisma.position.create({
+        const position = await this.prisma.position.create({
             data: positionData,
             include: {
                 pool: {
@@ -201,18 +208,18 @@ export class PositionService {
                         token0Ref: {
                             include: {
                                 globalToken: true,
-                                userToken: true
-                            }
+                                userToken: true,
+                            },
                         },
                         token1Ref: {
                             include: {
                                 globalToken: true,
-                                userToken: true
-                            }
-                        }
-                    }
-                }
-            }
+                                userToken: true,
+                            },
+                        },
+                    },
+                },
+            },
         });
 
         return this.mapToBasicPosition(position);
@@ -221,8 +228,11 @@ export class PositionService {
     /**
      * Update an existing position
      */
-    async updatePosition(positionId: string, data: UpdatePositionData): Promise<BasicPosition> {
-        const position = await prisma.position.update({
+    async updatePosition(
+        positionId: string,
+        data: UpdatePositionData
+    ): Promise<BasicPosition> {
+        const position = await this.prisma.position.update({
             where: { id: positionId },
             data,
             include: {
@@ -231,18 +241,18 @@ export class PositionService {
                         token0Ref: {
                             include: {
                                 globalToken: true,
-                                userToken: true
-                            }
+                                userToken: true,
+                            },
                         },
                         token1Ref: {
                             include: {
                                 globalToken: true,
-                                userToken: true
-                            }
-                        }
-                    }
-                }
-            }
+                                userToken: true,
+                            },
+                        },
+                    },
+                },
+            },
         });
 
         return this.mapToBasicPosition(position);
@@ -252,19 +262,21 @@ export class PositionService {
      * Delete a position
      */
     async deletePosition(positionId: string): Promise<void> {
-        await prisma.position.delete({
-            where: { id: positionId }
+        await this.prisma.position.delete({
+            where: { id: positionId },
         });
     }
 
     /**
      * Count positions with optional filtering
      */
-    async countPositions(options: Pick<PositionListOptions, 'userId' | 'chain' | 'status'> = {}): Promise<number> {
-        const { userId, chain, status = 'active' } = options;
+    async countPositions(
+        options: Pick<PositionListOptions, "userId" | "chain" | "status"> = {}
+    ): Promise<number> {
+        const { userId, chain, status = "active" } = options;
 
         const whereClause: any = {
-            status
+            status,
         };
 
         if (userId) {
@@ -273,31 +285,34 @@ export class PositionService {
 
         if (chain) {
             whereClause.pool = {
-                chain
+                chain,
             };
         }
 
-        return await prisma.position.count({
-            where: whereClause
+        return await this.prisma.position.count({
+            where: whereClause,
         });
     }
 
     /**
      * Get positions by NFT ID
      */
-    async getPositionsByNftId(nftId: string, chain?: SupportedChainsType): Promise<BasicPosition[]> {
+    async getPositionsByNftId(
+        nftId: string,
+        chain?: SupportedChainsType
+    ): Promise<BasicPosition[]> {
         const whereClause: any = {
             nftId,
-            status: 'active'
+            status: "active",
         };
 
         if (chain) {
             whereClause.pool = {
-                chain
+                chain,
             };
         }
 
-        const positions = await prisma.position.findMany({
+        const positions = await this.prisma.position.findMany({
             where: whereClause,
             include: {
                 pool: {
@@ -305,30 +320,30 @@ export class PositionService {
                         token0Ref: {
                             include: {
                                 globalToken: true,
-                                userToken: true
-                            }
+                                userToken: true,
+                            },
                         },
                         token1Ref: {
                             include: {
                                 globalToken: true,
-                                userToken: true
-                            }
-                        }
-                    }
-                }
-            }
+                                userToken: true,
+                            },
+                        },
+                    },
+                },
+            },
         });
 
-        return positions.map(position => this.mapToBasicPosition(position));
+        return positions.map((position) => this.mapToBasicPosition(position));
     }
 
     /**
      * Check if position exists
      */
     async positionExists(positionId: string): Promise<boolean> {
-        const position = await prisma.position.findUnique({
+        const position = await this.prisma.position.findUnique({
             where: { id: positionId },
-            select: { id: true }
+            select: { id: true },
         });
 
         return position !== null;
@@ -362,10 +377,10 @@ export class PositionService {
                 token0: token0Data,
                 token1: token1Data,
                 currentTick: position.pool.currentTick,
-                currentPrice: position.pool.currentPrice
+                currentPrice: position.pool.currentPrice,
             },
             createdAt: position.createdAt,
-            updatedAt: position.updatedAt
+            updatedAt: position.updatedAt,
         };
     }
 
@@ -374,9 +389,9 @@ export class PositionService {
      */
     private extractTokenData(tokenRef: any): TokenData {
         const token = tokenRef.globalToken || tokenRef.userToken;
-        
+
         if (!token) {
-            throw new Error('Token data not found in reference');
+            throw new Error("Token data not found in reference");
         }
 
         return {
@@ -384,7 +399,7 @@ export class PositionService {
             symbol: token.symbol,
             name: token.name,
             decimals: token.decimals,
-            logoUrl: token.logoUrl
+            logoUrl: token.logoUrl,
         };
     }
 
@@ -394,14 +409,4 @@ export class PositionService {
     async disconnect(): Promise<void> {
         // Prisma client cleanup is handled globally
     }
-}
-
-// Singleton instance
-let positionServiceInstance: PositionService | null = null;
-
-export function getPositionService(): PositionService {
-    if (!positionServiceInstance) {
-        positionServiceInstance = new PositionService();
-    }
-    return positionServiceInstance;
 }
