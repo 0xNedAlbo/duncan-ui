@@ -39,6 +39,13 @@ export interface EtherscanResponse {
     result: EtherscanLog[];
 }
 
+// Response for block number lookup
+export interface BlockNumberResponse {
+    status: string;
+    message: string;
+    result: string; // Block number as string
+}
+
 // Options for fetching logs
 export interface LogOptions {
     fromBlock?: string | number;
@@ -162,6 +169,73 @@ export class EtherscanClient {
      */
     getSupportedChains(): SupportedChainsType[] {
         return Object.keys(CHAIN_CONFIG) as SupportedChainsType[];
+    }
+
+    /**
+     * Get block number for timestamp using Etherscan API
+     */
+    async getBlockNumberForTimestamp(
+        chain: SupportedChainsType,
+        timestamp: number,
+        closest: "before" | "after" = "before"
+    ): Promise<string> {
+        const config = CHAIN_CONFIG[chain];
+        if (!config) {
+            throw new Error(`Unsupported chain: ${chain}`);
+        }
+
+        const apiKey = process.env.ETHERSCAN_API_KEY;
+        if (!apiKey) {
+            throw new Error(
+                "Missing API key: ETHERSCAN_API_KEY not found in environment"
+            );
+        }
+
+        await this.enforceRateLimit();
+
+        const params = new URLSearchParams({
+            chainid: config.chainId.toString(),
+            module: "block",
+            action: "getblocknobytime",
+            timestamp: timestamp.toString(),
+            closest: closest,
+            apikey: apiKey,
+        });
+
+        const url = `${API_BASE_URL}?${params.toString()}`;
+
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    "User-Agent": "Duncan-UI/1.0",
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    `HTTP ${response.status}: ${response.statusText}`
+                );
+            }
+
+            const data: BlockNumberResponse = await response.json();
+
+            if (data.status !== "1") {
+                if (data.message.includes("Invalid timestamp")) {
+                    throw new Error(
+                        `Timestamp too old or too new: ${new Date(timestamp * 1000).toISOString()}`
+                    );
+                }
+                throw new Error(`Etherscan API error: ${data.message}`);
+            }
+
+            return data.result;
+
+        } catch (error) {
+            if (error instanceof Error) {
+                throw error;
+            }
+            throw new Error(`Unknown error during block lookup: ${error}`);
+        }
     }
 
     /**

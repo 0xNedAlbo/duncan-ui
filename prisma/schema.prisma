@@ -286,7 +286,7 @@ model PositionEvent {
   position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
 
   // Ledger Order
-  ledgerOrder Int // Internal ordering fpr cost basis calculations
+  ledgerIgnore Boolean // Ignore this event in the ledger
 
   // Blockchain Ordering (CRITICAL for proper event sequencing)
   blockNumber      BigInt // Ethereum block number
@@ -332,6 +332,6 @@ model PositionEvent {
   @@unique([transactionHash, logIndex, positionId]) // Prevent exact duplicates
   @@unique([inputHash]) // Prvent duplicates during sync
   // Indexes for performance and ordering
-  @@index([positionId, ledgerOrder]) // Proper calculation ordering
+  @@index([positionId, blockNumber, transactionIndex, logIndex]) // Natural blockchain ordering
   @@map("position_events")
 }
