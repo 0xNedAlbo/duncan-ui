@@ -119,6 +119,24 @@ export const CHAIN_ID_TO_NAME: Record<number, string> = {
     8453: "base",
 };
 
+/**
+ * Get chain ID for a supported chain
+ */
+export function getChainId(chain: SupportedChainsType): number {
+    const config = CHAIN_CONFIG[chain];
+    if (!config) {
+        throw new Error(`Unsupported chain: ${chain}`);
+    }
+    return config.chainId;
+}
+
+/**
+ * Get supported chains
+ */
+export function getSupportedChains(): SupportedChainsType[] {
+    return Object.keys(CHAIN_CONFIG) as SupportedChainsType[];
+}
+
 export function getChainFromId(chainId: number): string | null {
     return CHAIN_ID_TO_NAME[chainId] || null;
 }

@@ -1,6 +1,6 @@
 /**
  * Etherscan Client
- * 
+ *
  * Generic client for interacting with the Etherscan V2 API.
  * Handles API communication, rate limiting, and basic response parsing.
  */
@@ -43,10 +43,10 @@ export interface EtherscanResponse {
 export interface LogOptions {
     fromBlock?: string | number;
     toBlock?: string | number;
-    topic0?: string;        // Event signature
-    topic1?: string;        // First indexed parameter  
-    topic2?: string;        // Second indexed parameter
-    topic3?: string;        // Third indexed parameter
+    topic0?: string; // Event signature
+    topic1?: string; // First indexed parameter
+    topic2?: string; // Second indexed parameter
+    topic3?: string; // Third indexed parameter
 }
 
 // Rate limiting state
@@ -142,7 +142,6 @@ export class EtherscanClient {
 
             return Array.isArray(data.result) ? data.result : [];
         } catch (error) {
-            console.error(`🔥 Etherscan API request failed:`, { url, error });
             throw error;
         }
     }
@@ -170,7 +169,9 @@ export class EtherscanClient {
      */
     validateApiKey(): void {
         if (!process.env.ETHERSCAN_API_KEY) {
-            throw new Error("ETHERSCAN_API_KEY environment variable is not set");
+            throw new Error(
+                "ETHERSCAN_API_KEY environment variable is not set"
+            );
         }
     }
 
@@ -191,7 +192,6 @@ export class EtherscanClient {
             // 5 requests per second
             const waitTime = this.rateLimitState.resetTime - now;
             if (waitTime > 0) {
-                console.log(`⏳ Rate limiting: waiting ${waitTime}ms`);
                 await this.delay(waitTime);
             }
         }

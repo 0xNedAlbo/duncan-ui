@@ -45,18 +45,18 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String      @id @default(cuid())
   name          String?
-  email         String    @unique
-  password      String    // Hashed password
+  email         String      @unique
+  password      String // Hashed password
   emailVerified DateTime?
   image         String?
   accounts      Account[]
   sessions      Session[]
   positions     Position[]
-  userTokens    UserToken[]  // User's custom token list
-  ownedPools    Pool[]    @relation("PoolOwner")  // Pools with custom tokens
-  
+  userTokens    UserToken[] // User's custom token list
+  ownedPools    Pool[]      @relation("PoolOwner") // Pools with custom tokens
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -74,33 +74,33 @@ model VerificationToken {
 
 // Token Model - ONLY verified tokens from Alchemy (global)
 model Token {
-  id            String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Chain & Address (unique together)
-  chain         String   // "ethereum", "arbitrum", "base"
-  address       String
-  
+  chain   String // "ethereum", "arbitrum", "base"
+  address String
+
   // Token Information
-  symbol        String
-  name          String
-  decimals      Int
-  
+  symbol   String
+  name     String
+  decimals Int
+
   // Alchemy Metadata
-  logoUrl       String?
-  verified      Boolean  @default(true)   // Always true for global tokens
-  
+  logoUrl  String?
+  verified Boolean @default(true) // Always true for global tokens
+
   // Metadata Caching
-  lastUpdatedAt DateTime?  // When last updated from Alchemy
-  
+  lastUpdatedAt DateTime? // When last updated from Alchemy
+
   // Relations
   // poolsAsToken0 Pool[]   @relation("Token0")
   // poolsAsToken1 Pool[]   @relation("Token1")
-  references    TokenReference[] @relation("TokenReferenceToGlobal")
-  
+  references TokenReference[] @relation("TokenReferenceToGlobal")
+
   // Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([chain, address])
   @@index([chain, symbol])
   @@map("tokens")
@@ -108,36 +108,36 @@ model Token {
 
 // UserToken Model - User-specific Custom Tokens
 model UserToken {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // Chain & Address
-  chain         String   // "ethereum", "arbitrum", "base"
-  address       String
-  
+  chain   String // "ethereum", "arbitrum", "base"
+  address String
+
   // Token Information
-  symbol        String
-  name          String
-  decimals      Int
-  logoUrl       String?
-  
+  symbol   String
+  name     String
+  decimals Int
+  logoUrl  String?
+
   // Metadata
-  source        String   // "contract", "manual", "placeholder"
-  addedAt       DateTime @default(now())
-  lastUsedAt    DateTime @updatedAt
-  
+  source     String // "contract", "manual", "placeholder"
+  addedAt    DateTime @default(now())
+  lastUsedAt DateTime @updatedAt
+
   // User can assign custom labels
-  userLabel     String?  // e.g. "My Test Token"
-  notes         String?  // User notes
-  
+  userLabel String? // e.g. "My Test Token"
+  notes     String? // User notes
+
   // Relations
-  references    TokenReference[] @relation("TokenReferenceToUser")
-  
+  references TokenReference[] @relation("TokenReferenceToUser")
+
   // Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([userId, chain, address])
   @@index([userId, chain])
   @@index([userId, symbol])
@@ -146,36 +146,36 @@ model UserToken {
 
 // TokenReference Model - Polymorphic token reference for unified Pool relations
 model TokenReference {
-  id            String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Polymorphic token type discriminator
-  tokenType     String   // "global" | "user"
-  
+  tokenType String // "global" | "user"
+
   // XOR relationship - exactly one must be set
   globalTokenId String?
-  globalToken   Token?   @relation("TokenReferenceToGlobal", fields: [globalTokenId], references: [id], onDelete: Cascade)
-  
-  userTokenId   String?
-  userToken     UserToken? @relation("TokenReferenceToUser", fields: [userTokenId], references: [id], onDelete: Cascade)
-  
+  globalToken   Token?  @relation("TokenReferenceToGlobal", fields: [globalTokenId], references: [id], onDelete: Cascade)
+
+  userTokenId String?
+  userToken   UserToken? @relation("TokenReferenceToUser", fields: [userTokenId], references: [id], onDelete: Cascade)
+
   // Denormalized fields for query performance
-  chain         String
-  address       String
-  symbol        String   // Cached for quick access
-  
+  chain   String
+  address String
+  symbol  String // Cached for quick access
+
   // Pool relations
-  poolsAsToken0 Pool[]   @relation("PoolToken0Reference")
-  poolsAsToken1 Pool[]   @relation("PoolToken1Reference")
-  
+  poolsAsToken0 Pool[] @relation("PoolToken0Reference")
+  poolsAsToken1 Pool[] @relation("PoolToken1Reference")
+
   // Metadata
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Constraints
-  @@unique([tokenType, globalTokenId])  // Each global token has max one reference
-  @@unique([tokenType, userTokenId])    // Each user token has max one reference
-  @@unique([chain, address, tokenType, globalTokenId])  // Prevent duplicate global references
-  @@unique([chain, address, tokenType, userTokenId])    // Prevent duplicate user references
+  @@unique([tokenType, globalTokenId]) // Each global token has max one reference
+  @@unique([tokenType, userTokenId]) // Each user token has max one reference
+  @@unique([chain, address, tokenType, globalTokenId]) // Prevent duplicate global references
+  @@unique([chain, address, tokenType, userTokenId]) // Prevent duplicate user references
   @@index([chain, address])
   @@index([tokenType])
   @@index([symbol])
@@ -184,51 +184,51 @@ model TokenReference {
 
 // Pool Model - central Pool data with flexible Token references
 model Pool {
-  id            String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Chain & Address (unique together)
-  chain         String   // "ethereum", "arbitrum", "base"
-  poolAddress   String
-  
+  chain       String // "ethereum", "arbitrum", "base"
+  poolAddress String
+
   // TokenReference Relations (polymorphic token handling)
-  token0RefId   String
-  token0Ref     TokenReference @relation("PoolToken0Reference", fields: [token0RefId], references: [id])
-  token1RefId   String
-  token1Ref     TokenReference @relation("PoolToken1Reference", fields: [token1RefId], references: [id])
-  
+  token0RefId String
+  token0Ref   TokenReference @relation("PoolToken0Reference", fields: [token0RefId], references: [id])
+  token1RefId String
+  token1Ref   TokenReference @relation("PoolToken1Reference", fields: [token1RefId], references: [id])
+
   // Token Addresses (kept for backward compatibility and direct queries)
   token0Address String
   token1Address String
-  
+
   // Legacy token relations (deprecated, will be removed after migration)
   // token0Id      String?
   // token0        Token?   @relation("Token0", fields: [token0Id], references: [id])
   // token1Id      String?
   // token1        Token?   @relation("Token1", fields: [token1Id], references: [id])
-  
+
   // Pool Parameters
-  fee           Int      // Fee in basis points (100 = 0.01%, 500 = 0.05%, 3000 = 0.3%, 10000 = 1%)
-  tickSpacing   Int
-  
+  fee         Int // Fee in basis points (100 = 0.01%, 500 = 0.05%, 3000 = 0.3%, 10000 = 1%)
+  tickSpacing Int
+
   // Current State (updated periodically)
-  currentTick   Int?
-  currentPrice  String?  // BigInt as string (token1 per token0 in smallest unit)
-  sqrtPriceX96  String?  // Uniswap V3 price format
-  tvl           String?
-  volume24h     String?
-  apr           Float?
-  
+  currentTick  Int?
+  currentPrice String? // BigInt as string (token1 per token0 in smallest unit)
+  sqrtPriceX96 String? // Uniswap V3 price format
+  tvl          String?
+  volume24h    String?
+  apr          Float?
+
   // Pool Owner (for custom tokens)
-  ownerId       String?
-  owner         User?    @relation("PoolOwner", fields: [ownerId], references: [id])
-  
+  ownerId String?
+  owner   User?   @relation("PoolOwner", fields: [ownerId], references: [id])
+
   // Relations
-  positions     Position[]
-  
+  positions Position[]
+
   // Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([chain, poolAddress])
   @@unique([chain, token0Address, token1Address, fee])
   // @@index([chain, token0Id, token1Id])
@@ -239,39 +239,39 @@ model Pool {
 
 // Simplified Position Model
 model Position {
-  id            String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Relations
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  poolId        String
-  pool          Pool     @relation(fields: [poolId], references: [id])
-  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  poolId String
+  pool   Pool   @relation(fields: [poolId], references: [id])
+
   // Position Details
-  tickLower     Int
-  tickUpper     Int
-  liquidity     String   // BigInt as String
-  
+  tickLower Int
+  tickUpper Int
+  liquidity String // BigInt as String
+
   // Token Configuration (für PnL-Berechnung)
-  token0IsQuote Boolean  // true wenn Token0 = Quote Asset, false wenn Token1 = Quote Asset
-  
+  token0IsQuote Boolean // true wenn Token0 = Quote Asset, false wenn Token1 = Quote Asset
+
   // Owner Information
-  owner         String?  // Wallet address of position owner
-  
+  owner String? // Wallet address of position owner
+
   // Import Metadata
-  importType    String   // "manual", "wallet", "nft"
-  nftId         String?  // For NFT imports
-  
+  importType String // "manual", "wallet", "nft"
+  nftId      String? // For NFT imports
+
   // Position State
-  status        String   @default("active") // "active", "closed", "archived"
-  
+  status String @default("active") // "active", "closed", "archived"
+
   // Relations
-  events              PositionEvent[]
-  
+  events PositionEvent[]
+
   // Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([userId, status])
   @@index([owner])
   @@map("positions")
@@ -279,57 +279,59 @@ model Position {
 
 // Position Event Model - Stateful event ledger with proper ordering and caching
 model PositionEvent {
-  id              String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Relations
-  positionId      String
-  position        Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
-  
+  positionId String
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  // Ledger Order
+  ledgerOrder Int // Internal ordering fpr cost basis calculations
+
   // Blockchain Ordering (CRITICAL for proper event sequencing)
-  blockNumber     BigInt   // Ethereum block number
-  transactionIndex Int     // Transaction index within block
-  logIndex        Int      // Log index within transaction
-  blockTimestamp  DateTime // Block timestamp (not event processing time)
-  transactionHash String   // For deduplication and verification
-  
+  blockNumber      BigInt // Ethereum block number
+  transactionIndex Int // Transaction index within block
+  logIndex         Int // Log index within transaction
+  blockTimestamp   DateTime // Block timestamp (not event processing time)
+  transactionHash  String // For deduplication and verification
+
   // Event Classification
-  eventType       String   // "INCREASE", "DECREASE", "COLLECT"
-  
+  eventType String // "INCREASE", "DECREASE", "COLLECT"
+
   // Liquidity Changes
-  deltaL          String   // BigInt: +/- liquidity change (can be negative for DECREASE)
-  
-  // Token Amounts (in smallest units)
-  token0Amount    String   // BigInt: Token0 amount added/removed
-  token1Amount    String   // BigInt: Token1 amount added/removed
-  
+  deltaL         String // BigInt: +/- liquidity change (can be negative for DECREASE)
+  liquidityAfter String // BigInt: Total position liquidity after this event
+
   // Price Information
-  poolPrice       String   // BigInt: Quote tokens per 1 Base token (in smallest units)
-  
-  // State Caching (BEFORE this event)
-  liquidityBefore      String   // BigInt: Total position liquidity before this event
-  costBasisBefore      String   // BigInt: Total cost basis before this event (in quote token smallest units)
-  realizedPnLBefore    String   // BigInt: Realized PnL from position changes only (INCREASE/DECREASE)
-  feesCollected0Before String   // BigInt: Accumulated token0 fees collected via COLLECT events
-  feesCollected1Before String   // BigInt: Accumulated token1 fees collected via COLLECT events
-  
-  // State Caching (AFTER this event)
-  liquidityAfter       String   // BigInt: Total position liquidity after this event
-  costBasisAfter       String   // BigInt: Total cost basis after this event
-  realizedPnLAfter     String   // BigInt: Realized PnL from position changes only (INCREASE/DECREASE)
-  feesCollected0After  String   // BigInt: Accumulated token0 fees collected via COLLECT events
-  feesCollected1After  String   // BigInt: Accumulated token1 fees collected via COLLECT events
-  
-  // Event-specific value calculations
-  valueInQuote         String?  // BigInt: Position value change in quote token (INCREASE/DECREASE only)
-  feeValueInQuote      String?  // BigInt: Total fee value in quote token (COLLECT events only)
-  
-  // Metadata
-  source          String   // "subgraph", "onchain", "manual"
-  createdAt       DateTime @default(now())
-  
-  // Indexes for performance and ordering
-  @@index([positionId, blockNumber, transactionIndex, logIndex]) // Proper chronological ordering
-  @@index([blockNumber, transactionIndex, logIndex]) // Global event ordering
+  poolPrice String // BigInt: Quote tokens per 1 Base token (in smallest units)
+
+  // Token Amounts (in smallest units)
+  token0Amount      String @default("0") // BigInt: Token0 amount added/removed
+  token1Amount      String @default("0") // BigInt: Token1 amount added/removed
+  tokenValueInQuote String @default("0") // BigInt: Position value in quote token (INCREASE/DECREASE only) after event
+
+  // Fees
+  feesCollected0  String @default("0") // BigInt: Collected token0 fees from this event
+  feesCollected1  String @default("0") // BigInt: Collected token1 fees from this event
+  feeValueInQuote String @default("0") // BigInt: Fee value in quote token (COLLECT events only)
+
+  // Cost Basis
+  deltaCostBasis String // BigInt: Cost Basis Change
+  costBasisAfter String // BigInt: Total cost basis after this event
+
+  // PnL
+  deltaPnL         String // BigInt: Change in Realized PnL   
+  realizedPnLAfter String // BigInt: Realized PnL from position changes only (INCREASE/DECREASE)
+
+  // Metadata and syncing
+  source      String // "onchain" | "manual"
+  createdAt   DateTime
+  inputHash   String // manual: MD5("manual-rnd()), onchain: MD5(CONCAT(blocknumber, txIndex, logIndex))")
+  calcVersion Int // Increasing number per calculation run, should be the same within each position
+
   @@unique([transactionHash, logIndex, positionId]) // Prevent exact duplicates
+  @@unique([inputHash]) // Prvent duplicates during sync
+  // Indexes for performance and ordering
+  @@index([positionId, ledgerOrder]) // Proper calculation ordering
   @@map("position_events")
 }

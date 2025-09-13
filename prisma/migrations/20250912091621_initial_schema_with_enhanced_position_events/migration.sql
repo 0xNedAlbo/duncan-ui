@@ -147,6 +147,7 @@ CREATE TABLE "public"."positions" (
 CREATE TABLE "public"."position_events" (
     "id" TEXT NOT NULL,
     "positionId" TEXT NOT NULL,
+    "ledgerOrder" INTEGER NOT NULL,
     "blockNumber" BIGINT NOT NULL,
     "transactionIndex" INTEGER NOT NULL,
     "logIndex" INTEGER NOT NULL,
@@ -154,17 +155,22 @@ CREATE TABLE "public"."position_events" (
     "transactionHash" TEXT NOT NULL,
     "eventType" TEXT NOT NULL,
     "deltaL" TEXT NOT NULL,
-    "amountBase" TEXT NOT NULL,
-    "amountQuote" TEXT NOT NULL,
-    "poolPrice" TEXT NOT NULL,
-    "liquidityBefore" TEXT NOT NULL,
-    "costBasisBefore" TEXT NOT NULL,
-    "realizedPnLBefore" TEXT NOT NULL,
     "liquidityAfter" TEXT NOT NULL,
+    "poolPrice" TEXT NOT NULL,
+    "token0Amount" TEXT NOT NULL DEFAULT '0',
+    "token1Amount" TEXT NOT NULL DEFAULT '0',
+    "tokenValueInQuote" TEXT NOT NULL DEFAULT '0',
+    "feesCollected0" TEXT NOT NULL DEFAULT '0',
+    "feesCollected1" TEXT NOT NULL DEFAULT '0',
+    "feeValueInQuote" TEXT NOT NULL DEFAULT '0',
+    "deltaCostBasis" TEXT NOT NULL,
     "costBasisAfter" TEXT NOT NULL,
+    "deltaPnL" TEXT NOT NULL,
     "realizedPnLAfter" TEXT NOT NULL,
     "source" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL,
+    "inputHash" TEXT NOT NULL,
+    "calcVersion" INTEGER NOT NULL,
 
     CONSTRAINT "position_events_pkey" PRIMARY KEY ("id")
 );
@@ -239,13 +245,13 @@ CREATE INDEX "positions_userId_status_idx" ON "public"."positions"("userId", "st
 CREATE INDEX "positions_owner_idx" ON "public"."positions"("owner");
 
 -- CreateIndex
-CREATE INDEX "position_events_positionId_blockNumber_transactionIndex_log_idx" ON "public"."position_events"("positionId", "blockNumber", "transactionIndex", "logIndex");
-
--- CreateIndex
-CREATE INDEX "position_events_blockNumber_transactionIndex_logIndex_idx" ON "public"."position_events"("blockNumber", "transactionIndex", "logIndex");
+CREATE INDEX "position_events_positionId_ledgerOrder_idx" ON "public"."position_events"("positionId", "ledgerOrder");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "position_events_transactionHash_logIndex_positionId_key" ON "public"."position_events"("transactionHash", "logIndex", "positionId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "position_events_inputHash_key" ON "public"."position_events"("inputHash");
 
 -- AddForeignKey
 ALTER TABLE "public"."accounts" ADD CONSTRAINT "accounts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

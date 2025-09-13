@@ -64,7 +64,7 @@ export class DefaultServiceFactory implements ServiceFactory {
         );
 
         const positionImportService = new PositionImportService(
-            { prisma, rpcClients },
+            { prisma, rpcClients, etherscanClient },
             { positionService, poolService }
         );
 

@@ -94,6 +94,7 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - Convert BigInt to human readable formats only when displaying values to the user
 - Never use float values for storing token amounts, token prices, position values, pnl, historical values with respect to tokens
 - Use English only for documentation and comments
+- **NEVER use console.log, console.warn, console.error, or any console methods in backend services and API code** - backend code should operate silently
 
 
 **Precision & BigInt Handling Rule:**
@@ -128,6 +129,13 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - Never hardcode chain configurations, RPC URLs, or chain IDs in services
 - Use `getChainConfig(chainName)` to get chain configuration including RPC URLs
 - This ensures consistent chain configuration across all services and prevents environment variable issues
+
+**Database Seeding:**
+- **Development database automatically seeds test user** via `prisma/seed.ts`
+- **Production database never gets seeded** - environment check prevents seeding
+- **Test credentials (development only)**: test@testmann.kk / test123456 / "Test Testmann"
+- **Seeding commands**: `npm run db:seed` or automatic via `prisma migrate reset/dev`
+- **Environment safety**: Only seeds when `NODE_ENV !== 'production'`
 
 **Additional Coding Guidelines for Claude:**
 - use formatFractionHuman() or other functions from fraction-formats.ts when displaying bigint values

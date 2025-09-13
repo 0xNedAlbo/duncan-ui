@@ -10,7 +10,7 @@ export const NONFUNGIBLE_POSITION_MANAGER_ADDRESSES: Record<number, Address> = {
   8453: '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1',
 };
 
-// Minimal ABI for the positions() function
+// ABI for the positions() and ownerOf() functions
 export const NONFUNGIBLE_POSITION_MANAGER_ABI = [
   {
     inputs: [
@@ -81,6 +81,25 @@ export const NONFUNGIBLE_POSITION_MANAGER_ABI = [
         internalType: 'uint128',
         name: 'tokensOwed1',
         type: 'uint128',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'uint256',
+        name: 'tokenId',
+        type: 'uint256',
+      },
+    ],
+    name: 'ownerOf',
+    outputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
       },
     ],
     stateMutability: 'view',

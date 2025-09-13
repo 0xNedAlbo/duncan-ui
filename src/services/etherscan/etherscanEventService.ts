@@ -6,7 +6,6 @@
  */
 
 import { SupportedChainsType } from "@/config/chains";
-import type { RawPositionEvent } from "../positions/eventStateCalculator";
 import { EtherscanClient, type EtherscanLog } from "./etherscanClient";
 import type { Clients } from "../ClientsFactory";
 
@@ -27,19 +26,32 @@ const NFT_MANAGER_ADDRESSES = {
     base: "0x03a520b32C04BF3bEEf7BF5d8b4B9d7e0e5d25F1",
 } as const;
 
+export interface RawPositionEvent {
+    eventType: "INCREASE_LIQUIDITY" | "DECREASE_LIQUIDITY" | "COLLECT";
+    tokenId: string;
+    transactionHash: string;
+    blockNumber: bigint;
+    transactionIndex: number;
+    logIndex: number;
+    blockTimestamp: Date;
+
+    // Event-specific data
+    liquidity?: string; // BigInt string for INCREASE/DECREASE events
+    amount0?: string; // BigInt string
+    amount1?: string; // BigInt string
+
+    // COLLECT event specific
+    recipient?: string;
+
+    // Pool and token context (must be provided)
+    chain: SupportedChainsType;
+}
+
 // Service options
 interface FetchOptions {
     fromBlock?: string | number;
     toBlock?: string | number;
     eventTypes?: Array<keyof typeof EVENT_SIGNATURES>;
-}
-
-// Service result
-interface FetchResult {
-    events: RawPositionEvent[];
-    errors: string[];
-    totalFetched: number;
-    duplicatesRemoved: number;
 }
 
 export class EtherscanEventService {
@@ -56,9 +68,7 @@ export class EtherscanEventService {
         chain: SupportedChainsType,
         tokenId: string,
         options: FetchOptions = {}
-    ): Promise<FetchResult> {
-        console.log(`🔍 Fetching events for token ${tokenId} on ${chain}...`);
-
+    ): Promise<RawPositionEvent[]> {
         const nftManagerAddress = NFT_MANAGER_ADDRESSES[chain];
         if (!nftManagerAddress) {
             throw new Error(`Unsupported chain: ${chain}`);
@@ -72,12 +82,7 @@ export class EtherscanEventService {
         const fromBlock = options.fromBlock || "earliest";
         const toBlock = options.toBlock || "latest";
 
-        const result: FetchResult = {
-            events: [],
-            errors: [],
-            totalFetched: 0,
-            duplicatesRemoved: 0,
-        };
+        const result: RawPositionEvent[] = [];
 
         // Create topic filter for tokenId (topic[1] for most events)
         const tokenIdHex =
@@ -86,8 +91,6 @@ export class EtherscanEventService {
         // Fetch events for each event type
         for (const eventType of eventTypes) {
             try {
-                console.log(`  📥 Fetching ${eventType} events...`);
-
                 const logs = await this.etherscanClient.fetchLogs(
                     chain,
                     nftManagerAddress,
@@ -99,8 +102,6 @@ export class EtherscanEventService {
                     }
                 );
 
-                console.log(`  ✅ Found ${logs.length} ${eventType} logs`);
-
                 // Parse each log into structured event data
                 for (const log of logs) {
                     try {
@@ -109,10 +110,7 @@ export class EtherscanEventService {
                             eventType,
                             chain
                         );
-                        if (parsed) {
-                            result.events.push(parsed);
-                            result.totalFetched++;
-                        }
+                        if (parsed) result.push(parsed);
                     } catch (error) {
                         const errorMsg = `Failed to parse ${eventType} log ${
                             log.transactionHash
@@ -121,29 +119,19 @@ export class EtherscanEventService {
                                 ? error.message
                                 : "Unknown error"
                         }`;
-                        result.errors.push(errorMsg);
-                        console.warn(`⚠️ ${errorMsg}`);
+                        throw new Error(errorMsg);
                     }
                 }
             } catch (error) {
                 const errorMsg = `Failed to fetch ${eventType} events: ${
                     error instanceof Error ? error.message : "Unknown error"
                 }`;
-                result.errors.push(errorMsg);
-                console.error(`❌ ${errorMsg}`);
+                throw new Error(errorMsg);
             }
         }
 
         // Remove duplicates and sort by blockchain order
-        const beforeDedup = result.events.length;
-        result.events = this.deduplicateAndSort(result.events);
-        result.duplicatesRemoved = beforeDedup - result.events.length;
-
-        console.log(
-            `📊 Fetch complete: ${result.events.length} events (${result.duplicatesRemoved} duplicates removed, ${result.errors.length} errors)`
-        );
-
-        return result;
+        return this.deduplicateAndSort(result);
     }
 
     /**
@@ -216,11 +204,9 @@ export class EtherscanEventService {
                 }
 
                 default:
-                    console.warn(`🤷 Unknown event type: ${eventType}`);
                     return null;
             }
         } catch (error) {
-            console.error(`💥 Failed to parse log:`, { log, eventType, error });
             throw error;
         }
     }
@@ -322,12 +308,5 @@ export class EtherscanEventService {
             }
             return a.logIndex - b.logIndex;
         });
-    }
-
-    /**
-     * Get supported chains
-     */
-    getSupportedChains(): SupportedChainsType[] {
-        return this.etherscanClient.getSupportedChains();
     }
 }

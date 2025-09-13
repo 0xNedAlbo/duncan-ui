@@ -12,6 +12,8 @@ import { NONFUNGIBLE_POSITION_MANAGER_ABI } from "@/lib/contracts/nonfungiblePos
 import { PrismaClient } from "@prisma/client";
 import { PoolService } from "../pools/poolService";
 import { PositionService } from "./positionService";
+import { EtherscanEventService } from "../etherscan/etherscanEventService";
+import { QuoteTokenService } from "./quoteTokenService";
 import type { Services } from "../ServiceFactory";
 import type { Clients } from "../ClientsFactory";
 
@@ -49,15 +51,24 @@ export class PositionImportService {
     private rpcClients: Map<SupportedChainsType, PublicClient>;
     private pools: PoolService;
     private positions: PositionService;
+    private etherscanEventService: EtherscanEventService;
+    private quoteTokenService: QuoteTokenService;
 
     constructor(
-        requiredClients: Pick<Clients, 'prisma' | 'rpcClients'>,
-        requiredServices: Pick<Services, 'positionService' | 'poolService'>
+        requiredClients: Pick<
+            Clients,
+            "prisma" | "rpcClients" | "etherscanClient"
+        >,
+        requiredServices: Pick<Services, "positionService" | "poolService">
     ) {
         this.prisma = requiredClients.prisma;
         this.rpcClients = requiredClients.rpcClients;
         this.positions = requiredServices.positionService;
         this.pools = requiredServices.poolService;
+        this.etherscanEventService = new EtherscanEventService({
+            etherscanClient: requiredClients.etherscanClient,
+        });
+        this.quoteTokenService = new QuoteTokenService();
     }
 
     /**
@@ -88,14 +99,32 @@ export class PositionImportService {
                 );
             }
 
-            // Step 1: Get position data from NFT Manager
+            // Step 1: Get position events to check if position is closed
+            const events = await this.etherscanEventService.fetchPositionEvents(
+                chain,
+                nftId
+            );
+
+            // Step 2: Calculate position status from events
+            const positionStatus = this.calculatePositionStatus(events);
+
+            // Step 3: Get position data from NFT Manager
+            // If position is closed, query at the block before the last event
+            let queryBlock: bigint | undefined;
+            if (positionStatus.status === "closed" && events.length > 0) {
+                // Use the block before the last event to ensure position still existed
+                const lastEvent = events[events.length - 1];
+                queryBlock = lastEvent.blockNumber - 1n;
+            }
+
             const positionData = await this.getPositionFromNft(
                 client,
                 nftManagerAddress,
-                BigInt(nftId)
+                BigInt(nftId),
+                queryBlock
             );
 
-            // Step 2: Get pool information
+            // Step 4: Get pool information
             const poolData = await this.pools.findOrCreatePool(
                 chain,
                 positionData.token0,
@@ -104,7 +133,7 @@ export class PositionImportService {
                 userId
             );
 
-            // Step 3: Verify user exists
+            // Step 5: Verify user exists
             const user = await this.prisma.user.findUnique({
                 where: { id: userId },
             });
@@ -113,13 +142,14 @@ export class PositionImportService {
                 throw new Error(`User with ID ${userId} not found`);
             }
 
-            // Step 4: Create imported position data structure
+            // Step 6: Create imported position data structure
             const importedData: ImportedPositionData = {
                 nftId: nftId,
                 poolAddress: poolData.poolAddress.toLowerCase(),
                 tickLower: positionData.tickLower,
                 tickUpper: positionData.tickUpper,
-                liquidity: positionData.liquidity.toString(),
+                // Use current liquidity (0 for closed positions) instead of historical liquidity
+                liquidity: positionStatus.currentLiquidity.toString(),
                 token0Address: positionData.token0.toLowerCase(),
                 token1Address: positionData.token1.toLowerCase(),
                 fee: positionData.fee,
@@ -127,11 +157,29 @@ export class PositionImportService {
                 owner: positionData.owner.toLowerCase(),
             };
 
-            // Step 5: Save position to database
-            const savedPosition = await this.savePositionToDatabase(
-                userId,
-                importedData
-            );
+            // Step 7: Determine quote token configuration
+            const { token0IsQuote } =
+                this.quoteTokenService.determineQuoteToken(
+                    poolData.token0Data.symbol,
+                    poolData.token0Data.address,
+                    poolData.token1Data.symbol,
+                    poolData.token1Data.address,
+                    chain
+                );
+
+            // Step 8: Save position to database
+            const savedPosition = await this.positions.createPosition({
+                userId: userId,
+                poolId: poolData.id,
+                tickLower: importedData.tickLower,
+                tickUpper: importedData.tickUpper,
+                liquidity: importedData.liquidity,
+                token0IsQuote: token0IsQuote,
+                owner: importedData.owner,
+                importType: "nft",
+                nftId: importedData.nftId,
+                status: positionStatus.status === "closed" ? "closed" : "active",
+            });
 
             return {
                 success: true,
@@ -150,6 +198,30 @@ export class PositionImportService {
                 message: `Failed to import position NFT ${nftId}: ${errorMessage}`,
             };
         }
+    }
+
+    /**
+     * Calculate position status based on liquidity events
+     */
+    private calculatePositionStatus(events: any[]): {
+        status: "open" | "closed";
+        currentLiquidity: bigint;
+    } {
+        let netLiquidity = 0n;
+
+        for (const event of events) {
+            if (event.eventType === "INCREASE_LIQUIDITY") {
+                netLiquidity += BigInt(event.liquidity!);
+            } else if (event.eventType === "DECREASE_LIQUIDITY") {
+                netLiquidity -= BigInt(event.liquidity!);
+            }
+            // COLLECT events don't affect liquidity
+        }
+
+        return {
+            status: netLiquidity === 0n ? "closed" : "open",
+            currentLiquidity: netLiquidity,
+        };
     }
 
     /**
@@ -302,46 +374,38 @@ export class PositionImportService {
     private async getPositionFromNft(
         client: PublicClient,
         nftManagerAddress: string,
-        nftId: bigint
+        nftId: bigint,
+        blockNumber?: bigint
     ) {
         try {
-            // Try to get position data at current block first
             let positionData;
             let owner;
 
-            try {
-                // Get position data from positions() function
+            // If blockNumber is provided, query at that specific block
+            if (blockNumber) {
                 positionData = await client.readContract({
                     address: nftManagerAddress as `0x${string}`,
                     abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
                     functionName: "positions",
                     args: [nftId],
+                    blockNumber,
                 });
 
-                // Get owner from ownerOf() function
                 owner = await client.readContract({
                     address: nftManagerAddress as `0x${string}`,
                     abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
                     functionName: "ownerOf",
                     args: [nftId],
+                    blockNumber,
                 });
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            } catch (currentError) {
-                // If current block fails, try to find the last block when position was active
-                const historicalBlock = await this.getLastEventBlockNumber(
-                    client,
-                    nftManagerAddress,
-                    nftId
-                );
-
-                if (historicalBlock) {
-                    // Retry with historical block number
+            } else {
+                try {
+                    // Try current block first
                     positionData = await client.readContract({
                         address: nftManagerAddress as `0x${string}`,
                         abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
                         functionName: "positions",
                         args: [nftId],
-                        blockNumber: historicalBlock,
                     });
 
                     owner = await client.readContract({
@@ -349,12 +413,37 @@ export class PositionImportService {
                         abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
                         functionName: "ownerOf",
                         args: [nftId],
-                        blockNumber: historicalBlock,
                     });
-                } else {
-                    throw new Error(
-                        `Position NFT ${nftId} not found and no historical events available`
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                } catch (currentError) {
+                    // Fallback: find the last block when position was active
+                    const historicalBlock = await this.getLastEventBlockNumber(
+                        client,
+                        nftManagerAddress,
+                        nftId
                     );
+
+                    if (historicalBlock) {
+                        positionData = await client.readContract({
+                            address: nftManagerAddress as `0x${string}`,
+                            abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
+                            functionName: "positions",
+                            args: [nftId],
+                            blockNumber: historicalBlock,
+                        });
+
+                        owner = await client.readContract({
+                            address: nftManagerAddress as `0x${string}`,
+                            abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
+                            functionName: "ownerOf",
+                            args: [nftId],
+                            blockNumber: historicalBlock,
+                        });
+                    } else {
+                        throw new Error(
+                            `Position NFT ${nftId} not found and no historical events available`
+                        );
+                    }
                 }
             }
 
@@ -376,43 +465,6 @@ export class PositionImportService {
         } catch (error) {
             throw new Error(
                 `Failed to read position data from NFT ${nftId}: ${
-                    error instanceof Error ? error.message : "Unknown error"
-                }`
-            );
-        }
-    }
-
-    /**
-     * Save position to database
-     */
-    private async savePositionToDatabase(
-        userId: string,
-        positionData: ImportedPositionData
-    ) {
-        try {
-            // For now, create a simplified position record
-            // This will need to be expanded to handle pool creation, token references, etc.
-
-            const position = await this.prisma.position.create({
-                data: {
-                    userId: userId,
-                    tickLower: positionData.tickLower,
-                    tickUpper: positionData.tickUpper,
-                    liquidity: positionData.liquidity,
-                    token0IsQuote: false, // TODO: Determine based on token analysis
-                    owner: positionData.owner,
-                    importType: "nft",
-                    nftId: positionData.nftId,
-                    status: "active",
-                    // TODO: Create pool and token references
-                    poolId: "placeholder", // This needs proper pool creation/lookup
-                },
-            });
-
-            return position;
-        } catch (error) {
-            throw new Error(
-                `Failed to save position to database: ${
                     error instanceof Error ? error.message : "Unknown error"
                 }`
             );

@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { PublicRpcClients } from "@/lib/wagmi";
+import { BackendRpcClients } from "./evm/rpcClients";
 import type { PublicClient } from "viem";
 import type { SupportedChainsType } from "@/config/chains";
 import { EtherscanClient } from "./etherscan/etherscanClient";
@@ -20,7 +20,7 @@ export class DefaultClientsFactory implements ClientsFactory {
 
     private constructor() {
         const prisma = new PrismaClient();
-        const rpcClients = new PublicRpcClients().getClients();
+        const rpcClients = new BackendRpcClients().getClients();
         const etherscanClient = new EtherscanClient();
 
         this.clients = {
