@@ -91,8 +91,8 @@ async function syncPositionLedger() {
     console.log(`🔍 Looking for positions for user ${user.name} (${user.email})...`);
 
     const allUserPositions = await positionService.listPositions({
-      userId: user.id,
-      status: "closed" // Position has status "closed"
+      userId: user.id
+      // Don't filter by status - include all positions
     });
 
     console.log(`📦 Found ${allUserPositions.length} total positions for user`);
