@@ -10,13 +10,15 @@ import { createHash, randomUUID } from "crypto";
 import { SupportedChainsType } from "@/config/chains";
 import type { Clients } from "../ClientsFactory";
 import type { Services } from "../ServiceFactory";
-import { EtherscanEventService } from "../etherscan/etherscanEventService";
 import type { RawPositionEvent } from "../etherscan/etherscanEventService";
-import { EtherscanBlockInfoService } from "../etherscan/etherscanBlockInfoService";
-import { TokenService } from "../tokens/tokenService";
 import { PoolPriceService } from "../prices/poolPriceService";
+import { EtherscanBlockInfoService } from "../etherscan/etherscanBlockInfoService";
+import { EvmBlockInfoService } from "../evm/evmBlockInfoService";
 import { PrismaClient, type PositionEvent } from "@prisma/client";
-import { sqrtRatioX96ToToken1PerToken0, sqrtRatioX96ToToken0PerToken1 } from "@/lib/utils/uniswap-v3/price";
+import {
+    sqrtRatioX96ToToken1PerToken0,
+    sqrtRatioX96ToToken0PerToken1,
+} from "@/lib/utils/uniswap-v3/price";
 import JSBI from "jsbi";
 import type { BasicPosition } from "./positionService";
 
@@ -39,18 +41,17 @@ interface ProcessableEvent {
 }
 
 // Position sync information interface - picks necessary fields from BasicPosition
-export type PositionSyncInfo = Pick<BasicPosition, 'id' | 'token0IsQuote'> & {
-    pool: Pick<BasicPosition['pool'], 'poolAddress' | 'chain'> & {
-        token0: Pick<BasicPosition['pool']['token0'], 'decimals'>;
-        token1: Pick<BasicPosition['pool']['token1'], 'decimals'>;
+export type PositionSyncInfo = Pick<BasicPosition, "id" | "token0IsQuote"> & {
+    pool: Pick<BasicPosition["pool"], "poolAddress" | "chain"> & {
+        token0: Pick<BasicPosition["pool"]["token0"], "decimals">;
+        token1: Pick<BasicPosition["pool"]["token1"], "decimals">;
     };
 };
 
 export class PositionLedgerService {
     private prisma: PrismaClient;
-    private etherscanEventService: EtherscanEventService;
     private etherscanBlockInfoService: EtherscanBlockInfoService;
-    private tokenService: TokenService;
+    private evmBlockInfoService: EvmBlockInfoService;
     private poolPriceService: PoolPriceService;
 
     /**
@@ -64,27 +65,22 @@ export class PositionLedgerService {
                 poolAddress: position.pool.poolAddress,
                 chain: position.pool.chain,
                 token0: {
-                    decimals: position.pool.token0.decimals
+                    decimals: position.pool.token0.decimals,
                 },
                 token1: {
-                    decimals: position.pool.token1.decimals
-                }
-            }
+                    decimals: position.pool.token1.decimals,
+                },
+            },
         };
     }
 
     constructor(
-        requiredClients: Pick<Clients, "prisma" | "etherscanClient">,
-        requiredServices: Pick<Services, "tokenService" | "poolPriceService">
+        requiredClients: Pick<Clients, "prisma">,
+        requiredServices: Pick<Services, "tokenService" | "poolPriceService" | "etherscanBlockInfoService" | "evmBlockInfoService">
     ) {
         this.prisma = requiredClients.prisma;
-        this.etherscanEventService = new EtherscanEventService({
-            etherscanClient: requiredClients.etherscanClient,
-        });
-        this.etherscanBlockInfoService = new EtherscanBlockInfoService({
-            etherscanClient: requiredClients.etherscanClient,
-        });
-        this.tokenService = requiredServices.tokenService;
+        this.etherscanBlockInfoService = requiredServices.etherscanBlockInfoService;
+        this.evmBlockInfoService = requiredServices.evmBlockInfoService;
         this.poolPriceService = requiredServices.poolPriceService;
     }
 
@@ -135,6 +131,146 @@ export class PositionLedgerService {
     }
 
     /**
+     * Find the finality boundary for a position and return the last final event with its state
+     * This helps establish the initial state for processing non-final events
+     */
+    private async findFinalityBoundary(
+        positionId: string,
+        chain: SupportedChainsType
+    ): Promise<{
+        lastFinalEvent: PositionEvent | null;
+        initialState: {
+            liquidityAfter: string;
+            costBasisAfter: string;
+            realizedPnLAfter: string;
+            uncollectedPrincipal0: string;
+            uncollectedPrincipal1: string;
+        };
+    }> {
+        // Get the last finalized block number
+        const lastFinalizedBlock = await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
+
+        // Query all position events ordered by blockchain order
+        const allEvents = await this.prisma.positionEvent.findMany({
+            where: { positionId },
+            orderBy: [
+                { blockNumber: 'asc' },
+                { transactionIndex: 'asc' },
+                { logIndex: 'asc' },
+            ],
+        });
+
+        // Find the last event that is at or before the finalized block
+        let lastFinalEvent: PositionEvent | null = null;
+
+        if (lastFinalizedBlock !== null) {
+            for (let i = allEvents.length - 1; i >= 0; i--) {
+                const event = allEvents[i];
+                if (event.blockNumber <= lastFinalizedBlock) {
+                    lastFinalEvent = event;
+                    break;
+                }
+            }
+        }
+
+        // Return the initial state based on the last final event
+        const initialState = lastFinalEvent ? {
+            liquidityAfter: lastFinalEvent.liquidityAfter,
+            costBasisAfter: lastFinalEvent.costBasisAfter,
+            realizedPnLAfter: lastFinalEvent.realizedPnLAfter,
+            uncollectedPrincipal0: lastFinalEvent.uncollectedPrincipal0,
+            uncollectedPrincipal1: lastFinalEvent.uncollectedPrincipal1,
+        } : {
+            liquidityAfter: "0",
+            costBasisAfter: "0",
+            realizedPnLAfter: "0",
+            uncollectedPrincipal0: "0",
+            uncollectedPrincipal1: "0",
+        };
+
+        return { lastFinalEvent, initialState };
+    }
+
+    /**
+     * Filter raw events to keep only events that need processing
+     * - Always keeps non-final events (for reorg protection)
+     * - Keeps final events that are not yet in database (for catch-up sync)
+     * - Skips final events already in database (for efficiency)
+     */
+    private async filterNonFinalEvents(
+        rawEvents: RawPositionEvent[],
+        chain: SupportedChainsType,
+        positionId: string
+    ): Promise<RawPositionEvent[]> {
+        if (rawEvents.length === 0) {
+            return [];
+        }
+
+        // Get the last finalized block number with single RPC call
+        const lastFinalizedBlock = await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
+
+        if (lastFinalizedBlock === null) {
+            // No finalized blocks yet, all events are non-final
+            return rawEvents;
+        }
+
+        // Get unique existing transaction hashes ONLY after finalized block
+        // (events <= finalized block are either correctly processed or need processing anyway)
+        const existingTxHashes = new Set(
+            (await this.prisma.positionEvent.findMany({
+                where: {
+                    positionId,
+                    blockNumber: { gt: lastFinalizedBlock }
+                },
+                select: { transactionHash: true },
+                distinct: ['transactionHash']
+            })).map(event => event.transactionHash)
+        );
+
+        return rawEvents.filter(event => {
+            // Keep non-final events (always process for reorg protection)
+            if (event.blockNumber > lastFinalizedBlock) {
+                return true;
+            }
+
+            // For final events: only keep if NOT already in database (catch-up sync)
+            return !existingTxHashes.has(event.transactionHash);
+        });
+    }
+
+    /**
+     * Delete only non-final position events, preserving final events and user data
+     * This is a more targeted deletion than the clean slate approach
+     */
+    private async deleteNonFinalEvents(
+        positionId: string,
+        chain: SupportedChainsType
+    ): Promise<number> {
+        // Get the last finalized block number
+        const lastFinalizedBlock = await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
+
+        if (lastFinalizedBlock === null) {
+            // No finalized blocks yet, all events are non-final, delete all onchain events
+            return this.deletePositionEvents(positionId);
+        }
+
+        // Delete only non-final events (blockNumber > lastFinalizedBlock)
+        // Still preserve manual events and ledgerIgnore events
+        const result = await this.prisma.positionEvent.deleteMany({
+            where: {
+                positionId,
+                blockNumber: { gt: lastFinalizedBlock },
+                AND: [
+                    { source: { not: "manual" } }, // Exclude manual events
+                    { ledgerIgnore: false }, // Exclude ledgerIgnore events
+                ],
+            },
+        });
+
+        return result.count;
+    }
+
+    /**
      * Sync position events from raw blockchain events to database
      * Validates chronological ordering with failsafe checks during iteration
      */
@@ -146,47 +282,52 @@ export class PositionLedgerService {
             return [];
         }
 
-        // Clean slate approach: Delete all existing onchain events (preserve manual and ledgerIgnore)
-        const deletedCount = await this.deletePositionEvents(positionInfo.id);
-        console.log(
-            `Deleted ${deletedCount} existing onchain events for clean slate sync`
+        const chain = positionInfo.pool.chain as SupportedChainsType;
+
+        // Find the finality boundary and establish initial state from last final event
+        const { lastFinalEvent, initialState } = await this.findFinalityBoundary(
+            positionInfo.id,
+            chain
         );
 
-        // Start from zero state - no complex initial state calculation needed
-        let currentState = {
-            liquidityAfter: "0",
-            costBasisAfter: "0",
-            realizedPnLAfter: "0",
-            uncollectedPrincipal0: "0",
-            uncollectedPrincipal1: "0",
-        };
+        // Filter input events to exclude already-final ones (but keep final events not yet in DB)
+        const nonFinalRawEvents = await this.filterNonFinalEvents(rawEvents, chain, positionInfo.id);
 
-        // Get all events (manual + new onchain) in natural blockchain order
+        if (nonFinalRawEvents.length === 0 && lastFinalEvent) {
+            // All input events are already final, nothing to process
+            return [];
+        }
+
+        // Delete only non-final events (preserve final events, manual events, and ledgerIgnore)
+        await this.deleteNonFinalEvents(positionInfo.id, chain);
+
+        // Start from the state after the last final event (not zero state)
+        let currentState = initialState;
+
+        // Get all events (manual + non-final existing + non-final new) in natural blockchain order
         const allEvents = await this.getAllPositionEventsWithRaw(
             positionInfo.id,
-            rawEvents
-        );
-        console.log(
-            `Processing ${allEvents.length} total events (${
-                rawEvents.length
-            } new onchain + ${allEvents.length - rawEvents.length} existing)`
+            nonFinalRawEvents
         );
 
-        // Process each event in chronological order
-        for (let i = 0; i < allEvents.length; i++) {
-            const event = allEvents[i];
+        // Filter to only process events after the finality boundary
+        const eventsToProcess = lastFinalEvent
+            ? allEvents.filter(event =>
+                event.blockNumber > lastFinalEvent.blockNumber ||
+                (event.blockNumber === lastFinalEvent.blockNumber &&
+                 (event.transactionIndex > lastFinalEvent.transactionIndex ||
+                  (event.transactionIndex === lastFinalEvent.transactionIndex &&
+                   event.logIndex > lastFinalEvent.logIndex)))
+              )
+            : allEvents;
 
-            console.log(
-                `Processing event ${i + 1}/${allEvents.length}: ${
-                    event.source
-                } ${event.eventType} at ${event.blockNumber}:${
-                    event.transactionIndex
-                }:${event.logIndex}`
-            );
+
+        // Process each event in chronological order (only non-final events)
+        for (let i = 0; i < eventsToProcess.length; i++) {
+            const event = eventsToProcess[i];
 
             if (event.ledgerIgnore) {
                 // Update DB but don't change ledger state
-                console.log(`  → Ignored event (ledgerIgnore=true)`);
 
                 // For existing DB events, just keep current state values
                 if (event.dbEvent) {
@@ -217,12 +358,13 @@ export class PositionLedgerService {
 
                 if (event.rawEvent) {
                     // For new onchain events, calculate values
-                    const priceData = await this.poolPriceService.getExactPoolPriceAtBlock(
-                        positionInfo.pool.poolAddress,
-                        positionInfo.pool.chain as any,
-                        event.rawEvent.blockNumber,
-                        event.rawEvent.blockTimestamp
-                    );
+                    const priceData =
+                        await this.poolPriceService.getExactPoolPriceAtBlock(
+                            positionInfo.pool.poolAddress,
+                            positionInfo.pool.chain as any,
+                            event.rawEvent.blockNumber,
+                            event.rawEvent.blockTimestamp
+                        );
                     poolPrice = this.calculatePoolPriceInQuoteToken(
                         priceData.sqrtPriceX96,
                         positionInfo.token0IsQuote,
@@ -243,14 +385,17 @@ export class PositionLedgerService {
                 }
 
                 // Update ledger state and get deltaCostBasis from the calculation
-                const stateResult = this.calculateNewState(currentState, event, tokenValueInQuote, poolPrice, positionInfo);
+                const stateResult = this.calculateNewState(
+                    currentState,
+                    event,
+                    tokenValueInQuote,
+                    poolPrice,
+                    positionInfo
+                );
                 const newState = stateResult.state;
                 calculatedDeltaCostBasis = stateResult.deltaCostBasis || "0";
                 const calculatedDeltaPnL = stateResult.deltaPnL || "0";
                 calculatedFeeValue = stateResult.feeValue || "0";
-                console.log(
-                    `  → Processing for ledger state: L ${currentState.liquidityAfter} → ${newState.liquidityAfter}`
-                );
 
                 // Save event with calculated state
                 if (event.rawEvent) {
@@ -273,8 +418,10 @@ export class PositionLedgerService {
                             liquidityAfter: newState.liquidityAfter,
                             costBasisAfter: newState.costBasisAfter,
                             realizedPnLAfter: newState.realizedPnLAfter,
-                            uncollectedPrincipal0: newState.uncollectedPrincipal0,
-                            uncollectedPrincipal1: newState.uncollectedPrincipal1,
+                            uncollectedPrincipal0:
+                                newState.uncollectedPrincipal0,
+                            uncollectedPrincipal1:
+                                newState.uncollectedPrincipal1,
                         },
                     });
                 }
@@ -284,8 +431,17 @@ export class PositionLedgerService {
             }
         }
 
-        // Currently returns empty array as stub
-        return [];
+        // Return the processed events for reporting
+        const processedEvents = await this.prisma.positionEvent.findMany({
+            where: { positionId: positionInfo.id },
+            orderBy: [
+                { blockNumber: 'asc' },
+                { transactionIndex: 'asc' },
+                { logIndex: 'asc' },
+            ],
+        });
+
+        return processedEvents;
     }
 
     /**
@@ -462,9 +618,10 @@ export class PositionLedgerService {
                     rawEvent.eventType === "COLLECT"
                         ? rawEvent.amount1 || "0"
                         : "0",
-                feeValueInQuote: rawEvent.eventType === "COLLECT"
-                    ? calculatedFeeValue || "0"
-                    : "0",
+                feeValueInQuote:
+                    rawEvent.eventType === "COLLECT"
+                        ? calculatedFeeValue || "0"
+                        : "0",
 
                 // Uncollected principal tracking
                 uncollectedPrincipal0: state.uncollectedPrincipal0,
@@ -559,7 +716,9 @@ export class PositionLedgerService {
         const deltaL =
             event.rawEvent?.liquidity || event.dbEvent?.deltaL || "0";
         const currentLiquidity = BigInt(currentState.liquidityAfter);
-        const newLiquidityAfter = (currentLiquidity - BigInt(deltaL)).toString();
+        const newLiquidityAfter = (
+            currentLiquidity - BigInt(deltaL)
+        ).toString();
 
         // Calculate proportional cost basis being removed
         const currentCostBasis = BigInt(currentState.costBasisAfter);
@@ -568,7 +727,8 @@ export class PositionLedgerService {
 
         if (currentLiquidity > 0n) {
             // Calculate proportion of liquidity being removed
-            const proportionalCostBasis = (currentCostBasis * BigInt(deltaL)) / currentLiquidity;
+            const proportionalCostBasis =
+                (currentCostBasis * BigInt(deltaL)) / currentLiquidity;
             deltaCostBasis = proportionalCostBasis.toString();
 
             // Calculate current value of tokens received
@@ -579,14 +739,18 @@ export class PositionLedgerService {
             deltaPnL = realizedPnL.toString();
         }
 
-        const newCostBasisAfter = (currentCostBasis - BigInt(deltaCostBasis)).toString();
+        const newCostBasisAfter = (
+            currentCostBasis - BigInt(deltaCostBasis)
+        ).toString();
         const newRealizedPnLAfter = (
             BigInt(currentState.realizedPnLAfter) + BigInt(deltaPnL)
         ).toString();
 
         // DECREASE events add tokens to uncollected principal
-        const token0Amount = event.rawEvent?.amount0 || event.dbEvent?.token0Amount || "0";
-        const token1Amount = event.rawEvent?.amount1 || event.dbEvent?.token1Amount || "0";
+        const token0Amount =
+            event.rawEvent?.amount0 || event.dbEvent?.token0Amount || "0";
+        const token1Amount =
+            event.rawEvent?.amount1 || event.dbEvent?.token1Amount || "0";
         const newUncollectedToken0Amount = (
             BigInt(currentState.uncollectedPrincipal0) + BigInt(token0Amount)
         ).toString();
@@ -624,20 +788,38 @@ export class PositionLedgerService {
         uncollectedPrincipal1: string;
     } {
         // Get token amounts from the COLLECT event
-        const collectedToken0 = BigInt(event.rawEvent?.amount0 || event.dbEvent?.token0Amount || "0");
-        const collectedToken1 = BigInt(event.rawEvent?.amount1 || event.dbEvent?.token1Amount || "0");
+        const collectedToken0 = BigInt(
+            event.rawEvent?.amount0 || event.dbEvent?.token0Amount || "0"
+        );
+        const collectedToken1 = BigInt(
+            event.rawEvent?.amount1 || event.dbEvent?.token1Amount || "0"
+        );
 
         // Get current uncollected principal amounts
-        const currentUncollectedToken0 = BigInt(currentState.uncollectedPrincipal0);
-        const currentUncollectedToken1 = BigInt(currentState.uncollectedPrincipal1);
+        const currentUncollectedToken0 = BigInt(
+            currentState.uncollectedPrincipal0
+        );
+        const currentUncollectedToken1 = BigInt(
+            currentState.uncollectedPrincipal1
+        );
 
         // Separate principal collection from fee collection
-        const principalToken0 = collectedToken0 <= currentUncollectedToken0 ? collectedToken0 : currentUncollectedToken0;
-        const principalToken1 = collectedToken1 <= currentUncollectedToken1 ? collectedToken1 : currentUncollectedToken1;
+        const principalToken0 =
+            collectedToken0 <= currentUncollectedToken0
+                ? collectedToken0
+                : currentUncollectedToken0;
+        const principalToken1 =
+            collectedToken1 <= currentUncollectedToken1
+                ? collectedToken1
+                : currentUncollectedToken1;
 
         // Calculate new uncollected amounts (reduce by principal collected)
-        const newUncollectedToken0Amount = (currentUncollectedToken0 - principalToken0).toString();
-        const newUncollectedToken1Amount = (currentUncollectedToken1 - principalToken1).toString();
+        const newUncollectedToken0Amount = (
+            currentUncollectedToken0 - principalToken0
+        ).toString();
+        const newUncollectedToken1Amount = (
+            currentUncollectedToken1 - principalToken1
+        ).toString();
 
         // COLLECT events don't change liquidity, cost basis, or realized PnL
         return {
@@ -701,17 +883,18 @@ export class PositionLedgerService {
             // Quote = token0, Base = token1
             // token0Amount is already in quote units
             // Convert token1Amount to quote using price
-            const token1ValueInQuote = (token1Amt * poolPrice) / (10n ** BigInt(token1Decimals));
+            const token1ValueInQuote =
+                (token1Amt * poolPrice) / 10n ** BigInt(token1Decimals);
             return token0Amt + token1ValueInQuote;
         } else {
             // Quote = token1, Base = token0
             // token1Amount is already in quote units
             // Convert token0Amount to quote using price
-            const token0ValueInQuote = (token0Amt * poolPrice) / (10n ** BigInt(token0Decimals));
+            const token0ValueInQuote =
+                (token0Amt * poolPrice) / 10n ** BigInt(token0Decimals);
             return token1Amt + token0ValueInQuote;
         }
     }
-
 
     /**
      * Calculate the pure fee value for COLLECT events (excluding principal collection)
@@ -738,8 +921,14 @@ export class PositionLedgerService {
 
         // Separate principal from fees
         // Principal collected = min(tokens collected, available uncollected principal)
-        const principalCollectedToken0 = collectedToken0 <= uncollectedToken0 ? collectedToken0 : uncollectedToken0;
-        const principalCollectedToken1 = collectedToken1 <= uncollectedToken1 ? collectedToken1 : uncollectedToken1;
+        const principalCollectedToken0 =
+            collectedToken0 <= uncollectedToken0
+                ? collectedToken0
+                : uncollectedToken0;
+        const principalCollectedToken1 =
+            collectedToken1 <= uncollectedToken1
+                ? collectedToken1
+                : uncollectedToken1;
 
         const feeToken0 = collectedToken0 - principalCollectedToken0;
         const feeToken1 = collectedToken1 - principalCollectedToken1;
@@ -754,7 +943,6 @@ export class PositionLedgerService {
             positionInfo.pool.token1.decimals
         ).toString();
     }
-
 
     /**
      * Calculate new state based on event type
@@ -792,7 +980,7 @@ export class PositionLedgerService {
                         event,
                         tokenValueInQuote
                     ),
-                    deltaCostBasis: tokenValueInQuote // Positive for INCREASE
+                    deltaCostBasis: tokenValueInQuote, // Positive for INCREASE
                 };
 
             case "DECREASE_LIQUIDITY":
@@ -807,14 +995,16 @@ export class PositionLedgerService {
                 const deltaCostBasis = newCostBasis - originalCostBasis; // Will be negative
 
                 // Calculate the deltaPnL as the difference in realized PnL
-                const originalRealizedPnL = BigInt(currentState.realizedPnLAfter);
+                const originalRealizedPnL = BigInt(
+                    currentState.realizedPnLAfter
+                );
                 const newRealizedPnL = BigInt(decreaseResult.realizedPnLAfter);
                 const deltaPnL = newRealizedPnL - originalRealizedPnL;
 
                 return {
                     state: decreaseResult,
                     deltaCostBasis: deltaCostBasis.toString(),
-                    deltaPnL: deltaPnL.toString()
+                    deltaPnL: deltaPnL.toString(),
                 };
 
             case "COLLECT":
@@ -832,20 +1022,19 @@ export class PositionLedgerService {
                 return {
                     state: collectState,
                     deltaCostBasis: "0", // COLLECT events don't affect cost basis
-                    feeValue
+                    feeValue,
                 };
 
             default:
-                console.warn(
-                    `Unknown event type: ${event.eventType}, keeping state unchanged`
-                );
                 return {
                     state: {
                         ...currentState,
-                        uncollectedPrincipal0: currentState.uncollectedPrincipal0,
-                        uncollectedPrincipal1: currentState.uncollectedPrincipal1
+                        uncollectedPrincipal0:
+                            currentState.uncollectedPrincipal0,
+                        uncollectedPrincipal1:
+                            currentState.uncollectedPrincipal1,
                     },
-                    deltaCostBasis: "0"
+                    deltaCostBasis: "0",
                 };
         }
     }

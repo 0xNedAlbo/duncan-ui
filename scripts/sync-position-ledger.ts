@@ -172,8 +172,35 @@ async function syncPositionLedger() {
       console.log(`   ${eventType}: ${count}`);
     });
 
-    // Sync events through ledger service
+    // Get existing events before sync for comparison
+    const { prisma: syncPrisma } = DefaultClientsFactory.getInstance().getClients();
+    const existingEventsBefore = await syncPrisma.positionEvent.findMany({
+      where: { positionId: position.id },
+      select: { transactionHash: true, logIndex: true, eventType: true }
+    });
+
+    const existingTxHashes = new Set(
+      existingEventsBefore.map(e => `${e.transactionHash}-${e.logIndex}`)
+    );
+
     console.log('🔄 Syncing events through ledger service...');
+
+    // Process each raw event and show status
+    console.log('\n📋 Processing blockchain events:');
+    console.log('─'.repeat(100));
+
+    rawEvents.forEach((event, index) => {
+      const eventKey = `${event.transactionHash}-${event.logIndex}`;
+      const status = existingTxHashes.has(eventKey) ? '🔄 ALREADY IN DB' : '➕ ADDING TO DB';
+      const eventNum = `${index + 1}`.padStart(3, ' ');
+      const blockInfo = `Block ${event.blockNumber}:${event.transactionIndex}:${event.logIndex}`;
+      const timestamp = event.blockTimestamp.toISOString().split('T')[0];
+      const eventType = event.eventType.padEnd(12, ' ');
+
+      console.log(`${eventNum}. ${blockInfo.padEnd(25)} ${timestamp} ${eventType} ${status}`);
+    });
+
+    console.log('─'.repeat(100));
 
     const syncedEvents = await positionLedgerService.syncPositionEvents(
       positionSyncInfo,
@@ -184,9 +211,47 @@ async function syncPositionLedger() {
     console.log(`   Position ID: ${position.id}`);
     console.log(`   Processed: ${rawEvents.length} blockchain events`);
 
+    // Calculate processing statistics
+    const alreadyInDb = rawEvents.filter(event => {
+      const eventKey = `${event.transactionHash}-${event.logIndex}`;
+      return existingTxHashes.has(eventKey);
+    }).length;
+    const addedToDb = rawEvents.length - alreadyInDb;
+
+    console.log(`   📊 Processing summary:`);
+    console.log(`      ➕ Added to database: ${addedToDb}`);
+    console.log(`      🔄 Already in database: ${alreadyInDb}`);
+    console.log(`      📁 Total events in ledger: ${syncedEvents.length}`);
+
+    // Display synced events
+    if (syncedEvents.length > 0) {
+      console.log('\n📋 Synced events in chronological order:');
+      console.log('─'.repeat(120));
+
+      syncedEvents.forEach((event, index) => {
+        const eventNum = `${index + 1}`.padStart(3, ' ');
+        const blockInfo = `Block ${event.blockNumber}:${event.transactionIndex}:${event.logIndex}`;
+        const timestamp = event.blockTimestamp.toISOString().split('T')[0];
+        const eventType = event.eventType.padEnd(12, ' ');
+        const source = event.source.padEnd(8, ' ');
+        const liquidity = event.liquidityAfter === '0' ? '0' : `${event.liquidityAfter.slice(0, 10)}...`;
+        const costBasis = event.costBasisAfter === '0' ? '0' : `${event.costBasisAfter.slice(0, 10)}...`;
+
+        console.log(`${eventNum}. ${blockInfo.padEnd(20)} ${timestamp} ${source} ${eventType} L=${liquidity.padEnd(12)} CB=${costBasis.padEnd(12)} ${event.ledgerIgnore ? '(IGNORED)' : ''}`);
+      });
+      console.log('─'.repeat(120));
+
+      // Show final state
+      const lastEvent = syncedEvents[syncedEvents.length - 1];
+      console.log('\n📊 Final position state:');
+      console.log(`   Final Liquidity: ${lastEvent.liquidityAfter}`);
+      console.log(`   Final Cost Basis: ${lastEvent.costBasisAfter}`);
+      console.log(`   Final Realized PnL: ${lastEvent.realizedPnLAfter}`);
+    }
+
     // Calculate final position status
     const positionStatus = positionLedgerService.calculatePositionStatus(rawEvents);
-    console.log(`   Status: ${positionStatus.status}`);
+    console.log(`\n🎯 Position Status: ${positionStatus.status}`);
     console.log(`   Current Liquidity: ${positionStatus.currentLiquidity.toString()}`);
 
   } catch (error) {

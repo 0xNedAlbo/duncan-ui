@@ -1,5 +1,9 @@
 // Blockchain Configuration mit Wrapped Native Token Adressen
 
+export type FinalityConfig =
+    | { type: "blockTag" }
+    | { type: "blockHeight"; minBlockHeight: number };
+
 export interface ChainConfig {
     chainId: number;
     name: string;
@@ -13,6 +17,7 @@ export interface ChainConfig {
         decimals: number;
     };
     explorer: string;
+    finality: FinalityConfig;
 }
 
 // Wrapped Native Token Adressen für unterstützte Chains
@@ -29,6 +34,7 @@ const CHAIN_CONFIG: Record<string, ChainConfig> = {
             decimals: 18,
         },
         explorer: "https://etherscan.io",
+        finality: { type: "blockTag" },
     },
     arbitrum: {
         chainId: 42161,
@@ -42,6 +48,7 @@ const CHAIN_CONFIG: Record<string, ChainConfig> = {
             decimals: 18,
         },
         explorer: "https://arbiscan.io",
+        finality: { type: "blockTag" },
     },
     base: {
         chainId: 8453,
@@ -55,6 +62,7 @@ const CHAIN_CONFIG: Record<string, ChainConfig> = {
             decimals: 18,
         },
         explorer: "https://basescan.org",
+        finality: { type: "blockTag" },
     },
 };
 
@@ -149,4 +157,15 @@ export function isValidChainSlug(slug: string): boolean {
 // Get chain config by slug
 export function getChainConfigBySlug(slug: string): ChainConfig | null {
     return getChainConfig(slug);
+}
+
+/**
+ * Get finality configuration for a chain
+ */
+export function getFinalityConfig(chain: SupportedChainsType): FinalityConfig {
+    const config = getChainConfig(chain);
+    if (!config) {
+        throw new Error(`Unsupported chain: ${chain}`);
+    }
+    return config.finality;
 }

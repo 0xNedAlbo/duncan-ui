@@ -1,5 +1,7 @@
 import { AlchemyTokenService } from "./alchemy/tokenMetadata";
 import { EtherscanEventService } from "./etherscan/etherscanEventService";
+import { EtherscanBlockInfoService } from "./etherscan/etherscanBlockInfoService";
+import { EvmBlockInfoService } from "./evm/evmBlockInfoService";
 import { PoolService } from "./pools/poolService";
 import { PoolPriceService } from "./prices/poolPriceService";
 import { QuoteTokenService } from "./positions/quoteTokenService";
@@ -14,6 +16,8 @@ import { DefaultClientsFactory } from "./ClientsFactory";
 export interface Services {
     alchemyTokenService: AlchemyTokenService;
     etherscanEventService: EtherscanEventService;
+    etherscanBlockInfoService: EtherscanBlockInfoService;
+    evmBlockInfoService: EvmBlockInfoService;
     poolService: PoolService;
     poolPriceService: PoolPriceService;
     quoteTokenService: QuoteTokenService;
@@ -41,6 +45,10 @@ export class DefaultServiceFactory implements ServiceFactory {
         const etherscanEventService = new EtherscanEventService(
             { etherscanClient }
         );
+        const etherscanBlockInfoService = new EtherscanBlockInfoService(
+            { etherscanClient }
+        );
+        const evmBlockInfoService = new EvmBlockInfoService(rpcClients);
         const poolPriceService = new PoolPriceService({ rpcClients, prisma });
         const quoteTokenService = new QuoteTokenService();
         const positionService = new PositionService(prisma);
@@ -66,8 +74,8 @@ export class DefaultServiceFactory implements ServiceFactory {
         );
 
         const positionLedgerService = new PositionLedgerService(
-            { prisma, etherscanClient },
-            { tokenService, poolPriceService }
+            { prisma },
+            { tokenService, poolPriceService, etherscanBlockInfoService, evmBlockInfoService }
         );
 
         const positionImportService = new PositionImportService(
@@ -78,6 +86,8 @@ export class DefaultServiceFactory implements ServiceFactory {
         this.services = {
             alchemyTokenService,
             etherscanEventService,
+            etherscanBlockInfoService,
+            evmBlockInfoService,
             poolService,
             poolPriceService,
             quoteTokenService,
