@@ -13,7 +13,7 @@ import { ApiServiceFactory } from '@/lib/api/ApiServiceFactory';
 export const runtime = "nodejs";
 
 // GET /api/auth/api-keys - List user's API keys
-export const GET = withLogging(async (request: NextRequest, { log }) => {
+export const GET = withLogging<{ apiKeys: any[] } | { error: string }>(async (request: NextRequest, { log }) => {
   const authUser = await getAuthUser(request);
 
   if (!authUser) {
@@ -48,7 +48,7 @@ export const GET = withLogging(async (request: NextRequest, { log }) => {
 });
 
 // POST /api/auth/api-keys - Create new API key
-export const POST = withLogging(async (request: NextRequest, { log }) => {
+export const POST = withLogging<{ id: string; name: string; key: string; prefix: string; scopes: any[]; message: string } | { error: string }>(async (request: NextRequest, { log }) => {
   const authUser = await getAuthUser(request);
 
   if (!authUser) {
@@ -114,7 +114,7 @@ export const POST = withLogging(async (request: NextRequest, { log }) => {
 });
 
 // DELETE /api/auth/api-keys - Revoke API key
-export const DELETE = withLogging(async (request: NextRequest, { log }) => {
+export const DELETE = withLogging<{ message: string } | { error: string }>(async (request: NextRequest, { log }) => {
   const authUser = await getAuthUser(request);
 
   if (!authUser) {

@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { ApiServiceFactory } from '@/lib/api/ApiServiceFactory';
 import { withLogging, logError } from '@/lib/api/withLogging';
 
-export const GET = withLogging(async (request: NextRequest, { log, reqId }) => {
+export const GET = withLogging<{ token: any } | { error: string }>(async (request: NextRequest, { log }) => {
   // Check authentication
   const session = await getSession();
   if (!session?.user?.id) {
@@ -46,7 +46,7 @@ export const GET = withLogging(async (request: NextRequest, { log, reqId }) => {
   }
 });
 
-export const POST = withLogging(async (request: NextRequest, { log, reqId }) => {
+export const POST = withLogging<{ token: any } | { error: string }>(async (request: NextRequest, { log }) => {
   // Check authentication
   const session = await getSession();
   if (!session?.user?.id) {
