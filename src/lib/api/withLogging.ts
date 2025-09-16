@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { initRequestLogging } from "./httpLogger";
+import { beginRequestLog } from "./httpLogger";
 import type { Logger } from "./logger";
 
 export interface LoggingContext {
@@ -34,10 +34,7 @@ export function withLogging<T = any>(
     handler: ApiHandler<T>
 ): (request: NextRequest, context?: RouteParams) => Promise<NextResponse<T>> {
     return async (request: NextRequest, context?: RouteParams) => {
-        const { reqId, log, logAccess } = initRequestLogging(request);
-
-        const startTime = Date.now();
-        let statusCode = 200;
+        const { reqId, headers, access, log } = beginRequestLog(request);
 
         try {
             // Log incoming request
@@ -45,7 +42,7 @@ export function withLogging<T = any>(
                 {
                     method: request.method,
                     url: new URL(request.url).pathname,
-                    headers: Object.fromEntries(request.headers.entries()),
+                    headers,
                 },
                 "Incoming API request"
             );
@@ -63,23 +60,20 @@ export function withLogging<T = any>(
                 resolvedParams
             );
 
-            statusCode = response.status;
+            // Log access line with actual status code
+            access(response.status);
 
             // Log successful response
             log.debug(
                 {
-                    statusCode,
-                    responseTime: Date.now() - startTime,
+                    statusCode: response.status,
                 },
                 "API request completed successfully"
             );
 
-            // Create response with request ID header
-            const headers = logAccess(statusCode);
+            // Add request ID header to response
             const newHeaders = new Headers(response.headers);
-            headers.forEach((value: any, key: any) => {
-                newHeaders.set(key, value);
-            });
+            newHeaders.set('x-request-id', reqId);
 
             return new NextResponse(response.body, {
                 status: response.status,
@@ -87,28 +81,25 @@ export function withLogging<T = any>(
                 headers: newHeaders,
             });
         } catch (error) {
-            statusCode = 500;
-
             // Log error with full stack trace in DEBUG level
             log.debug(
                 {
                     error: error instanceof Error ? error.stack : String(error),
-                    responseTime: Date.now() - startTime,
                 },
                 "Service error in API handler"
             );
 
             // Log access for error case
-            const headers = logAccess(statusCode);
+            access(500);
 
             // Return generic error response
             return new NextResponse(
                 JSON.stringify({ error: "Internal server error" }),
                 {
-                    status: statusCode,
+                    status: 500,
                     headers: {
                         "Content-Type": "application/json",
-                        ...Object.fromEntries(headers.entries()),
+                        "x-request-id": reqId,
                     },
                 }
             );

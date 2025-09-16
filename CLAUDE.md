@@ -76,13 +76,34 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - Glassmorphism cards with backdrop-blur effects
 
 **API Security & Authentication:**
-- **All API routes require authentication** except `/api/auth/*` (registration, login)
-- **NextAuth middleware** (`src/middleware.ts`) automatically protects API endpoints
-- **Session-based authentication** using `getSession()` in route handlers
+- **All API routes require authentication** except `/api/auth/*` (registration, login) and `/api/health`
+- **Dual authentication support**: Session-based authentication AND API key authentication
+- **Use `withAuthAndLogging()` wrapper for all protected API routes** - provides both authentication and structured logging
+- **Alternative: Use `withAuth()` for auth-only** when logging is not needed
+- **Never use `getSession()` or `getAuthUser()` directly in API routes** - always use the wrapper approach
+- **Middleware is lightweight** - only handles routing, authentication is handled at API route level
 - **Consistent 401 responses** with "Unauthorized - Please sign in" messages
 - **Comprehensive test coverage** including auth integration tests
-- **Public routes:** `/api/auth/register`, `/api/auth/[...nextauth]`
+- **Public routes:** `/api/auth/register`, `/api/auth/[...nextauth]`, `/api/health`
 - **Protected routes:** `/api/tokens/*`, `/api/positions/*`, all other APIs
+
+**Authentication Wrapper Patterns:**
+```typescript
+// Recommended: Combined auth + logging
+export const GET = withAuthAndLogging<ResponseType>(
+  async (request: NextRequest, { user, log }) => {
+    log.debug({ userId: user.userId }, 'Processing request');
+    // Your logic here
+  }
+);
+
+// Alternative: Auth only (when logging not needed)
+export const GET = withAuth<ResponseType>(
+  async (request: NextRequest, { user }) => {
+    // Your logic here
+  }
+);
+```
 
 **Code Conventions:**
 - TypeScript strict mode enabled

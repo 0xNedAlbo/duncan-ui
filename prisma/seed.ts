@@ -57,7 +57,7 @@ async function main() {
   } else {
     // Create the exact same API key used in debug script
     const apiKeyPlaintext = 'ak_live_zIdCcBStkntsCI_mVXqYUuNz5-VMSeGI-W8XWHn_C4A';
-    const prefix = 'zIdCcBSt';
+    const prefix = apiKeyPlaintext.substring(0, 8); // 'ak_live_'
 
     const hashedApiKey = await hash(apiKeyPlaintext, {
       memoryCost: 19456,

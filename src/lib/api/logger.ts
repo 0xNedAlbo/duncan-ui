@@ -29,17 +29,9 @@ const loggerConfig: pino.LoggerOptions = {
   }
 };
 
-// Pretty printing for development
-if (LOG_PRETTY) {
-  loggerConfig.transport = {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-      translateTime: 'SYS:standard',
-      ignore: 'pid,hostname'
-    }
-  };
-}
+// Skip transport configuration for Next.js compatibility
+// pino-pretty transport doesn't work well in Next.js server environment
+// Pino will write JSON logs directly to console, which is more reliable
 
 // Create and export logger instance
 export const logger = pino(loggerConfig);

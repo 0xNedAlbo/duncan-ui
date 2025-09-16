@@ -13,7 +13,7 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token, req }) => {
+      authorized: ({ req }) => {
         // Allow access to NextAuth API routes
         if (req.nextUrl.pathname.startsWith("/api/auth")) {
           return true
