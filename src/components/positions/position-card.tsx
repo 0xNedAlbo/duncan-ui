@@ -229,41 +229,32 @@ export function PositionCard({
                     </div>
                     {/* Position Info with PnL Data */}
                     <div className="flex items-start gap-6 ml-6">
+                        {/* Current Value */}
                         <div className="text-right">
                             <div className="text-xs text-slate-400 mb-0.5">
-                                Liquidity
+                                Current Value ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
                             </div>
                             <div className="text-lg font-semibold text-white">
-                                {formatCompactValue(
-                                    BigInt(position.liquidity),
-                                    0 // Liquidity is always integer
+                                {pnlDisplayValues.currentValue ? (
+                                    formatCompactValue(
+                                        pnlDisplayValues.currentValue,
+                                        quoteTokenDecimals
+                                    )
+                                ) : (
+                                    "0"
                                 )}
                             </div>
                         </div>
 
-                        {/* Current Value */}
-                        {pnlDisplayValues.currentValue ? (
-                            <div className="text-right">
-                                <div className="text-xs text-slate-400 mb-0.5">
-                                    Current Value ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
-                                </div>
-                                <div className="text-lg font-semibold text-white">
-                                    {formatCompactValue(
-                                        pnlDisplayValues.currentValue,
-                                        quoteTokenDecimals
-                                    )}
-                                </div>
+                        {/* Range (Ticks) */}
+                        <div className="text-right">
+                            <div className="text-xs text-slate-400 mb-0.5">
+                                Range (Ticks)
                             </div>
-                        ) : (
-                            <div className="text-right">
-                                <div className="text-xs text-slate-400 mb-0.5">
-                                    Range (Ticks)
-                                </div>
-                                <div className="text-lg font-semibold text-white">
-                                    {position.tickLower} - {position.tickUpper}
-                                </div>
+                            <div className="text-lg font-semibold text-white">
+                                {position.tickLower} - {position.tickUpper}
                             </div>
-                        )}
+                        </div>
 
                         {/* Total PnL */}
                         {pnlDisplayValues.totalPnL !== null ? (
@@ -308,19 +299,21 @@ export function PositionCard({
                         ) : null}
 
                         {/* Unclaimed Fees */}
-                        {pnlDisplayValues.unclaimedFees ? (
-                            <div className="text-right">
-                                <div className="text-xs text-slate-400 mb-0.5">
-                                    Claimable Fees ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
-                                </div>
-                                <div className="text-lg font-semibold text-amber-400">
-                                    {formatCompactValue(
+                        <div className="text-right">
+                            <div className="text-xs text-slate-400 mb-0.5">
+                                Claimable Fees ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
+                            </div>
+                            <div className={`text-lg font-semibold ${pnlDisplayValues.unclaimedFees ? 'text-amber-400' : 'text-white'}`}>
+                                {pnlDisplayValues.unclaimedFees ? (
+                                    formatCompactValue(
                                         pnlDisplayValues.unclaimedFees,
                                         quoteTokenDecimals
-                                    )}
-                                </div>
+                                    )
+                                ) : (
+                                    "0"
+                                )}
                             </div>
-                        ) : null}
+                        </div>
                     </div>
                 </div>
 

@@ -117,27 +117,48 @@ export class PositionPnLService {
       throw new Error(`NFPM not deployed on chain: ${chainName}`);
     }
 
-    const nftPosition = await client.readContract({
-      address: nfpmAddress,
-      abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
-      functionName: "positions",
-      args: [BigInt(position.nftId)],
-    }) as [bigint, string, string, string, number, number, number, bigint, bigint, bigint, bigint, bigint];
+    let nftData: NFTPosition;
+    try {
+      const nftPosition = await client.readContract({
+        address: nfpmAddress,
+        abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
+        functionName: "positions",
+        args: [BigInt(position.nftId)],
+      }) as [bigint, string, string, string, number, number, number, bigint, bigint, bigint, bigint, bigint];
 
-    const nftData: NFTPosition = {
-      nonce: nftPosition[0],
-      operator: nftPosition[1] as `0x${string}`,
-      token0: nftPosition[2] as `0x${string}`,
-      token1: nftPosition[3] as `0x${string}`,
-      fee: nftPosition[4],
-      tickLower: nftPosition[5],
-      tickUpper: nftPosition[6],
-      liquidity: nftPosition[7],
-      feeGrowthInside0LastX128: nftPosition[8],
-      feeGrowthInside1LastX128: nftPosition[9],
-      tokensOwed0: nftPosition[10],
-      tokensOwed1: nftPosition[11],
-    };
+      nftData = {
+        nonce: nftPosition[0],
+        operator: nftPosition[1] as `0x${string}`,
+        token0: nftPosition[2] as `0x${string}`,
+        token1: nftPosition[3] as `0x${string}`,
+        fee: nftPosition[4],
+        tickLower: nftPosition[5],
+        tickUpper: nftPosition[6],
+        liquidity: nftPosition[7],
+        feeGrowthInside0LastX128: nftPosition[8],
+        feeGrowthInside1LastX128: nftPosition[9],
+        tokensOwed0: nftPosition[10],
+        tokensOwed1: nftPosition[11],
+      };
+    } catch {
+      // Handle case where NFT is burned/invalid (e.g., "Invalid token ID")
+      // Return zero fees for invalid/burned NFTs
+      const fees: UnclaimedFees = {
+        incremental0: 0n,
+        incremental1: 0n,
+        checkpointed0: 0n,
+        checkpointed1: 0n,
+        totalClaimable0: 0n,
+        totalClaimable1: 0n,
+      };
+
+      return {
+        fees,
+        baseTokenAmount: 0n,
+        quoteTokenAmount: 0n,
+        valueInQuoteToken: "0",
+      };
+    }
 
     // 5. Read tick data at position bounds
     const [tickLowerResult, tickUpperResult] = await Promise.all([
