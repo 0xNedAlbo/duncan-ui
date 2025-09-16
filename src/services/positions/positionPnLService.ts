@@ -24,8 +24,26 @@ import {
   computeFeeGrowthInside,
   calculateIncrementalFees
 } from "@/lib/utils/uniswap-v3/fees";
+import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { PositionService } from "./positionService";
 import { PoolService } from "../pools/poolService";
+
+export interface PnlBreakdown {
+  // Core position metrics (all in quote token units as strings)
+  currentValue: string;           // Current position value
+  currentCostBasis: string;       // Latest cost basis from PositionEvent
+  collectedFees: string;          // Total fees collected historically
+  unclaimedFees: string;          // Current unclaimed fees value
+  realizedPnL: string;            // Current realized PnL from PositionEvent
+
+  // Derived metrics
+  unrealizedPnL: string;          // currentValue - currentCostBasis
+  totalPnL: string;               // unrealizedPnL + collectedFees
+
+  // Metadata
+  positionId: string;
+  calculatedAt: Date;
+}
 
 export class PositionPnLService {
   private prisma: PrismaClient;
@@ -237,6 +255,176 @@ export class PositionPnLService {
       baseTokenAmount,
       quoteTokenAmount,
       valueInQuoteToken,
+    };
+  }
+
+  /**
+   * Calculate the current value of a position
+   * Current Value = quoteAmount + baseAmount * poolPrice
+   */
+  async calculateCurrentValue(positionId: string): Promise<string> {
+    // 1. Fetch position using PositionService
+    const position = await this.positionService.getPosition(positionId);
+
+    if (!position) {
+      throw new Error(`Position not found: ${positionId}`);
+    }
+
+    // 2. Get current pool data using PoolService
+    const pool = await this.poolService.getPoolById(position.pool.id);
+
+    if (!pool) {
+      throw new Error(`Pool not found: ${position.pool.id}`);
+    }
+
+    // Ensure we have current pool data
+    if (!pool.currentTick) {
+      throw new Error(`Pool ${pool.id} has no current tick data`);
+    }
+
+    if (!pool.currentPrice) {
+      throw new Error(`Pool ${pool.id} has no current price data`);
+    }
+
+    // 3. Calculate actual token amounts from liquidity and position bounds
+    const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
+      BigInt(position.liquidity),
+      pool.currentTick,
+      position.tickLower,
+      position.tickUpper
+    );
+
+    // 4. Determine base and quote token amounts based on position configuration
+    const baseTokenAmount = position.token0IsQuote ? token1Amount : token0Amount;
+    const quoteTokenAmount = position.token0IsQuote ? token0Amount : token1Amount;
+
+    // 5. Get token decimals for price calculation
+    const baseTokenDecimals = position.token0IsQuote ? pool.token1Data.decimals : pool.token0Data.decimals;
+
+    // 6. Calculate current value: quoteAmount + baseAmount * poolPrice
+    const currentPrice = BigInt(pool.currentPrice);
+    const baseValueInQuote = baseTokenAmount > 0n
+      ? (baseTokenAmount * currentPrice) / (10n ** BigInt(baseTokenDecimals))
+      : 0n;
+
+    const totalValue = quoteTokenAmount + baseValueInQuote;
+
+    return totalValue.toString();
+  }
+
+  /**
+   * Get the current cost basis for a position from the latest PositionEvent
+   */
+  async getCurrentCostBasis(positionId: string): Promise<string> {
+    const latestEvent = await this.prisma.positionEvent.findFirst({
+      where: { positionId },
+      select: {
+        costBasisAfter: true,
+      },
+      orderBy: [
+        { blockNumber: 'desc' },
+        { transactionIndex: 'desc' },
+        { logIndex: 'desc' },
+      ],
+    });
+
+    if (!latestEvent) {
+      // No events found - position has no cost basis yet
+      return "0";
+    }
+
+    return latestEvent.costBasisAfter;
+  }
+
+  /**
+   * Get total value of all collected fees for a position in quote token units
+   */
+  async getTotalCollectedFeesValue(positionId: string): Promise<string> {
+    const collectEvents = await this.prisma.positionEvent.findMany({
+      where: {
+        positionId,
+        eventType: 'COLLECT',
+      },
+      select: {
+        feeValueInQuote: true,
+      },
+    });
+
+    // Sum up all collected fees manually since Prisma aggregate doesn't work well with String fields
+    let totalFees = 0n;
+    for (const event of collectEvents) {
+      totalFees += BigInt(event.feeValueInQuote);
+    }
+
+    return totalFees.toString();
+  }
+
+  /**
+   * Get the current realized PnL for a position from the latest PositionEvent
+   */
+  async getCurrentRealizedPnL(positionId: string): Promise<string> {
+    const latestEvent = await this.prisma.positionEvent.findFirst({
+      where: { positionId },
+      select: {
+        realizedPnLAfter: true,
+      },
+      orderBy: [
+        { blockNumber: 'desc' },
+        { transactionIndex: 'desc' },
+        { logIndex: 'desc' },
+      ],
+    });
+
+    if (!latestEvent) {
+      // No events found - position has no realized PnL yet
+      return "0";
+    }
+
+    return latestEvent.realizedPnLAfter;
+  }
+
+  /**
+   * Get comprehensive PnL breakdown for a position
+   */
+  async getPnlBreakdown(positionId: string): Promise<PnlBreakdown> {
+    // Validate position exists
+    const position = await this.positionService.getPosition(positionId);
+    if (!position) {
+      throw new Error(`Position not found: ${positionId}`);
+    }
+
+    // Fetch all PnL components in parallel for efficiency
+    const [currentValue, currentCostBasis, collectedFees, realizedPnL, unclaimedFeesData] = await Promise.all([
+      this.calculateCurrentValue(positionId),
+      this.getCurrentCostBasis(positionId),
+      this.getTotalCollectedFeesValue(positionId),
+      this.getCurrentRealizedPnL(positionId),
+      this.getUnclaimedFees(positionId),
+    ]);
+
+    // Calculate derived metrics using BigInt arithmetic
+    const currentValueBigInt = BigInt(currentValue);
+    const currentCostBasisBigInt = BigInt(currentCostBasis);
+    const collectedFeesBigInt = BigInt(collectedFees);
+
+    const unrealizedPnL = (currentValueBigInt - currentCostBasisBigInt).toString();
+    const totalPnL = (BigInt(unrealizedPnL) + collectedFeesBigInt).toString();
+
+    return {
+      // Core position metrics
+      currentValue,
+      currentCostBasis,
+      collectedFees,
+      unclaimedFees: unclaimedFeesData.valueInQuoteToken,
+      realizedPnL,
+
+      // Derived metrics
+      unrealizedPnL,
+      totalPnL,
+
+      // Metadata
+      positionId,
+      calculatedAt: new Date(),
     };
   }
 
