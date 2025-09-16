@@ -1,33 +1,20 @@
-// Remove dependency on PositionWithPnL - define local interface for curve calculations
-import { calculatePositionValue } from "@/lib/utils/uniswap-v3/liquidity";
+/**
+ * Curve Data Service - Updated to Current Design Patterns
+ *
+ * Generates PnL curve data for Uniswap V3 positions using proper cost basis
+ * from PositionPnLService and dependency injection patterns.
+ */
+
+import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 import type { CurvePoint, CurveData } from "@/components/charts/mini-pnl-curve";
+import type { Services } from "../ServiceFactory";
+import type { Clients } from "../ClientsFactory";
+import type { BasicPosition } from "./positionService";
+import { PositionService } from "./positionService";
+import { PositionPnLService } from "./positionPnLService";
 
-// Enhanced position interface for curve calculations (includes PnL data)
-export interface PositionWithPnL {
-    id: string;
-    liquidity: string;
-    tickLower: number;
-    tickUpper: number;
-    token0IsQuote: boolean;
-    initialValue: string;
-    pool: {
-        token0: {
-            id: string;
-            decimals: number;
-        };
-        token1: {
-            id: string;
-            decimals: number;
-        };
-        token0Address: string;
-        token1Address: string;
-        fee: number;
-        currentPrice?: string;
-    };
-}
-
-export interface PositionParams {
+interface CurvePositionParams {
     liquidity: bigint;
     tickLower: number;
     tickUpper: number;
@@ -37,12 +24,23 @@ export interface PositionParams {
     baseDecimals: number;
     quoteDecimals: number;
     baseIsToken0: boolean;
-    initialValue: bigint;
+    currentCostBasis: bigint;
     currentPrice: bigint;
     tickSpacing: number;
 }
 
 export class CurveDataService {
+    private positionService: PositionService;
+    private positionPnLService: PositionPnLService;
+
+    constructor(
+        requiredClients: Pick<Clients, 'prisma' | 'rpcClients'>,
+        requiredServices: Pick<Services, 'positionService' | 'positionPnLService'>
+    ) {
+        this.positionService = requiredServices.positionService;
+        this.positionPnLService = requiredServices.positionPnLService;
+    }
+
     /**
      * Get tick spacing from fee tier
      */
@@ -55,10 +53,53 @@ export class CurveDataService {
             default: return 60; // Default to 0.3% fee tier
         }
     }
+
     /**
-     * Extract position parameters for curve calculation
+     * Calculate position value at a specific price
+     * @param liquidity Position liquidity
+     * @param currentTick Current price tick
+     * @param tickLower Lower bound tick
+     * @param tickUpper Upper bound tick
+     * @param currentPrice Current price in quote token units
+     * @param baseIsToken0 Whether base token is token0
+     * @param baseDecimals Base token decimals
+     * @returns Position value in quote token units
      */
-    extractPositionParams(position: PositionWithPnL): PositionParams {
+    private calculatePositionValue(
+        liquidity: bigint,
+        currentTick: number,
+        tickLower: number,
+        tickUpper: number,
+        currentPrice: bigint,
+        baseIsToken0: boolean,
+        baseDecimals: number
+    ): bigint {
+        // Get token amounts at current price
+        const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
+            liquidity,
+            currentTick,
+            tickLower,
+            tickUpper
+        );
+
+        if (baseIsToken0) {
+            // Base = token0, Quote = token1
+            // Value = token0Amount * currentPrice + token1Amount
+            // currentPrice is already in quote token decimals per base token
+            const baseValueInQuote = (token0Amount * currentPrice) / BigInt(10 ** baseDecimals);
+            return baseValueInQuote + token1Amount;
+        } else {
+            // Base = token1, Quote = token0
+            // Value = token1Amount * currentPrice + token0Amount
+            // currentPrice is already in quote token decimals per base token
+            const baseValueInQuote = (token1Amount * currentPrice) / BigInt(10 ** baseDecimals);
+            return baseValueInQuote + token0Amount;
+        }
+    }
+    /**
+     * Extract position parameters for curve calculation with current cost basis
+     */
+    private async extractPositionParams(position: BasicPosition): Promise<CurvePositionParams> {
         
         const baseIsToken0 = !position.token0IsQuote;
         const baseDecimals = baseIsToken0 ? position.pool.token0.decimals : position.pool.token1.decimals;
@@ -78,8 +119,8 @@ export class CurveDataService {
             }
         } catch {
             // Fallback: calculate middle price from ticks using proper utilities
-            const baseTokenAddress = baseIsToken0 ? position.pool.token0.id : position.pool.token1.id;
-            const quoteTokenAddress = baseIsToken0 ? position.pool.token1.id : position.pool.token0.id;
+            const baseTokenAddress = baseIsToken0 ? position.pool.token0.address : position.pool.token1.address;
+            const quoteTokenAddress = baseIsToken0 ? position.pool.token1.address : position.pool.token0.address;
             const lowerPrice = this.tickToPriceBigInt(position.tickLower, baseTokenAddress, quoteTokenAddress, baseDecimals);
             const upperPrice = this.tickToPriceBigInt(position.tickUpper, baseTokenAddress, quoteTokenAddress, baseDecimals);
             currentPrice = (lowerPrice + upperPrice) / 2n;
@@ -88,8 +129,8 @@ export class CurveDataService {
         // Calculate current tick from current price using proper utilities
         let currentTick: number;
         try {
-            const baseTokenAddress = baseIsToken0 ? position.pool.token0.id : position.pool.token1.id;
-            const quoteTokenAddress = baseIsToken0 ? position.pool.token1.id : position.pool.token0.id;
+            const baseTokenAddress = baseIsToken0 ? position.pool.token0.address : position.pool.token1.address;
+            const quoteTokenAddress = baseIsToken0 ? position.pool.token1.address : position.pool.token0.address;
             currentTick = priceToTick(
                 currentPrice,
                 tickSpacing,
@@ -98,9 +139,13 @@ export class CurveDataService {
                 baseDecimals
             );
         } catch {
-            // Fallback: use middle of range
-            currentTick = Math.floor((position.tickLower + position.tickUpper) / 2);
+            // Fallback: use current tick from pool if available, otherwise middle of range
+            currentTick = position.pool.currentTick ?? Math.floor((position.tickLower + position.tickUpper) / 2);
         }
+
+        // Get current cost basis from PnL service
+        const pnlBreakdown = await this.positionPnLService.getPnlBreakdown(position.id);
+        const currentCostBasis = BigInt(pnlBreakdown.currentCostBasis);
 
         const result = {
             liquidity: BigInt(position.liquidity),
@@ -108,12 +153,12 @@ export class CurveDataService {
             tickUpper: position.tickUpper,
             currentTick,
             // Use blockchain addresses from pool, not database IDs from token
-            token0Address: position.pool.token0Address,
-            token1Address: position.pool.token1Address, 
+            token0Address: position.pool.token0.address,
+            token1Address: position.pool.token1.address,
             baseDecimals,
             quoteDecimals,
             baseIsToken0,
-            initialValue: BigInt(position.initialValue),
+            currentCostBasis,
             currentPrice,
             tickSpacing
         };
@@ -125,8 +170,8 @@ export class CurveDataService {
     /**
      * Generate optimized curve data with proper Uniswap V3 calculations
      */
-    generateCurveData(position: PositionWithPnL): CurveData {
-        const params = this.extractPositionParams(position);
+    async generateCurveData(position: BasicPosition): Promise<CurveData> {
+        const params = await this.extractPositionParams(position);
         
         // Calculate price range for curve using proper token addresses  
         const baseTokenAddress = params.baseIsToken0 ? params.token0Address : params.token1Address;
@@ -219,20 +264,21 @@ export class CurveDataService {
 
     /**
      * Calculate PnL at a specific price using Uniswap V3 math
+     * PnL = current value - current cost basis (not initial value)
      */
-    private calculatePnLAtPrice(price: bigint, params: PositionParams): bigint {
+    private calculatePnLAtPrice(price: bigint, params: CurvePositionParams): bigint {
         try {
             // Convert price to tick using proper utilities
             const tickAtPrice = priceToTick(
                 price,
                 params.tickSpacing,
                 params.baseIsToken0 ? params.token0Address : params.token1Address, // baseTokenAddress
-                params.baseIsToken0 ? params.token1Address : params.token0Address, // quoteTokenAddress  
+                params.baseIsToken0 ? params.token1Address : params.token0Address, // quoteTokenAddress
                 params.baseDecimals
             );
-            
+
             // Calculate position value at this price/tick
-            const positionValue = calculatePositionValue(
+            const positionValue = this.calculatePositionValue(
                 params.liquidity,
                 tickAtPrice,
                 params.tickLower,
@@ -241,12 +287,11 @@ export class CurveDataService {
                 params.baseIsToken0,
                 params.baseDecimals
             );
-            
-            // PnL = current value - initial value
-            return positionValue - params.initialValue;
-            
-        } catch (error) {
-            console.warn('PnL calculation failed for price:', price, error);
+
+            // PnL = current value - current cost basis (proper baseline)
+            return positionValue - params.currentCostBasis;
+
+        } catch {
             return 0n; // Fallback to zero PnL
         }
     }
@@ -258,8 +303,7 @@ export class CurveDataService {
     private tickToPriceBigInt(tick: number, baseTokenAddress: string, quoteTokenAddress: string, baseDecimals: number): bigint {
         try {
             return tickToPrice(tick, baseTokenAddress, quoteTokenAddress, baseDecimals);
-        } catch (error) {
-            console.warn('Tick to price conversion failed:', tick, error);
+        } catch {
             // Fallback - should not be used in production
             return 0n;
         }
@@ -268,43 +312,39 @@ export class CurveDataService {
     /**
      * Generate curve data for multiple positions in batch (for future optimization)
      */
-    generateBatchCurveData(positions: PositionWithPnL[]): Map<string, CurveData | null> {
+    async generateBatchCurveData(positions: BasicPosition[]): Promise<Map<string, CurveData | null>> {
         const results = new Map<string, CurveData | null>();
-        
+
         for (const position of positions) {
             try {
                 if (this.validatePosition(position)) {
-                    results.set(position.id, this.generateCurveData(position));
+                    const curveData = await this.generateCurveData(position);
+                    results.set(position.id, curveData);
                 } else {
                     results.set(position.id, null);
                 }
-            } catch (error) {
-                console.warn(`Batch curve generation failed for position ${position.id}:`, error);
+            } catch {
                 results.set(position.id, null);
             }
         }
-        
+
         return results;
     }
 
     /**
      * Validate position data before curve generation
      */
-    validatePosition(position: PositionWithPnL): boolean {
+    private validatePosition(position: BasicPosition): boolean {
         try {
             // Check required fields
             if (!position.liquidity || position.liquidity === "0") return false;
             if (position.tickLower >= position.tickUpper) return false;
-            if (!position.initialValue || position.initialValue === "0") return false;
             if (!position.pool) return false;
             if (!position.pool.token0 || !position.pool.token1) return false;
-            
+
             return true;
         } catch {
             return false;
         }
     }
 }
-
-// Export singleton instance
-export const curveDataService = new CurveDataService();
