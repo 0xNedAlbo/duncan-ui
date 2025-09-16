@@ -6,6 +6,7 @@
 
 import type { BasicPosition } from '@/services/positions/positionService';
 import type { ParsedNFTPosition } from '@/services/uniswap/nftPosition';
+import type { PnlBreakdown } from '@/services/positions/positionPnLService';
 
 // Enhanced position interface for API responses (includes PnL data)
 export interface PositionWithPnL extends BasicPosition {
@@ -59,7 +60,7 @@ export interface FilterParams {
 export type PositionListParams = PaginationParams & SortParams & FilterParams;
 
 export interface PositionListData {
-  positions: PositionWithPnL[];
+  positions: BasicPosition[];
   pagination: PaginationResponse;
 }
 
@@ -134,6 +135,13 @@ export interface PositionRefreshResponse extends ApiResponse<{ position: Positio
     upgraded: boolean;
     previousDataSource?: string;
     newDataSource?: string;
+  };
+}
+
+export interface PositionPnlResponse extends ApiResponse<PnlBreakdown> {
+  meta: {
+    requestedAt: string;
+    positionId: string;
   };
 }
 

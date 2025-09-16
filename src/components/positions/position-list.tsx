@@ -6,7 +6,7 @@ import { useTranslations } from "@/i18n/client";
 import { PositionCard } from "./position-card";
 import { usePositions, useRefreshPosition } from "@/hooks/api/usePositions";
 import { handleApiError } from "@/lib/app/apiError";
-import type { PositionWithPnL } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/services/positions/positionService";
 import type { PositionListParams } from "@/types/api";
 
 interface PositionListProps {
@@ -18,7 +18,7 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
   const t = useTranslations();
   
   // Filters and sorting state
-  const [status, setStatus] = useState<string>("active");
+  const [status, setStatus] = useState<string>("all");
   const [chain, setChain] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("createdAt");
   const [sortOrder, setSortOrder] = useState<string>("desc");
@@ -75,7 +75,7 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
   };
 
   // Handle single position refresh
-  const handleRefreshPosition = async (position: PositionWithPnL) => {
+  const handleRefreshPosition = async (position: BasicPosition) => {
     try {
       await refreshPosition.mutateAsync(position);
       // Success is handled by the hook's onSuccess callback
@@ -87,7 +87,7 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
   };
 
   // Check if a specific position is being refreshed
-  const isPositionRefreshing = (position: PositionWithPnL) => {
+  const isPositionRefreshing = (position: BasicPosition) => {
     return refreshPosition.isPending && refreshPosition.variables?.id === position.id;
   };
 
@@ -132,6 +132,7 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
             onChange={(e) => setStatus(e.target.value)}
             className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
+            <option value="all">{t("dashboard.positions.filters.all")}</option>
             <option value="active">{t("dashboard.positions.filters.active")}</option>
             <option value="closed">{t("dashboard.positions.filters.closed")}</option>
             <option value="archived">{t("dashboard.positions.filters.archived")}</option>
@@ -160,9 +161,10 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
             className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="createdAt">{t("dashboard.positions.filters.sortBy.createdAt")}</option>
-            <option value="currentValue">{t("dashboard.positions.filters.sortBy.currentValue")}</option>
-            <option value="pnl">{t("dashboard.positions.filters.sortBy.pnl")}</option>
-            <option value="pnlPercent">{t("dashboard.positions.filters.sortBy.pnlPercent")}</option>
+            {/* PnL-related sorting options commented out until PnL service is implemented */}
+            {/* <option value="currentValue">{t("dashboard.positions.filters.sortBy.currentValue")}</option> */}
+            {/* <option value="pnl">{t("dashboard.positions.filters.sortBy.pnl")}</option> */}
+            {/* <option value="pnlPercent">{t("dashboard.positions.filters.sortBy.pnlPercent")}</option> */}
           </select>
           
           <button
@@ -213,7 +215,7 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
         </div>
       ) : (
         <div className="space-y-4">
-          {positions.map((position) => (
+          {positions.map((position: BasicPosition) => (
             <PositionCard
               key={position.id}
               position={position}

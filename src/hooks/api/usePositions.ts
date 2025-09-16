@@ -18,7 +18,7 @@ import type {
   PositionEventsResponse
 } from '@/types/api';
 import { QUERY_KEYS, MUTATION_KEYS, QUERY_OPTIONS } from '@/types/api';
-import type { PositionWithPnL } from '@/services/positions/positionService';
+import type { BasicPosition } from '@/services/positions/positionService';
 
 /**
  * Hook to fetch positions list with filtering, sorting, and pagination
@@ -195,7 +195,7 @@ export function useImportNFT(
               ...oldData,
               data: {
                 ...oldData.data,
-                positions: [position as PositionWithPnL, ...oldData.data.positions],
+                positions: [response.data.position as BasicPosition, ...oldData.data.positions],
                 pagination: {
                   ...oldData.data.pagination,
                   total: oldData.data.pagination.total + 1,
@@ -220,13 +220,13 @@ export function useImportNFT(
  * Hook to refresh a single position
  */
 export function useRefreshPosition(
-  options?: UseMutationOptions<PositionRefreshResponse, ApiError, PositionWithPnL>
+  options?: UseMutationOptions<PositionRefreshResponse, ApiError, BasicPosition>
 ) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationKey: MUTATION_KEYS.refreshPosition,
-    mutationFn: (position: PositionWithPnL) => {
+    mutationFn: (position: BasicPosition) => {
       // Use new protocol-aware endpoint for NFT positions
       if (position.nftId && position.pool.chain) {
         return apiClient.post<PositionRefreshResponse>(

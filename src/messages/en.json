@@ -138,8 +138,9 @@
         "snapshot": "Snapshot"
       },
       "filters": {
+        "all": "All Positions",
         "active": "Active Positions",
-        "closed": "Closed Positions", 
+        "closed": "Closed Positions",
         "archived": "Archived Positions",
         "allChains": "All Chains",
         "sortBy": {

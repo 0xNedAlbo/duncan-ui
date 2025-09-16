@@ -3,16 +3,16 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { RefreshCw, TrendingUp, TrendingDown, Copy, Search } from "lucide-react";
+import { RefreshCw, Copy, Search, TrendingUp, TrendingDown } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
-import { formatPercent } from "@/lib/utils/formatters";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
-import type { PositionWithPnL } from "@/services/positions/positionService";
-import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy";
+import type { BasicPosition } from "@/services/positions/positionService";
+import { usePositionPnL, usePnLDisplayValues } from "@/hooks/api/usePositionPnL";
+// import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy"; // Commented out until PnL service is implemented
 
 interface PositionCardProps {
-    position: PositionWithPnL;
-    onRefresh?: (position: PositionWithPnL) => void;
+    position: BasicPosition;
+    onRefresh?: (position: BasicPosition) => void;
     isRefreshing?: boolean;
 }
 
@@ -31,28 +31,41 @@ export function PositionCard({
         ? position.pool.token0.decimals
         : position.pool.token1.decimals;
 
-    // Get PnL color classes
-    const getPnLColorClasses = (pnlPercent: number) => {
-        if (pnlPercent > 0) {
-            return "text-green-400 bg-green-500/10 border-green-500/20";
-        } else if (pnlPercent < 0) {
-            return "text-red-400 bg-red-500/10 border-red-500/20";
-        } else {
-            return "text-slate-400 bg-slate-500/10 border-slate-500/20";
-        }
-    };
+    // Fetch PnL data for this position
+    const { data: pnlData, isLoading: pnlLoading, error: pnlError } = usePositionPnL(
+        position.pool.chain,
+        position.nftId,
+        { enabled: Boolean(position.nftId) } // Only fetch if position has NFT ID
+    );
 
-    // Get range status color
-    const getRangeStatusColor = (status: string) => {
-        switch (status) {
-            case "in-range":
-                return "text-green-400 bg-green-500/10 border-green-500/20";
-            case "out-of-range":
-                return "text-orange-400 bg-orange-500/10 border-orange-500/20";
-            default:
-                return "text-slate-400 bg-slate-500/10 border-slate-500/20";
-        }
-    };
+    // Get formatted display values
+    const pnlDisplayValues = usePnLDisplayValues(pnlData, quoteTokenDecimals);
+
+    // Check if PnL data failed to load (for debugging)
+    const pnlFailed = Boolean(pnlError && !pnlLoading);
+
+    // Get PnL color classes - Commented out until PnL data is available
+    // const getPnLColorClasses = (pnlPercent: number) => {
+    //     if (pnlPercent > 0) {
+    //         return "text-green-400 bg-green-500/10 border-green-500/20";
+    //     } else if (pnlPercent < 0) {
+    //         return "text-red-400 bg-red-500/10 border-red-500/20";
+    //     } else {
+    //         return "text-slate-400 bg-slate-500/10 border-slate-500/20";
+    //     }
+    // };
+
+    // Get range status color - Commented out until range status is calculated
+    // const getRangeStatusColor = (status: string) => {
+    //     switch (status) {
+    //         case "in-range":
+    //             return "text-green-400 bg-green-500/10 border-green-500/20";
+    //         case "out-of-range":
+    //             return "text-orange-400 bg-orange-500/10 border-orange-500/20";
+    //         default:
+    //             return "text-slate-400 bg-slate-500/10 border-slate-500/20";
+    //     }
+    // };
 
     // Get NFT explorer link
     const getNFTExplorerLink = (chain: string, nftId: string) => {
@@ -93,13 +106,14 @@ export function PositionCard({
     };
 
     // Check if position is stale (not refreshed for more than 30 minutes)
-    const isStalePosition = () => {
-        if (!position.lastUpdated) return true;
-        const lastUpdatedTime = new Date(position.lastUpdated).getTime();
-        const now = Date.now();
-        const thirtyMinutesInMs = 30 * 60 * 1000;
-        return (now - lastUpdatedTime) > thirtyMinutesInMs;
-    };
+    // Commented out until lastUpdated field is available
+    // const isStalePosition = () => {
+    //     if (!position.lastUpdated) return true;
+    //     const lastUpdatedTime = new Date(position.lastUpdated).getTime();
+    //     const now = Date.now();
+    //     const thirtyMinutesInMs = 30 * 60 * 1000;
+    //     return (now - lastUpdatedTime) > thirtyMinutesInMs;
+    // };
 
     return (
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-6 py-4 hover:border-slate-600/50 transition-all duration-200">
@@ -134,10 +148,10 @@ export function PositionCard({
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <h3 className="text-lg font-semibold text-white">
-                                {position.tokenPair}
+                                {position.pool.token0.symbol}/{position.pool.token1.symbol}
                             </h3>
-                            {/* Range Status */}
-                            <span
+                            {/* Range Status - Commented out until range status calculation is implemented */}
+                            {/* <span
                                 className={`px-2 py-1 rounded-md text-xs font-medium border ${getRangeStatusColor(
                                     position.rangeStatus
                                 )}`}
@@ -154,6 +168,7 @@ export function PositionCard({
                                           "dashboard.positions.rangeStatus.unknown"
                                       )}
                             </span>
+                            */}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-slate-400">
                             <span className="px-2 py-0.5 rounded text-xs font-medium border bg-slate-500/20 text-slate-400 border-slate-500/30">
@@ -212,78 +227,100 @@ export function PositionCard({
                             )}
                         </div>
                     </div>
-                    {/* Current Value & PnL */}
+                    {/* Position Info with PnL Data */}
                     <div className="flex items-start gap-6 ml-6">
                         <div className="text-right">
                             <div className="text-xs text-slate-400 mb-0.5">
-                                {t("dashboard.positions.currentValue")} ({position.quoteSymbol})
+                                Liquidity
                             </div>
                             <div className="text-lg font-semibold text-white">
                                 {formatCompactValue(
-                                    BigInt(position.currentValue),
-                                    quoteTokenDecimals
+                                    BigInt(position.liquidity),
+                                    0 // Liquidity is always integer
                                 )}
                             </div>
                         </div>
-                        
-                        <div className="text-right">
-                            <div className="text-xs text-slate-400 mb-0.5">
-                                {t("dashboard.positions.pnl")} ({position.quoteSymbol})
-                            </div>
-                            <div
-                                className={`text-lg font-semibold ${
-                                    position.pnlPercent > 0
-                                        ? "text-green-400"
-                                        : position.pnlPercent < 0
-                                        ? "text-red-400"
-                                        : "text-slate-400"
-                                }`}
-                            >
-                                <div className="flex items-center justify-end gap-1">
-                                    {position.pnlPercent > 0 ? (
-                                        <TrendingUp className="w-4 h-4" />
-                                    ) : position.pnlPercent < 0 ? (
-                                        <TrendingDown className="w-4 h-4" />
-                                    ) : null}
-                                    <span>
-                                        {formatCompactValue(
-                                            BigInt(position.pnl),
-                                            quoteTokenDecimals
-                                        )}
-                                    </span>
+
+                        {/* Current Value */}
+                        {pnlDisplayValues.currentValue ? (
+                            <div className="text-right">
+                                <div className="text-xs text-slate-400 mb-0.5">
+                                    Current Value ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
                                 </div>
-                                <div className="text-xs text-slate-400 mt-0.5">
-                                    {formatPercent(position.pnlPercent)}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        {/* Mini PnL Curve */}
-                        <div className="flex items-center">
-                            <MiniPnLCurveLazy 
-                                position={position}
-                                width={120}
-                                height={60}
-                                showTooltip={true}
-                                className="rounded border border-slate-700/30 bg-slate-800/20"
-                            />
-                        </div>
-                        
-                        {/* Uncollected Fees */}
-                        <div className="text-right">
-                            <div className="text-xs text-slate-400 mb-0.5">
-                                {t("dashboard.positions.unclaimedFees")} ({position.quoteSymbol})
-                            </div>
-                            <div className="text-lg font-semibold text-amber-400">
-                                {position.pnlBreakdown?.unclaimedFees 
-                                    ? formatCompactValue(
-                                        BigInt(position.pnlBreakdown.unclaimedFees),
+                                <div className="text-lg font-semibold text-white">
+                                    {formatCompactValue(
+                                        pnlDisplayValues.currentValue,
                                         quoteTokenDecimals
-                                    )
-                                    : "0"
-                                }
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="text-right">
+                                <div className="text-xs text-slate-400 mb-0.5">
+                                    Range (Ticks)
+                                </div>
+                                <div className="text-lg font-semibold text-white">
+                                    {position.tickLower} - {position.tickUpper}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Total PnL */}
+                        {pnlDisplayValues.totalPnL !== null ? (
+                            <div className="text-right">
+                                <div className="text-xs text-slate-400 mb-0.5">
+                                    Total PnL ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
+                                </div>
+                                <div className={`text-lg font-semibold ${pnlDisplayValues.pnlColor}`}>
+                                    <div className="flex items-center justify-end gap-1">
+                                        {pnlDisplayValues.isPositive ? (
+                                            <TrendingUp className="w-4 h-4" />
+                                        ) : pnlDisplayValues.isNegative ? (
+                                            <TrendingDown className="w-4 h-4" />
+                                        ) : null}
+                                        <span>
+                                            {formatCompactValue(
+                                                pnlDisplayValues.totalPnL,
+                                                quoteTokenDecimals
+                                            )}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : pnlLoading ? (
+                            <div className="text-right">
+                                <div className="text-xs text-slate-400 mb-0.5">
+                                    Loading PnL...
+                                </div>
+                                <div className="text-lg font-semibold text-slate-400">
+                                    --
+                                </div>
+                            </div>
+                        ) : pnlFailed ? (
+                            <div className="text-right">
+                                <div className="text-xs text-slate-400 mb-0.5">
+                                    PnL Unavailable
+                                </div>
+                                <div className="text-lg font-semibold text-slate-400">
+                                    --
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {/* Unclaimed Fees */}
+                        {pnlDisplayValues.unclaimedFees ? (
+                            <div className="text-right">
+                                <div className="text-xs text-slate-400 mb-0.5">
+                                    Claimable Fees ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
+                                </div>
+                                <div className="text-lg font-semibold text-amber-400">
+                                    {formatCompactValue(
+                                        pnlDisplayValues.unclaimedFees,
+                                        quoteTokenDecimals
+                                    )}
+                                </div>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
 
@@ -320,12 +357,12 @@ export function PositionCard({
                                 className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`}
                             />
                         </button>
-                        {/* Stale Position Indicator */}
-                        {isStalePosition() && !isRefreshing && (
+                        {/* Stale Position Indicator - Commented out until lastUpdated field is available */}
+                        {/* {isStalePosition() && !isRefreshing && (
                             <div className="absolute -top-1 -right-1 bg-yellow-500 text-yellow-900 rounded-full w-4 h-4 flex items-center justify-center text-xs font-bold">
                                 !
                             </div>
-                        )}
+                        )} */}
                     </div>
                 </div>
             </div>

@@ -17,7 +17,7 @@ export default function Dashboard() {
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     // Handle successful position import
-    const handleImportSuccess = (position: any) => {
+    const handleImportSuccess = (_position: any) => {
         // Trigger refresh of position list
         setRefreshTrigger(prev => prev + 1);
     };

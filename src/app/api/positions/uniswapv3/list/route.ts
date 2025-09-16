@@ -107,10 +107,30 @@ export const GET = withAuthAndLogging<{ success: boolean; positions?: any[]; tot
 
       return NextResponse.json({
         success: true,
-        positions,
-        total,
-        limit,
-        offset
+        data: {
+          positions,
+          pagination: {
+            total,
+            limit,
+            offset,
+            hasMore: positions.length === limit && (offset + limit) < total,
+            nextOffset: positions.length === limit && (offset + limit) < total ? offset + limit : null
+          }
+        },
+        meta: {
+          requestedAt: new Date().toISOString(),
+          filters: {
+            status: status,
+            chain: chain || null,
+            sortBy: sortBy || 'createdAt',
+            sortOrder: sortOrder || 'desc'
+          },
+          dataQuality: {
+            subgraphPositions: positions.length, // All positions for now, will be updated when PnL service is added
+            snapshotPositions: 0,
+            upgradedPositions: 0
+          }
+        }
       });
     } catch (error) {
       logError(log, error, { endpoint: 'positions/uniswapv3/list' });

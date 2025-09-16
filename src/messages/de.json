@@ -138,6 +138,7 @@
         "snapshot": "Snapshot"
       },
       "filters": {
+        "all": "Alle Positionen",
         "active": "Aktive Positionen",
         "closed": "Geschlossene Positionen",
         "archived": "Archivierte Positionen",
