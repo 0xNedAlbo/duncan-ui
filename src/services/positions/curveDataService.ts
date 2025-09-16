@@ -9,9 +9,7 @@ import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 import type { CurvePoint, CurveData } from "@/components/charts/mini-pnl-curve";
 import type { Services } from "../ServiceFactory";
-import type { Clients } from "../ClientsFactory";
 import type { BasicPosition } from "./positionService";
-import { PositionService } from "./positionService";
 import { PositionPnLService } from "./positionPnLService";
 
 interface CurvePositionParams {
@@ -30,14 +28,11 @@ interface CurvePositionParams {
 }
 
 export class CurveDataService {
-    private positionService: PositionService;
     private positionPnLService: PositionPnLService;
 
     constructor(
-        requiredClients: Pick<Clients, 'prisma' | 'rpcClients'>,
-        requiredServices: Pick<Services, 'positionService' | 'positionPnLService'>
+        requiredServices: Pick<Services, 'positionPnLService'>
     ) {
-        this.positionService = requiredServices.positionService;
         this.positionPnLService = requiredServices.positionPnLService;
     }
 
