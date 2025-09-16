@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { DefaultServiceFactory } from '@/services/ServiceFactory';
+import { ApiServiceFactory } from '@/lib/api/ApiServiceFactory';
 
 export async function GET(request: NextRequest) {
   // Handle authentication separately to ensure proper error handling
@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
     
     if (!verifiedOnly) {
       // Get user's custom tokens first
-      const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
-      const userTokens = await tokenResolutionService.getUserTokens(session.user.id, chain || undefined);
+      const apiServices = ApiServiceFactory.getInstance();
+      const userTokens = await apiServices.tokenResolutionService.getUserTokens(session.user.id, chain || undefined);
       
       // Filter user tokens by query
       const filteredUserTokens = userTokens.filter(token => {
@@ -78,8 +78,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get global verified tokens
-    const { tokenService } = DefaultServiceFactory.getInstance().getServices();
-    const globalTokens = await tokenService.searchTokens({
+    const apiServices = ApiServiceFactory.getInstance();
+    const globalTokens = await apiServices.tokenService.searchTokens({
       chain: chain || undefined,
       query: query || undefined,
       limit,

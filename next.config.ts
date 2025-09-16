@@ -13,12 +13,17 @@ const nextConfig: NextConfig = {
   webpack: (config, { isServer }) => {
     // Fix for RainbowKit and wagmi ESM issues with Next.js 15
     config.externals.push('pino-pretty', 'lokijs', 'encoding');
-    
+
+    // Exclude server-only packages from client bundle
+    if (!isServer) {
+      config.externals.push('@node-rs/argon2');
+    }
+
     // Handle ESM modules properly
     config.resolve.extensionAlias = {
       '.js': ['.js', '.ts', '.tsx'],
     };
-    
+
     // Fix for RainbowKit vendor chunk issues
     if (!isServer) {
       config.resolve.fallback = {
@@ -28,7 +33,7 @@ const nextConfig: NextConfig = {
         tls: false,
       };
     }
-    
+
     return config;
   },
 };

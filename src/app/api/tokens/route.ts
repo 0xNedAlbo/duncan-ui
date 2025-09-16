@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { DefaultServiceFactory } from '@/services/ServiceFactory';
+import { ApiServiceFactory } from '@/lib/api/ApiServiceFactory';
 import { withLogging, logError } from '@/lib/api/withLogging';
 
 export const GET = withLogging(async (request: NextRequest, { log, reqId }) => {
@@ -27,8 +27,8 @@ export const GET = withLogging(async (request: NextRequest, { log, reqId }) => {
 
   try {
     // Resolve token for user
-    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
-    const token = await tokenResolutionService.resolveToken(chain, address, session.user.id);
+    const apiServices = ApiServiceFactory.getInstance();
+    const token = await apiServices.tokenResolutionService.resolveToken(chain, address, session.user.id);
 
     return NextResponse.json({ token });
   } catch (error) {
@@ -69,8 +69,8 @@ export const POST = withLogging(async (request: NextRequest, { log, reqId }) => 
 
   try {
     // Add custom token for user
-    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
-    const token = await tokenResolutionService.addCustomToken(session.user.id, {
+    const apiServices = ApiServiceFactory.getInstance();
+    const token = await apiServices.tokenResolutionService.addCustomToken(session.user.id, {
       chain,
       address,
       symbol,

@@ -75,7 +75,7 @@ export class TokenService {
                     lastUpdatedAt: new Date(),
                 },
             });
-        } catch (error) {
+        } catch {
             // If Alchemy fails, create with minimal data
             // Alchemy fetch failed - will create with minimal data
 
@@ -334,7 +334,7 @@ export class TokenService {
             }
 
             return [...existingTokens, ...newTokens];
-        } catch (error) {
+        } catch {
             // Batch fetch from Alchemy failed
 
             // Fallback: create tokens with minimal data
@@ -408,7 +408,7 @@ export class TokenService {
 
                 // Add small delay to respect rate limits
                 await new Promise((resolve) => setTimeout(resolve, 100));
-            } catch (error) {
+            } catch {
                 // Failed to refresh individual token
             }
         }

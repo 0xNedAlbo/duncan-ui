@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withLogging } from '@/lib/api/withLogging';
 import { getAuthUser } from '@/lib/auth/getAuthUser';
-import { DefaultServiceFactory } from '@/services/ServiceFactory';
+import { ApiServiceFactory } from '@/lib/api/ApiServiceFactory';
 
 export const runtime = "nodejs";
 
@@ -34,8 +34,8 @@ export const GET = withLogging(async (request: NextRequest, { log }) => {
   }
 
   try {
-    const services = DefaultServiceFactory.getInstance().getServices();
-    const apiKeys = await services.apiKeyService.listUserApiKeys(authUser.userId);
+    const apiServices = ApiServiceFactory.getInstance();
+    const apiKeys = await apiServices.apiKeyService.listUserApiKeys(authUser.userId);
 
     log.debug({ apiKeyCount: apiKeys.length }, 'Retrieved user API keys');
 
@@ -88,8 +88,8 @@ export const POST = withLogging(async (request: NextRequest, { log }) => {
       );
     }
 
-    const services = DefaultServiceFactory.getInstance().getServices();
-    const generatedKey = await services.apiKeyService.createApiKey(
+    const apiServices = ApiServiceFactory.getInstance();
+    const generatedKey = await apiServices.apiKeyService.createApiKey(
       authUser.userId,
       name,
       scopes
@@ -146,8 +146,8 @@ export const DELETE = withLogging(async (request: NextRequest, { log }) => {
       );
     }
 
-    const services = DefaultServiceFactory.getInstance().getServices();
-    const revoked = await services.apiKeyService.revokeApiKey(authUser.userId, keyId);
+    const apiServices = ApiServiceFactory.getInstance();
+    const revoked = await apiServices.apiKeyService.revokeApiKey(authUser.userId, keyId);
 
     if (!revoked) {
       log.debug({ keyId }, 'API key not found or already revoked');

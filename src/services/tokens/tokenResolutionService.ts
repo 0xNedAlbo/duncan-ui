@@ -160,7 +160,7 @@ export class TokenResolutionService {
                     source: "alchemy",
                 };
             }
-        } catch (error) {
+        } catch {
             // Alchemy fetch failed, will try contract call
         }
 
@@ -190,7 +190,7 @@ export class TokenResolutionService {
                     isVerified: false,
                 };
             }
-        } catch (error) {
+        } catch {
             // Contract call failed
         }
 

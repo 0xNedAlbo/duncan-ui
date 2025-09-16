@@ -113,7 +113,7 @@ export class PoolPriceService {
                 chain: cached.chain,
                 retrievedAt: cached.retrievedAt,
             };
-        } catch (error) {
+        } catch {
             // Log error but don't throw - cache miss is acceptable
             // Cache lookup failed
             return null;
@@ -161,7 +161,7 @@ export class PoolPriceService {
                     retrievedAt: priceData.retrievedAt,
                 },
             });
-        } catch (error) {
+        } catch {
             // Log error but don't throw - cache failure shouldn't block price retrieval
             // Cache storage failed
         }
@@ -355,7 +355,7 @@ export class PoolPriceService {
             );
 
             return { size, keys };
-        } catch (error) {
+        } catch {
             // Cache stats failed
             // Return empty stats if database fails
             return {

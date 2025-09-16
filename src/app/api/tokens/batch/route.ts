@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { DefaultServiceFactory } from '@/services/ServiceFactory';
+import { ApiServiceFactory } from '@/lib/api/ApiServiceFactory';
 
 export async function POST(request: NextRequest) {
   // Check authentication
@@ -53,9 +53,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Resolve tokens for user (will create if needed)
-    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
+    const apiServices = ApiServiceFactory.getInstance();
     const tokenRequests = addresses.map(address => ({ chain, address }));
-    const tokens = await tokenResolutionService.resolveTokens(tokenRequests, session.user.id);
+    const tokens = await apiServices.tokenResolutionService.resolveTokens(tokenRequests, session.user.id);
 
     return NextResponse.json({
       tokens,
@@ -118,9 +118,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Resolve tokens for user (similar to POST, but via GET)
-    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
+    const apiServices = ApiServiceFactory.getInstance();
     const tokenRequests = addresses.map(address => ({ chain, address }));
-    const tokens = await tokenResolutionService.resolveTokens(tokenRequests, session.user.id);
+    const tokens = await apiServices.tokenResolutionService.resolveTokens(tokenRequests, session.user.id);
 
     return NextResponse.json({
       tokens,

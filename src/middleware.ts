@@ -1,53 +1,14 @@
 import { withAuth } from "next-auth/middleware"
-import { NextRequest, NextResponse } from "next/server"
-import { DefaultServiceFactory } from "@/services/ServiceFactory"
-
-async function checkApiKeyAuth(req: NextRequest): Promise<{ isValid: boolean; userId?: string }> {
-  const authHeader = req.headers.get("authorization")
-
-  if (!authHeader?.startsWith("Bearer ")) {
-    return { isValid: false }
-  }
-
-  const apiKey = authHeader.replace("Bearer ", "")
-
-  if (!apiKey.startsWith("ak_live_")) {
-    return { isValid: false }
-  }
-
-  try {
-    const services = DefaultServiceFactory.getInstance().getServices()
-    const result = await services.apiKeyService.verifyApiKey(apiKey)
-
-    return {
-      isValid: result.isValid,
-      userId: result.userId
-    }
-  } catch (error) {
-    return { isValid: false }
-  }
-}
+import { NextResponse } from "next/server"
 
 export default withAuth(
   async function middleware(req) {
-    // For API routes, check API key authentication first
+    // For API routes, just pass through - let the API routes handle auth validation
     if (req.nextUrl.pathname.startsWith("/api/")) {
-      const apiKeyResult = await checkApiKeyAuth(req)
-
-      if (apiKeyResult.isValid) {
-        // Create a new request with user ID for API key auth
-        const requestHeaders = new Headers(req.headers)
-        requestHeaders.set("x-api-key-user-id", apiKeyResult.userId!)
-
-        return NextResponse.next({
-          request: {
-            headers: requestHeaders,
-          },
-        })
-      }
+      return NextResponse.next()
     }
 
-    // Fallback to default NextAuth behavior
+    // Fallback to default NextAuth behavior for other routes
     return NextResponse.next()
   },
   {
@@ -58,17 +19,9 @@ export default withAuth(
           return true
         }
 
-        // For other API routes, check if we have API key authentication
+        // For other API routes, allow all requests - let API routes handle auth
         if (req.nextUrl.pathname.startsWith("/api/")) {
-          const authHeader = req.headers.get("authorization")
-
-          // If API key is present, let the middleware handle it
-          if (authHeader?.startsWith("Bearer ak_live_")) {
-            return true
-          }
-
-          // Otherwise, require NextAuth token
-          return !!token
+          return true
         }
 
         // Allow access to all non-API routes

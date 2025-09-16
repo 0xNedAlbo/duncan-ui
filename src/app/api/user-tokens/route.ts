@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { DefaultServiceFactory } from '@/services/ServiceFactory';
+import { ApiServiceFactory } from '@/lib/api/ApiServiceFactory';
 import { z } from 'zod';
 
 const CreateUserTokenSchema = z.object({
@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
 
     const validatedOptions = GetUserTokensSchema.parse(options);
 
-    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
-    const userTokens = await tokenResolutionService.getUserTokens(
+    const apiServices = ApiServiceFactory.getInstance();
+    const userTokens = await apiServices.tokenResolutionService.getUserTokens(
       session.user.id,
       validatedOptions.chain
     );
@@ -82,8 +82,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = CreateUserTokenSchema.parse(body);
 
-    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
-    const userToken = await tokenResolutionService.addCustomToken(
+    const apiServices = ApiServiceFactory.getInstance();
+    const userToken = await apiServices.tokenResolutionService.addCustomToken(
       session.user.id,
       validatedData
     );

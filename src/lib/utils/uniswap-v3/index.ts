@@ -31,16 +31,13 @@ export {
   // Liquidity calculations
   getTokenAmountsFromLiquidity,
   getLiquidityFromTokenAmounts,
-  calculatePositionValue,
 } from "./liquidity";
 
 export {
   // Position analysis
-  determineRangeStatus,
   determinePhase,
   calculatePnL,
   generatePnLCurve,
-  compareToHoldStrategy,
   calculatePositionValueAtPrice,
 } from "./position";
 

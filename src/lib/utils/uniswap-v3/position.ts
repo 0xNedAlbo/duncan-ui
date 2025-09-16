@@ -6,12 +6,6 @@ import { calculatePositionValue } from "./liquidity";
  * Pure functions with simple parameters - no custom data structures
  */
 
-export type RangeStatus =
-    | "in-range"
-    | "out-of-range-below"
-    | "out-of-range-above"
-    | "unknown";
-
 export type PositionPhase = "below" | "in-range" | "above";
 
 export interface PnLPoint {
@@ -22,26 +16,6 @@ export interface PnLPoint {
     phase: PositionPhase;
 }
 
-/**
- * Determine range status for a position
- * @param tickCurrent Current price tick
- * @param tickLower Lower bound tick
- * @param tickUpper Upper bound tick
- * @returns Range status
- */
-export function determineRangeStatus(
-    tickCurrent: number,
-    tickLower: number,
-    tickUpper: number
-): RangeStatus {
-    if (tickCurrent >= tickLower && tickCurrent < tickUpper) {
-        return "in-range";
-    } else if (tickCurrent < tickLower) {
-        return "out-of-range-below";
-    } else {
-        return "out-of-range-above";
-    }
-}
 
 /**
  * Determine position phase for PnL curve
@@ -151,55 +125,6 @@ export function generatePnLCurve(
     return points;
 }
 
-/**
- * Compare position performance to hold strategy
- * @param positionValue Current position value
- * @param initialToken0Amount Initial token0 amount
- * @param initialToken1Amount Initial token1 amount
- * @param currentPrice Current price (quote per base)
- * @param baseIsToken0 Whether base token is token0
- * @param baseDecimals Base token decimals
- * @returns Comparison metrics
- */
-export function compareToHoldStrategy(
-    positionValue: bigint,
-    initialToken0Amount: bigint,
-    initialToken1Amount: bigint,
-    currentPrice: bigint,
-    baseIsToken0: boolean,
-    baseDecimals: number
-): {
-    positionValue: bigint;
-    holdValue: bigint;
-    advantage: bigint;
-    advantagePercent: number;
-} {
-    // Calculate what the hold value would be
-    let holdValue: bigint;
-
-    if (baseIsToken0) {
-        // token0 = base, token1 = quote
-        holdValue =
-            (initialToken0Amount * currentPrice) / 10n ** BigInt(baseDecimals) +
-            initialToken1Amount;
-    } else {
-        // token0 = quote, token1 = base
-        holdValue =
-            initialToken0Amount +
-            (initialToken1Amount * currentPrice) / 10n ** BigInt(baseDecimals);
-    }
-
-    const advantage = positionValue - holdValue;
-    const advantagePercent =
-        holdValue > 0n ? Number((advantage * 10000n) / holdValue) / 100 : 0;
-
-    return {
-        positionValue,
-        holdValue,
-        advantage,
-        advantagePercent,
-    };
-}
 
 /**
  * Calculate position value at a specific price

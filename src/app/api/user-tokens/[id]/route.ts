@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { DefaultServiceFactory } from '@/services/ServiceFactory';
+import { ApiServiceFactory } from '@/lib/api/ApiServiceFactory';
 import { z } from 'zod';
 
 interface RouteContext {
@@ -42,8 +42,8 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const body = await request.json();
     const validatedData = UpdateUserTokenSchema.parse(body);
 
-    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
-    const updatedToken = await tokenResolutionService.updateUserToken(
+    const apiServices = ApiServiceFactory.getInstance();
+    const updatedToken = await apiServices.tokenResolutionService.updateUserToken(
       session.user.id,
       id,
       validatedData
@@ -97,8 +97,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
-    await tokenResolutionService.removeUserToken(session.user.id, id);
+    const apiServices = ApiServiceFactory.getInstance();
+    await apiServices.tokenResolutionService.removeUserToken(session.user.id, id);
 
     return NextResponse.json({ message: 'Token removed successfully' });
 

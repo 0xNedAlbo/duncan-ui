@@ -31,6 +31,7 @@ function base32(bytes: Buffer): string {
 }
 
 export class ApiKeyService {
+  // eslint-disable-next-line no-unused-vars
   constructor(private prisma: PrismaClient) {}
 
   async createApiKey(
@@ -105,7 +106,7 @@ export class ApiKeyService {
           keyId: apiKey.id,
         };
       }
-    } catch (error) {
+    } catch {
       return { isValid: false };
     }
 

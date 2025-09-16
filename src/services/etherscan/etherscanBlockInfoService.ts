@@ -8,7 +8,7 @@
 
 import { SupportedChainsType } from "@/config/chains";
 import type { Clients } from "../ClientsFactory";
-import type { EtherscanClient, BlockNumberResponse } from "./etherscanClient";
+import type { EtherscanClient } from "./etherscanClient";
 
 export class EtherscanBlockInfoService {
     private etherscanClient: EtherscanClient;
