@@ -13,6 +13,7 @@ import { CurveDataService } from "./positions/curveDataService";
 import { TokenService } from "./tokens/tokenService";
 import { TokenReferenceService } from "./tokens/tokenReferenceService";
 import { TokenResolutionService } from "./tokens/tokenResolutionService";
+import { ApiKeyService } from "./auth/apiKeyService";
 import { DefaultClientsFactory } from "./ClientsFactory";
 
 export interface Services {
@@ -31,6 +32,7 @@ export interface Services {
     tokenService: TokenService;
     tokenReferenceService: TokenReferenceService;
     tokenResolutionService: TokenResolutionService;
+    apiKeyService: ApiKeyService;
 }
 
 export interface ServiceFactory {
@@ -96,6 +98,8 @@ export class DefaultServiceFactory implements ServiceFactory {
             { positionPnLService }
         );
 
+        const apiKeyService = new ApiKeyService(prisma);
+
         this.services = {
             alchemyTokenService,
             etherscanEventService,
@@ -112,6 +116,7 @@ export class DefaultServiceFactory implements ServiceFactory {
             tokenService,
             tokenReferenceService,
             tokenResolutionService,
+            apiKeyService,
         };
     }
 

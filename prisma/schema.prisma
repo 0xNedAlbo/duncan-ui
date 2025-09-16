@@ -56,6 +56,7 @@ model User {
   positions     Position[]
   userTokens    UserToken[] // User's custom token list
   ownedPools    Pool[]      @relation("PoolOwner") // Pools with custom tokens
+  apiKeys       ApiKey[]    // User's API keys
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -70,6 +71,28 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verificationtokens")
+}
+
+// API Key Model - for API authentication
+model ApiKey {
+  id           String   @id @default(cuid())
+  userId       String   // User who owns this key
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String   // "CI on repo X", "Zapier", etc.
+  prefix       String   // first ~6-8 chars for quick lookup
+  hash         String   // argon2/bcrypt hash of full key
+  scopes       String[] // e.g. ["read:positions","write:orders"]
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime?
+  revokedAt    DateTime?
+
+  // Future: usage counters
+  monthlyUsage Int      @default(0)
+  dailyUsage   Int      @default(0)
+
+  @@index([userId])
+  @@index([prefix])
+  @@map("api_keys")
 }
 
 // Token Model - ONLY verified tokens from Alchemy (global)

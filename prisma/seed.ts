@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { hash } from '@node-rs/argon2';
 
 const prisma = new PrismaClient();
 
@@ -22,17 +23,17 @@ async function main() {
 
   // Create test user if it doesn't exist
   const testEmail = 'test@testmann.kk';
-  
-  const existingUser = await prisma.user.findUnique({
+
+  let testUser = await prisma.user.findUnique({
     where: { email: testEmail }
   });
 
-  if (existingUser) {
-    console.log('✅ Test user already exists:', existingUser.id);
+  if (testUser) {
+    console.log('✅ Test user already exists:', testUser.id);
   } else {
     const hashedPassword = await bcrypt.hash('test123456', 10);
-    
-    const testUser = await prisma.user.create({
+
+    testUser = await prisma.user.create({
       data: {
         name: 'Test Testmann',
         email: testEmail,
@@ -41,6 +42,40 @@ async function main() {
     });
 
     console.log('✅ Test user created:', testUser.id);
+  }
+
+  // Create test API key if it doesn't exist
+  const existingApiKey = await prisma.apiKey.findFirst({
+    where: {
+      userId: testUser.id,
+      name: 'Debug Scripts'
+    }
+  });
+
+  if (existingApiKey) {
+    console.log('✅ Test API key already exists:', existingApiKey.id);
+  } else {
+    // Create the exact same API key used in debug script
+    const apiKeyPlaintext = 'ak_live_zIdCcBStkntsCI_mVXqYUuNz5-VMSeGI-W8XWHn_C4A';
+    const prefix = 'zIdCcBSt';
+
+    const hashedApiKey = await hash(apiKeyPlaintext, {
+      memoryCost: 19456,
+      timeCost: 2,
+      parallelism: 1,
+    });
+
+    const apiKey = await prisma.apiKey.create({
+      data: {
+        userId: testUser.id,
+        name: 'Debug Scripts',
+        prefix: prefix,
+        hash: hashedApiKey,
+        scopes: [],
+      },
+    });
+
+    console.log('✅ Test API key created:', apiKey.id);
   }
 
   console.log('🌱 Development database seeding completed');

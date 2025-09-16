@@ -3,15 +3,13 @@
 /**
  * DUNCAN API Debug Script
  * 
- * This script helps debug the API by managing authentication and providing
+ * This script helps debug the API by using API key authentication and providing
  * helper functions for common API operations.
- * 
+ *
  * Usage:
- *   npx tsx scripts/api-debug.ts
- *   
- * Environment Variables:
- *   - TEST_USER: Email for test user
- *   - TEST_PASSWORD: Password for test user
+ *   npx tsx scripts/debug/api-debug.ts
+ *
+ * Uses hardcoded API key for test@testmann.kk user
  */
 
 import { readFileSync } from 'fs';
@@ -40,13 +38,9 @@ function loadEnvFile() {
 loadEnvFile();
 
 const BASE_URL = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-const TEST_USER = process.env.TEST_USER;
-const TEST_PASSWORD = process.env.TEST_PASSWORD;
 
-if (!TEST_USER || !TEST_PASSWORD) {
-  console.error('❌ Missing TEST_USER or TEST_PASSWORD in .env.local');
-  process.exit(1);
-}
+// Hardcoded API key for test@testmann.kk user
+const API_KEY = 'ak_live_zIdCcBStkntsCI_mVXqYUuNz5-VMSeGI-W8XWHn_C4A';
 
 interface ApiResponse<T = any> {
   success: boolean;
@@ -57,94 +51,27 @@ interface ApiResponse<T = any> {
 }
 
 class ApiDebugger {
-  private cookies: string[] = [];
-  private sessionToken?: string;
+  private apiKey: string;
 
   constructor() {
+    this.apiKey = API_KEY;
     console.log(`🚀 DUNCAN API Debugger`);
     console.log(`📍 Base URL: ${BASE_URL}`);
-    console.log(`👤 Test User: ${TEST_USER}`);
+    console.log(`🔑 API Key: ${API_KEY.substring(0, 20)}...`);
     console.log('');
   }
 
   /**
-   * Extract cookies from response headers
-   */
-  private extractCookies(response: Response) {
-    const setCookies = response.headers.get('set-cookie');
-    if (setCookies) {
-      const cookies = setCookies.split(',').map(cookie => cookie.trim());
-      this.cookies = [...this.cookies, ...cookies];
-      
-      // Extract session token
-      cookies.forEach(cookie => {
-        if (cookie.includes('next-auth.session-token') || cookie.includes('__Secure-next-auth.session-token')) {
-          const tokenMatch = cookie.match(/=([^;]+)/);
-          if (tokenMatch) {
-            this.sessionToken = tokenMatch[1];
-          }
-        }
-      });
-    }
-  }
-
-  /**
-   * Get cookie header string
-   */
-  private getCookieHeader(): string {
-    return this.cookies.map(cookie => cookie.split(';')[0]).join('; ');
-  }
-
-  /**
-   * Authenticate with the API and store session
+   * Authenticate using API key - no actual authentication needed
    */
   async authenticate(): Promise<boolean> {
-    console.log('🔐 Authenticating...');
-    
-    try {
-      // First, get CSRF token
-      const csrfResponse = await fetch(`${BASE_URL}/api/auth/csrf`);
-      const csrfData = await csrfResponse.json();
-      this.extractCookies(csrfResponse);
-      
-      console.log(`📝 CSRF Token: ${csrfData.csrfToken}`);
-
-      // Sign in with credentials
-      const signInResponse = await fetch(`${BASE_URL}/api/auth/callback/credentials`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Cookie': this.getCookieHeader()
-        },
-        body: new URLSearchParams({
-          email: TEST_USER || '',
-          password: TEST_PASSWORD || '',
-          csrfToken: csrfData.csrfToken,
-          callbackUrl: BASE_URL,
-          json: 'true'
-        }),
-        redirect: 'manual' // Don't follow redirects
-      });
-
-      this.extractCookies(signInResponse);
-      
-      if (signInResponse.status === 200 || signInResponse.status === 302) {
-        console.log('✅ Authentication successful');
-        console.log(`🍪 Session Token: ${this.sessionToken ? 'Set' : 'Not found'}`);
-        return true;
-      } else {
-        console.log('❌ Authentication failed:', signInResponse.status);
-        console.log('Response:', await signInResponse.text());
-        return false;
-      }
-    } catch (error) {
-      console.error('❌ Authentication error:', error);
-      return false;
-    }
+    console.log('🔑 Using API key authentication...');
+    console.log('✅ Ready to make API requests');
+    return true;
   }
 
   /**
-   * Make authenticated API request
+   * Make authenticated API request using API key
    */
   async apiRequest<T = any>(
     endpoint: string,
@@ -153,7 +80,7 @@ class ApiDebugger {
     const url = `${BASE_URL}${endpoint}`;
     const headers = {
       'Content-Type': 'application/json',
-      'Cookie': this.getCookieHeader(),
+      'Authorization': `Bearer ${this.apiKey}`,
       ...options.headers
     };
 
@@ -243,8 +170,8 @@ class ApiDebugger {
   async runExamples() {
     console.log('🧪 Running example API calls...\n');
 
-    // Test session endpoint
-    await this.get('/api/auth/session');
+    // Test health endpoint
+    await this.get('/api/health');
 
     // Test tokens endpoint
     await this.get('/api/tokens');
