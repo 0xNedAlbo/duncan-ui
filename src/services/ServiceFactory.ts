@@ -8,6 +8,7 @@ import { QuoteTokenService } from "./positions/quoteTokenService";
 import { PositionImportService } from "./positions/positionImportService";
 import { PositionLedgerService } from "./positions/positionLedgerService";
 import { PositionService } from "./positions/positionService";
+import { PositionPnLService } from "./positions/positionPnLService";
 import { TokenService } from "./tokens/tokenService";
 import { TokenReferenceService } from "./tokens/tokenReferenceService";
 import { TokenResolutionService } from "./tokens/tokenResolutionService";
@@ -24,6 +25,7 @@ export interface Services {
     positionImportService: PositionImportService;
     positionLedgerService: PositionLedgerService;
     positionService: PositionService;
+    positionPnLService: PositionPnLService;
     tokenService: TokenService;
     tokenReferenceService: TokenReferenceService;
     tokenResolutionService: TokenResolutionService;
@@ -83,6 +85,11 @@ export class DefaultServiceFactory implements ServiceFactory {
             { positionService, poolService }
         );
 
+        const positionPnLService = new PositionPnLService(
+            { prisma, rpcClients },
+            { positionService, poolService }
+        );
+
         this.services = {
             alchemyTokenService,
             etherscanEventService,
@@ -94,6 +101,7 @@ export class DefaultServiceFactory implements ServiceFactory {
             positionImportService,
             positionLedgerService,
             positionService,
+            positionPnLService,
             tokenService,
             tokenReferenceService,
             tokenResolutionService,

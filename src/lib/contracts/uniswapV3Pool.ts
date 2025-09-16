@@ -53,6 +53,36 @@ export const UNISWAP_V3_POOL_ABI = [
     "outputs": [{"internalType": "int24", "name": "", "type": "int24"}],
     "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "feeGrowthGlobal0X128",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "feeGrowthGlobal1X128",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "int24", "name": "tick", "type": "int24"}],
+    "name": "ticks",
+    "outputs": [
+      {"internalType": "uint128", "name": "liquidityGross", "type": "uint128"},
+      {"internalType": "int128", "name": "liquidityNet", "type": "int128"},
+      {"internalType": "uint256", "name": "feeGrowthOutside0X128", "type": "uint256"},
+      {"internalType": "uint256", "name": "feeGrowthOutside1X128", "type": "uint256"},
+      {"internalType": "int56", "name": "tickCumulativeOutside", "type": "int56"},
+      {"internalType": "uint160", "name": "secondsPerLiquidityOutsideX128", "type": "uint160"},
+      {"internalType": "uint32", "name": "secondsOutside", "type": "uint32"},
+      {"internalType": "bool", "name": "initialized", "type": "bool"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
   }
 ] as const;
 
@@ -74,6 +104,19 @@ export interface PoolState {
   token1: string;
   fee: number;
   tickSpacing: number;
+  feeGrowthGlobal0X128: bigint;
+  feeGrowthGlobal1X128: bigint;
+}
+
+export interface TickData {
+  liquidityGross: bigint;
+  liquidityNet: bigint;
+  feeGrowthOutside0X128: bigint;
+  feeGrowthOutside1X128: bigint;
+  tickCumulativeOutside: bigint;
+  secondsPerLiquidityOutsideX128: bigint;
+  secondsOutside: number;
+  initialized: boolean;
 }
 
 // sqrtPriceX96ToPrice function removed - now using shared implementation from utils/uniswap-v3/price.ts

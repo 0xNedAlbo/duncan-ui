@@ -2,6 +2,7 @@ import { FEE_TIERS, type FeeTier } from "./types";
 
 // BigInt constants for precise calculations
 export const Q96 = 1n << 96n;
+export const Q128 = 1n << 128n;
 export const Q192 = 1n << 192n;
 
 // Re-export fee tiers for convenience
