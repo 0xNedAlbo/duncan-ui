@@ -36,6 +36,18 @@ export interface PoolSearchOptions {
     includeUserPools?: boolean;
 }
 
+export interface PoolListOptions {
+    chain?: string;
+    poolAddress?: string;
+    token0Address?: string;
+    token1Address?: string;
+    fee?: number;
+    limit?: number;
+    offset?: number;
+    sortBy?: "createdAt" | "updatedAt" | "poolAddress";
+    sortOrder?: "asc" | "desc";
+}
+
 export interface PoolWithTokenReferences extends Pool {
     token0Ref: TokenReferenceWithToken;
     token1Ref: TokenReferenceWithToken;
@@ -599,6 +611,76 @@ export class PoolService {
             console.error(`Failed to fetch pool state:`, error);
             throw new Error(`Failed to fetch pool state: ${error}`);
         }
+    }
+
+    /**
+     * List pools with optional filtering
+     */
+    async listPools(
+        options: PoolListOptions = {}
+    ): Promise<PoolWithTokens[]> {
+        const {
+            chain,
+            poolAddress,
+            token0Address,
+            token1Address,
+            fee,
+            limit = 50,
+            offset = 0,
+            sortBy = "createdAt",
+            sortOrder = "desc",
+        } = options;
+
+        const whereClause: any = {};
+
+        if (chain) {
+            whereClause.chain = chain;
+        }
+
+        if (poolAddress) {
+            whereClause.poolAddress = normalizeAddress(poolAddress);
+        }
+
+        if (token0Address) {
+            whereClause.token0Address = normalizeAddress(token0Address);
+        }
+
+        if (token1Address) {
+            whereClause.token1Address = normalizeAddress(token1Address);
+        }
+
+        if (fee !== undefined) {
+            whereClause.fee = fee;
+        }
+
+        const pools = await this.prisma.pool.findMany({
+            where: whereClause,
+            include: {
+                token0Ref: {
+                    include: {
+                        globalToken: true,
+                        userToken: true,
+                    },
+                },
+                token1Ref: {
+                    include: {
+                        globalToken: true,
+                        userToken: true,
+                    },
+                },
+            },
+            orderBy: {
+                [sortBy]: sortOrder,
+            },
+            take: limit,
+            skip: offset,
+        });
+
+        return pools.map((pool) => ({
+            ...pool,
+            token0Data: this.tokenReferences.getUnifiedTokenData(pool.token0Ref),
+            token1Data: this.tokenReferences.getUnifiedTokenData(pool.token1Ref),
+        }));
     }
 
     /**

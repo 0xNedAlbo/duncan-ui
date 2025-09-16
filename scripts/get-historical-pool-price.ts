@@ -27,28 +27,9 @@ import { DefaultServiceFactory } from "@/services/ServiceFactory";
 const args = process.argv.slice(2);
 
 if (args.length < 2 || args.length > 3) {
-    console.error(
-        "Usage: npx tsx scripts/get-historical-pool-price.ts <poolAddress> <blockNumber> [chain]"
-    );
-    console.error("");
-    console.error("Arguments:");
-    console.error(
-        "  poolAddress  - Uniswap V3 pool contract address (e.g., 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640)"
-    );
-    console.error("  blockNumber  - Block number to query (e.g., 18800000)");
-    console.error(
-        "  chain        - Chain name (optional, defaults to ethereum)"
-    );
-    console.error("");
-    console.error("Supported chains: ethereum, arbitrum, base");
-    console.error("");
-    console.error("Examples:");
-    console.error(
-        "  npx tsx scripts/get-historical-pool-price.ts 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 18800000"
-    );
-    console.error(
-        "  npx tsx scripts/get-historical-pool-price.ts 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 18800000 ethereum"
-    );
+    console.log(JSON.stringify({
+        error: "Usage: npx tsx scripts/get-historical-pool-price.ts <poolAddress> <blockNumber> [chain]"
+    }));
     process.exit(1);
 }
 
@@ -58,24 +39,24 @@ const chain = (args[2] || "ethereum") as SupportedChainsType;
 
 // Validate inputs
 if (!poolAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
-    console.error(
-        "Error: Invalid pool address format. Must be a valid Ethereum address (0x followed by 40 hex characters)"
-    );
+    console.log(JSON.stringify({
+        error: "Invalid pool address format. Must be a valid Ethereum address (0x followed by 40 hex characters)"
+    }));
     process.exit(1);
 }
 
 if (blockNumber <= 0n) {
-    console.error("Error: Block number must be a positive integer");
+    console.log(JSON.stringify({
+        error: "Block number must be a positive integer"
+    }));
     process.exit(1);
 }
 
 const supportedChains = ["ethereum", "arbitrum", "base"];
 if (!supportedChains.includes(chain)) {
-    console.error(
-        `Error: Unsupported chain "${chain}". Supported chains: ${supportedChains.join(
-            ", "
-        )}`
-    );
+    console.log(JSON.stringify({
+        error: `Unsupported chain "${chain}". Supported chains: ${supportedChains.join(", ")}`
+    }));
     process.exit(1);
 }
 
@@ -105,15 +86,16 @@ async function main() {
 
         console.log(JSON.stringify(result, null, 2));
     } catch (error) {
-        console.error(
-            `❌ Error retrieving price data:`,
-            error instanceof Error ? error.message : "Unknown error"
-        );
+        console.log(JSON.stringify({
+            error: error instanceof Error ? error.message : "Unknown error"
+        }));
         process.exit(1);
     }
 }
 
 main().catch((error) => {
-    console.error("❌ Unexpected error:", error);
+    console.log(JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error"
+    }));
     process.exit(1);
 });

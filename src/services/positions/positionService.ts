@@ -131,16 +131,18 @@ export class PositionService {
         const {
             userId,
             chain,
-            status = "active",
+            status,
             limit = 50,
             offset = 0,
             sortBy = "createdAt",
             sortOrder = "desc",
         } = options;
 
-        const whereClause: any = {
-            status,
-        };
+        const whereClause: any = {};
+
+        if (status) {
+            whereClause.status = status;
+        }
 
         if (userId) {
             whereClause.userId = userId;
@@ -273,11 +275,13 @@ export class PositionService {
     async countPositions(
         options: Pick<PositionListOptions, "userId" | "chain" | "status"> = {}
     ): Promise<number> {
-        const { userId, chain, status = "active" } = options;
+        const { userId, chain, status } = options;
 
-        const whereClause: any = {
-            status,
-        };
+        const whereClause: any = {};
+
+        if (status) {
+            whereClause.status = status;
+        }
 
         if (userId) {
             whereClause.userId = userId;
@@ -299,12 +303,16 @@ export class PositionService {
      */
     async getPositionsByNftId(
         nftId: string,
-        chain?: SupportedChainsType
+        chain?: SupportedChainsType,
+        status?: string
     ): Promise<BasicPosition[]> {
         const whereClause: any = {
             nftId,
-            status: "active",
         };
+
+        if (status) {
+            whereClause.status = status;
+        }
 
         if (chain) {
             whereClause.pool = {

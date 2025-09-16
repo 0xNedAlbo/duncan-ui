@@ -55,12 +55,9 @@ const replaceFlag = args.includes("--replace");
 const positionalArgs = args.filter(arg => !arg.startsWith("--"));
 
 if (positionalArgs.length !== 3) {
-    console.error("Error: Expected exactly 3 arguments: <username> <chain> <nftId>");
-    console.error("");
-    console.error("Usage:");
-    console.error("  npx tsx scripts/import-position.ts <username> <chain> <nftId> [--replace]");
-    console.error("");
-    console.error("Run with --help for more information");
+    console.log(JSON.stringify({
+        error: "Expected exactly 3 arguments: <username> <chain> <nftId>"
+    }));
     process.exit(1);
 }
 
@@ -68,35 +65,41 @@ const [username, chain, nftIdStr] = positionalArgs;
 
 // Validate inputs
 if (!username || !chain || !nftIdStr) {
-    console.error("Error: All arguments are required: username, chain, nftId");
+    console.log(JSON.stringify({
+        error: "All arguments are required: username, chain, nftId"
+    }));
     process.exit(1);
 }
 
 // Validate chain
 const supportedChains = ["ethereum", "arbitrum", "base"];
 if (!supportedChains.includes(chain.toLowerCase())) {
-    console.error(`Error: Unsupported chain "${chain}". Supported chains: ${supportedChains.join(", ")}`);
+    console.log(JSON.stringify({
+        error: `Unsupported chain "${chain}". Supported chains: ${supportedChains.join(", ")}`
+    }));
     process.exit(1);
 }
 
 // Validate NFT ID
 const nftId = nftIdStr.trim();
 if (!/^\d+$/.test(nftId)) {
-    console.error("Error: NFT ID must be a positive integer");
+    console.log(JSON.stringify({
+        error: "NFT ID must be a positive integer"
+    }));
     process.exit(1);
 }
 
 // Validate email format
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 if (!emailRegex.test(username)) {
-    console.error("Error: Username must be a valid email address");
+    console.log(JSON.stringify({
+        error: "Username must be a valid email address"
+    }));
     process.exit(1);
 }
 
 async function main() {
     try {
-        console.error(`🔍 Importing position NFT ${nftId} for ${username} on ${chain}${replaceFlag ? " (with replace)" : ""}...`);
-
         // Get clients and services from factories
         const { prisma } = DefaultClientsFactory.getInstance().getClients();
         const { positionImportService } = DefaultServiceFactory.getInstance().getServices();
@@ -107,16 +110,11 @@ async function main() {
         });
 
         if (!user) {
-            console.error(`❌ Error: User with email "${username}" not found in database`);
-            console.error("Available users:");
-            const users = await prisma.user.findMany({
-                select: { email: true, name: true }
-            });
-            users.forEach(u => console.error(`  - ${u.email} (${u.name})`));
+            console.log(JSON.stringify({
+                error: `User with email "${username}" not found in database`
+            }));
             process.exit(1);
         }
-
-        console.error(`✅ Found user: ${user.name} (${user.email})`);
 
         // Step 2: Check if position already exists
         const existingPosition = await prisma.position.findFirst({
@@ -128,26 +126,20 @@ async function main() {
         });
 
         if (existingPosition && !replaceFlag) {
-            console.error(`⚠️  Position with NFT ID ${nftId} already exists for user ${username}`);
-            console.error(`   Use --replace flag to replace the existing position`);
-            console.error(`   Position ID: ${existingPosition.id}`);
+            console.log(JSON.stringify({
+                error: `Position with NFT ID ${nftId} already exists for user ${username}. Use --replace flag to replace the existing position`
+            }));
             process.exit(1);
         }
 
         if (existingPosition && replaceFlag) {
-            console.error(`🔄 Replacing existing position: ${existingPosition.id}`);
-            
             // Delete the existing position (cascade should handle related data)
             await prisma.position.delete({
                 where: { id: existingPosition.id }
             });
-            
-            console.error(`✅ Existing position deleted`);
         }
 
         // Step 3: Import position using the service
-        console.error(`🚀 Fetching position data from blockchain...`);
-        
         const result = await positionImportService.importPositionForUserByNftId(
             user.id,
             nftId,
@@ -155,16 +147,13 @@ async function main() {
         );
 
         if (!result.success) {
-            console.error(`❌ Import failed: ${result.message}`);
+            console.log(JSON.stringify({
+                error: result.message
+            }));
             process.exit(1);
         }
 
-        // Step 4: Output results
-        console.error(`✅ Import successful!`);
-        console.error(`   Position ID: ${result.positionId}`);
-        console.error(`   Message: ${result.message}`);
-
-        // Output detailed position data as JSON
+        // Step 4: Output results as JSON
         if (result.data) {
             console.log(JSON.stringify({
                 success: true,
@@ -186,7 +175,9 @@ async function main() {
         }
 
     } catch (error) {
-        console.error(`❌ Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`);
+        console.log(JSON.stringify({
+            error: error instanceof Error ? error.message : "Unknown error"
+        }));
         process.exit(1);
     } finally {
         const { prisma } = DefaultClientsFactory.getInstance().getClients();
@@ -195,6 +186,8 @@ async function main() {
 }
 
 main().catch((error) => {
-    console.error("❌ Fatal error:", error);
+    console.log(JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error"
+    }));
     process.exit(1);
 });

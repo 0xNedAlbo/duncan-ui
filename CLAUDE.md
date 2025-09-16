@@ -137,6 +137,18 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - **Seeding commands**: `npm run db:seed` or automatic via `prisma migrate reset/dev`
 - **Environment safety**: Only seeds when `NODE_ENV !== 'production'`
 
+**Script Output Standards:**
+- **All scripts in `scripts/` directory must output JSON-only structures**
+- **Success responses**: Return structured JSON with relevant data
+- **Error responses**: Return `{"error": "error message"}` object
+- **No console.log, console.error, console.warn, or any console methods**
+- **No emojis, fancy formatting, progress messages, or status updates**
+- **All output must be valid JSON parseable by automation tools**
+- **Examples:**
+  - Success: `{"poolAddress": "0x...", "blockNumber": "12345", "price": "..."}`
+  - Error: `{"error": "Invalid pool address format"}`
+- **Exception**: Help messages (--help flag) may use console.error for usage instructions
+
 **Additional Coding Guidelines for Claude:**
 - use formatFractionHuman() or other functions from fraction-formats.ts when displaying bigint values
 - use scripts/api-debug.ts when testing API behaviour because it contains proper authentication
