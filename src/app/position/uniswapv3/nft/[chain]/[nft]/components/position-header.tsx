@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ChainConfig } from "@/config/chains";
 import { useNFTPosition, useRefreshNFTPosition } from "@/hooks/api/usePositions";
-import { handleApiError } from "@/lib/api/apiError";
+import { handleApiError } from "@/lib/app/apiError";
 
 interface PositionHeaderProps {
     chainSlug: string;

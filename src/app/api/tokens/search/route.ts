@@ -1,19 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TokenResolutionService } from '@/services/tokens/tokenResolutionService';
-import { TokenService } from '@/services/tokens/tokenService';
-import { PrismaClient } from '@prisma/client';
 import { getSession } from '@/lib/auth';
-
-// Create services lazily to allow test injection
-function getTokenResolutionService() {
-  const prisma = globalThis.__testPrisma || new PrismaClient();
-  return new TokenResolutionService(prisma);
-}
-
-function getTokenService() {
-  const prisma = globalThis.__testPrisma || new PrismaClient();
-  return new TokenService(prisma);
-}
+import { DefaultServiceFactory } from '@/services/ServiceFactory';
 
 export async function GET(request: NextRequest) {
   // Handle authentication separately to ensure proper error handling
@@ -21,7 +8,6 @@ export async function GET(request: NextRequest) {
   try {
     session = await getSession();
   } catch (sessionError) {
-    console.error('Session service error:', sessionError);
     return NextResponse.json(
       { error: 'Session service error' },
       { status: 500 }
@@ -61,7 +47,8 @@ export async function GET(request: NextRequest) {
     
     if (!verifiedOnly) {
       // Get user's custom tokens first
-      const userTokens = await getTokenResolutionService().getUserTokens(session.user.id, chain || undefined);
+      const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
+      const userTokens = await tokenResolutionService.getUserTokens(session.user.id, chain || undefined);
       
       // Filter user tokens by query
       const filteredUserTokens = userTokens.filter(token => {
@@ -91,7 +78,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get global verified tokens
-    const globalTokens = await getTokenService().searchTokens({
+    const { tokenService } = DefaultServiceFactory.getInstance().getServices();
+    const globalTokens = await tokenService.searchTokens({
       chain: chain || undefined,
       query: query || undefined,
       limit,
@@ -124,7 +112,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error searching tokens:', error);
     
     if (error instanceof Error) {
       // Handle validation errors

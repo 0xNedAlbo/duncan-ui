@@ -52,8 +52,7 @@ export async function POST(request: NextRequest) {
       },
       { status: 501 }
     );
-  } catch (error) {
-    console.error('NFT import API error:', error);
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

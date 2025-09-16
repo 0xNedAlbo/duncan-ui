@@ -161,7 +161,7 @@ export class TokenResolutionService {
                 };
             }
         } catch (error) {
-            console.warn(`Alchemy failed for ${address} on ${chain}:`, error);
+            // Alchemy fetch failed, will try contract call
         }
 
         // Try contract call
@@ -191,10 +191,7 @@ export class TokenResolutionService {
                 };
             }
         } catch (error) {
-            console.warn(
-                `Contract call failed for ${address} on ${chain}:`,
-                error
-            );
+            // Contract call failed
         }
 
         // Fallback: placeholder in user's custom list
@@ -260,10 +257,7 @@ export class TokenResolutionService {
                 decimals: decimals || 18,
             };
         } catch (error) {
-            console.error(
-                `Failed to fetch token metadata from contract ${address} on ${chain}:`,
-                error
-            );
+            // Contract metadata fetch failed
             throw new Error(`Contract call failed: ${error}`);
         }
     }

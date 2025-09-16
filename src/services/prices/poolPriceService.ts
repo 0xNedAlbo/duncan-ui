@@ -115,7 +115,7 @@ export class PoolPriceService {
             };
         } catch (error) {
             // Log error but don't throw - cache miss is acceptable
-            console.error("Cache lookup failed:", error);
+            // Cache lookup failed
             return null;
         }
     }
@@ -163,7 +163,7 @@ export class PoolPriceService {
             });
         } catch (error) {
             // Log error but don't throw - cache failure shouldn't block price retrieval
-            console.error("Cache storage failed:", error);
+            // Cache storage failed
         }
     }
 
@@ -323,7 +323,7 @@ export class PoolPriceService {
         try {
             await this.prisma.poolPriceCache.deleteMany({});
         } catch (error) {
-            console.error("Cache clear failed:", error);
+            // Cache clear failed
             throw error;
         }
     }
@@ -356,7 +356,7 @@ export class PoolPriceService {
 
             return { size, keys };
         } catch (error) {
-            console.error("Cache stats failed:", error);
+            // Cache stats failed
             // Return empty stats if database fails
             return {
                 size: 0,

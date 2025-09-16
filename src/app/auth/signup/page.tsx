@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthTranslations } from "@/lib/auth-translations";
-import { apiClient } from "@/lib/api/apiClient";
-import { handleApiError } from "@/lib/api/apiError";
+import { apiClient } from "@/lib/app/apiClient";
+import { handleApiError } from "@/lib/app/apiError";
 import type { RegisterRequest, RegisterResponse } from "@/types/api";
 
 export default function SignUpPage() {

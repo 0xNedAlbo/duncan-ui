@@ -77,10 +77,7 @@ export class TokenService {
             });
         } catch (error) {
             // If Alchemy fails, create with minimal data
-            console.warn(
-                `Failed to fetch token metadata from Alchemy for ${address} on ${chain}:`,
-                error
-            );
+            // Alchemy fetch failed - will create with minimal data
 
             return await this.prisma.token.create({
                 data: {
@@ -338,7 +335,7 @@ export class TokenService {
 
             return [...existingTokens, ...newTokens];
         } catch (error) {
-            console.warn("Failed to batch fetch tokens from Alchemy:", error);
+            // Batch fetch from Alchemy failed
 
             // Fallback: create tokens with minimal data
             const fallbackTokens: Token[] = [];
@@ -412,10 +409,7 @@ export class TokenService {
                 // Add small delay to respect rate limits
                 await new Promise((resolve) => setTimeout(resolve, 100));
             } catch (error) {
-                console.warn(
-                    `Failed to refresh token ${token.address} on ${token.chain}:`,
-                    error
-                );
+                // Failed to refresh individual token
             }
         }
     }

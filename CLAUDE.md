@@ -94,7 +94,12 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 - Convert BigInt to human readable formats only when displaying values to the user
 - Never use float values for storing token amounts, token prices, position values, pnl, historical values with respect to tokens
 - Use English only for documentation and comments
-- **NEVER use console.log, console.warn, console.error, or any console methods in backend services and API code** - backend code should operate silently
+
+**Backend Logging Rules:**
+- **Service Layer**: Completely silent - no logging, no console.* outputs, only throw errors when needed
+- **API Layer**: Structured logging only through logging framework (Pino)
+- **Error Handling**: DEBUG-level logs with full stack traces when services throw errors
+- **Request Correlation**: All API logs include request ID for tracing across service calls
 
 
 **Precision & BigInt Handling Rule:**
@@ -148,6 +153,18 @@ This asymmetry is what most LP providers don't understand. The visualization mak
   - Success: `{"poolAddress": "0x...", "blockNumber": "12345", "price": "..."}`
   - Error: `{"error": "Invalid pool address format"}`
 - **Exception**: Help messages (--help flag) may use console.error for usage instructions
+
+**API Service Layer Architecture:**
+- **APIs NEVER query database or external infrastructure directly** - only through service methods
+- **APIs NEVER use human-readable number formats** - always BigInt values scaled to token decimals
+- **Input parameters:** Accept BigInt strings (e.g., "1000000" for 1 USDC)
+- **Output values:** Return BigInt strings (e.g., "1500000" for 1.5 USDC)
+- **Service methods handle all:** Database queries, external API calls, calculations
+- **APIs are thin wrappers:** Authentication → Service call → Response formatting
+- **Examples:**
+  - API receives: `{"amount": "1000000"}` (1 USDC as 1000000 scaled)
+  - API calls: `await TokenService.getPrice(tokenAddress, amount)`
+  - API returns: `{"price": "1500000"}` (1.5 USDC as 1500000 scaled)
 
 **Additional Coding Guidelines for Claude:**
 - use formatFractionHuman() or other functions from fraction-formats.ts when displaying bigint values

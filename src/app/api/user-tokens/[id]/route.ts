@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { TokenResolutionService } from '@/services/tokens/tokenResolutionService';
+import { DefaultServiceFactory } from '@/services/ServiceFactory';
 import { z } from 'zod';
 
 interface RouteContext {
@@ -42,8 +42,8 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const body = await request.json();
     const validatedData = UpdateUserTokenSchema.parse(body);
 
-    const tokenResolver = new TokenResolutionService();
-    const updatedToken = await tokenResolver.updateUserToken(
+    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
+    const updatedToken = await tokenResolutionService.updateUserToken(
       session.user.id,
       id,
       validatedData
@@ -52,7 +52,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ userToken: updatedToken });
 
   } catch (error) {
-    console.error('Error updating user token:', error);
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -98,13 +97,12 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const tokenResolver = new TokenResolutionService();
-    await tokenResolver.removeUserToken(session.user.id, id);
+    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
+    await tokenResolutionService.removeUserToken(session.user.id, id);
 
     return NextResponse.json({ message: 'Token removed successfully' });
 
   } catch (error) {
-    console.error('Error removing user token:', error);
     
     if (error instanceof Error) {
       return NextResponse.json(

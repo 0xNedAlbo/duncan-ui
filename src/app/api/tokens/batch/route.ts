@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TokenResolutionService } from '@/services/tokens/tokenResolutionService';
-import { PrismaClient } from '@prisma/client';
 import { getSession } from '@/lib/auth';
-
-// Create service lazily to allow test injection
-function getTokenResolutionService() {
-  const prisma = globalThis.__testPrisma || new PrismaClient();
-  return new TokenResolutionService(prisma);
-}
+import { DefaultServiceFactory } from '@/services/ServiceFactory';
 
 export async function POST(request: NextRequest) {
   // Check authentication
@@ -60,15 +53,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Resolve tokens for user (will create if needed)
+    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
     const tokenRequests = addresses.map(address => ({ chain, address }));
-    const tokens = await getTokenResolutionService().resolveTokens(tokenRequests, session.user.id);
+    const tokens = await tokenResolutionService.resolveTokens(tokenRequests, session.user.id);
 
     return NextResponse.json({
       tokens,
       count: tokens.length,
     });
   } catch (error) {
-    console.error('Error creating tokens from addresses:', error);
     
     if (error instanceof Error) {
       // Handle validation errors
@@ -125,15 +118,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Resolve tokens for user (similar to POST, but via GET)
+    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
     const tokenRequests = addresses.map(address => ({ chain, address }));
-    const tokens = await getTokenResolutionService().resolveTokens(tokenRequests, session.user.id);
+    const tokens = await tokenResolutionService.resolveTokens(tokenRequests, session.user.id);
 
     return NextResponse.json({
       tokens,
       count: tokens.length,
     });
   } catch (error) {
-    console.error('Error fetching tokens by addresses:', error);
     
     if (error instanceof Error) {
       // Handle validation errors

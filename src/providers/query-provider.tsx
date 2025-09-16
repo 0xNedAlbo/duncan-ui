@@ -9,7 +9,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState } from 'react';
-import { ApiError } from '@/lib/api/apiError';
+import { ApiError } from '@/lib/app/apiError';
 
 interface QueryProviderProps {
   children: React.ReactNode;

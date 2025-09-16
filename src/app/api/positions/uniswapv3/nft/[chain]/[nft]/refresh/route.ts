@@ -29,8 +29,7 @@ export async function POST(
       },
       { status: 501 }
     );
-  } catch (error) {
-    console.error('Position refresh API error:', error);
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

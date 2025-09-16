@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TokenResolutionService } from '@/services/tokens/tokenResolutionService';
-import { PrismaClient } from '@prisma/client';
 import { getSession } from '@/lib/auth';
+import { DefaultServiceFactory } from '@/services/ServiceFactory';
+import { withLogging, logError } from '@/lib/api/withLogging';
 
-// Create service lazily to allow test injection
-function getTokenResolutionService() {
-  const prisma = globalThis.__testPrisma || new PrismaClient();
-  return new TokenResolutionService(prisma);
-}
-
-export async function GET(request: NextRequest) {
+export const GET = withLogging(async (request: NextRequest, { log, reqId }) => {
   // Check authentication
   const session = await getSession();
   if (!session?.user?.id) {
@@ -19,44 +13,40 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const { searchParams } = new URL(request.url);
+  const chain = searchParams.get('chain');
+  const address = searchParams.get('address');
+
+  // Input validation
+  if (!chain || !address) {
+    return NextResponse.json(
+      { error: 'Missing required parameters: chain and address' },
+      { status: 400 }
+    );
+  }
+
   try {
-    const { searchParams } = new URL(request.url);
-    const chain = searchParams.get('chain');
-    const address = searchParams.get('address');
-
-    // Input validation
-    if (!chain || !address) {
-      return NextResponse.json(
-        { error: 'Missing required parameters: chain and address' },
-        { status: 400 }
-      );
-    }
-
     // Resolve token for user
-    const token = await getTokenResolutionService().resolveToken(chain, address, session.user.id);
+    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
+    const token = await tokenResolutionService.resolveToken(chain, address, session.user.id);
 
     return NextResponse.json({ token });
   } catch (error) {
-    console.error('Error fetching token:', error);
-    
-    if (error instanceof Error) {
-      // Handle validation errors
-      if (error.message.includes('Invalid') || error.message.includes('Unsupported')) {
-        return NextResponse.json(
-          { error: error.message },
-          { status: 400 }
-        );
-      }
+    // Handle validation errors
+    if (error instanceof Error && (error.message.includes('Invalid') || error.message.includes('Unsupported'))) {
+      logError(log, error, { chain, address, userId: session.user.id });
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    // Let withLogging handle the 500 error with full stack trace
+    throw error;
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withLogging(async (request: NextRequest, { log, reqId }) => {
   // Check authentication
   const session = await getSession();
   if (!session?.user?.id) {
@@ -66,20 +56,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const body = await request.json();
+  const { chain, address, symbol, name, decimals, logoUrl, userLabel, notes } = body;
+
+  // Input validation
+  if (!chain || !address || !symbol || !name || decimals === undefined) {
+    return NextResponse.json(
+      { error: 'Missing required parameters: chain, address, symbol, name, and decimals' },
+      { status: 400 }
+    );
+  }
+
   try {
-    const body = await request.json();
-    const { chain, address, symbol, name, decimals, logoUrl, userLabel, notes } = body;
-
-    // Input validation
-    if (!chain || !address || !symbol || !name || decimals === undefined) {
-      return NextResponse.json(
-        { error: 'Missing required parameters: chain, address, symbol, name, and decimals' },
-        { status: 400 }
-      );
-    }
-
     // Add custom token for user
-    const token = await getTokenResolutionService().addCustomToken(session.user.id, {
+    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
+    const token = await tokenResolutionService.addCustomToken(session.user.id, {
       chain,
       address,
       symbol,
@@ -92,21 +83,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ token }, { status: 201 });
   } catch (error) {
-    console.error('Error creating/updating token:', error);
-    
-    if (error instanceof Error) {
-      // Handle validation errors
-      if (error.message.includes('Invalid') || error.message.includes('Unsupported')) {
-        return NextResponse.json(
-          { error: error.message },
-          { status: 400 }
-        );
-      }
+    // Handle validation errors
+    if (error instanceof Error && (error.message.includes('Invalid') || error.message.includes('Unsupported'))) {
+      logError(log, error, { chain, address, symbol, userId: session.user.id });
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    // Let withLogging handle the 500 error with full stack trace
+    throw error;
   }
-}
+});

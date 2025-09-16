@@ -6,8 +6,8 @@
 
 import React from 'react';
 import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api/apiClient';
-import { ApiError } from '@/lib/api/apiError';
+import { apiClient } from '@/lib/app/apiClient';
+import { ApiError } from '@/lib/app/apiError';
 import type { 
   TokenSearchParams,
   TokenSearchResponse,

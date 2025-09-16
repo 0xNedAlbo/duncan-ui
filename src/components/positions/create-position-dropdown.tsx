@@ -4,7 +4,7 @@ import { Plus, ChevronDown, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslations } from "@/i18n/client";
 import { useImportNFT } from "@/hooks/api/usePositions";
-import { handleApiError } from "@/lib/api/apiError";
+import { handleApiError } from "@/lib/app/apiError";
 import type { ImportNFTResponse } from "@/types/api";
 import type { ParsedNFTPosition } from "@/services/uniswap/nftPosition";
 

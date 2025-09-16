@@ -5,7 +5,7 @@ import { Loader2, Filter, SortAsc, SortDesc, AlertCircle } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import { PositionCard } from "./position-card";
 import { usePositions, useRefreshPosition } from "@/hooks/api/usePositions";
-import { handleApiError } from "@/lib/api/apiError";
+import { handleApiError } from "@/lib/app/apiError";
 import type { PositionWithPnL } from "@/services/positions/positionService";
 import type { PositionListParams } from "@/types/api";
 

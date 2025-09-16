@@ -471,10 +471,7 @@ export class PoolService {
                 },
             });
         } catch (error) {
-            console.error(
-                `Failed to update pool state for pool ${poolId}:`,
-                error
-            );
+            // Pool state update failed
             throw error;
         }
     }
@@ -513,7 +510,7 @@ export class PoolService {
 
             return normalizeAddress(poolAddress);
         } catch (error) {
-            console.error(`Failed to compute pool address:`, error);
+            // Pool address computation failed
             throw new Error(`Failed to compute pool address: ${error}`);
         }
     }
@@ -622,7 +619,7 @@ export class PoolService {
                 feeGrowthGlobal1X128,
             };
         } catch (error) {
-            console.error(`Failed to fetch pool state:`, error);
+            // Pool state fetch failed
             throw new Error(`Failed to fetch pool state: ${error}`);
         }
     }

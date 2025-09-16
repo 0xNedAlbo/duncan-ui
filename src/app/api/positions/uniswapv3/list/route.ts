@@ -26,8 +26,7 @@ export async function GET(request: NextRequest) {
       },
       { status: 501 }
     );
-  } catch (error) {
-    console.error('Position list API error:', error);
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

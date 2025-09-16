@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { TokenResolutionService } from '@/services/tokens/tokenResolutionService';
+import { DefaultServiceFactory } from '@/services/ServiceFactory';
 import { z } from 'zod';
 
 const CreateUserTokenSchema = z.object({
@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
 
     const validatedOptions = GetUserTokensSchema.parse(options);
 
-    const tokenResolver = new TokenResolutionService();
-    const userTokens = await tokenResolver.getUserTokens(
+    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
+    const userTokens = await tokenResolutionService.getUserTokens(
       session.user.id,
       validatedOptions.chain
     );
@@ -50,7 +50,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ userTokens });
 
   } catch (error) {
-    console.error('Error fetching user tokens:', error);
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -83,8 +82,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = CreateUserTokenSchema.parse(body);
 
-    const tokenResolver = new TokenResolutionService();
-    const userToken = await tokenResolver.addCustomToken(
+    const { tokenResolutionService } = DefaultServiceFactory.getInstance().getServices();
+    const userToken = await tokenResolutionService.addCustomToken(
       session.user.id,
       validatedData
     );
@@ -92,7 +91,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ userToken });
 
   } catch (error) {
-    console.error('Error adding user token:', error);
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
