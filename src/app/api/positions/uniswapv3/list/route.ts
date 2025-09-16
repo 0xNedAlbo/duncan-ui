@@ -9,7 +9,7 @@ import { SupportedChainsType, SUPPORTED_CHAINS } from '@/config/chains';
  *
  * Query parameters:
  * - chain: Filter by specific chain (optional)
- * - status: Filter by position status (optional, default: active)
+ * - status: Filter by position status (optional, default: active, values: active, closed, archived, all)
  * - limit: Number of results per page (optional, default: 50, max: 100)
  * - offset: Results offset for pagination (optional, default: 0)
  * - sortBy: Sort field (optional, default: createdAt)
@@ -88,7 +88,7 @@ export const GET = withAuthAndLogging<{ success: boolean; positions?: any[]; tot
       const queryOptions = {
         userId: user.userId,
         chain: chain || undefined,
-        status,
+        status: status === 'all' ? undefined : status, // undefined for "all" means no status filter
         limit,
         offset,
         sortBy: sortBy || 'createdAt',
@@ -100,7 +100,7 @@ export const GET = withAuthAndLogging<{ success: boolean; positions?: any[]; tot
       // Fetch positions and total count
       const [positions, total] = await Promise.all([
         positionService.listPositions(queryOptions),
-        positionService.countPositions({ userId: user.userId, chain: chain || undefined, status })
+        positionService.countPositions({ userId: user.userId, chain: chain || undefined, status: status === 'all' ? undefined : status })
       ]);
 
       log.debug({ positionCount: positions.length, total }, 'Successfully fetched positions');
