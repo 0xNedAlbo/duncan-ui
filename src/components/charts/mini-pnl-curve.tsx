@@ -154,31 +154,49 @@ function MiniPnLCurveComponent({
                 <defs>
                     {/* Clip path for positive PnL area */}
                     <clipPath id={`positivePnLClip-${position.id}`}>
-                        <rect x="0" y="0" width={width} height={zeroLineY} />
+                        <rect x="0" y="0" width={width} height={Math.max(0, Math.min(height, zeroLineY))} />
                     </clipPath>
                     {/* Clip path for negative PnL area */}
                     <clipPath id={`negativePnLClip-${position.id}`}>
-                        <rect x="0" y={zeroLineY} width={width} height={height - zeroLineY} />
+                        <rect x="0" y={Math.max(0, Math.min(height, zeroLineY))} width={width} height={height - Math.max(0, Math.min(height, zeroLineY))} />
                     </clipPath>
                 </defs>
 
                 {/* Positive PnL area (green fill above zero line) */}
-                {zeroLineY >= 0 && zeroLineY <= height && (
-                    <path
-                        d={`${pathData} L ${width} ${zeroLineY} L 0 ${zeroLineY} Z`}
-                        fill="rgba(34, 197, 94, 0.3)"
-                        clipPath={`url(#positivePnLClip-${position.id})`}
-                    />
-                )}
+                {(() => {
+                    // Calculate effective fill boundary (clamp zero line to chart bounds)
+                    const effectiveZeroY = Math.max(0, Math.min(height, zeroLineY));
+
+                    // Determine if we should show positive fill
+                    const shouldShowPositiveFill = zeroLineY > 0 || // Zero line below chart (some positive area)
+                                                 (zeroLineY <= 0 && pnlRange.min >= 0); // Zero line above chart and all values positive
+
+                    return shouldShowPositiveFill && (
+                        <path
+                            d={`${pathData} L ${width} ${effectiveZeroY} L 0 ${effectiveZeroY} Z`}
+                            fill="rgba(34, 197, 94, 0.3)"
+                            clipPath={`url(#positivePnLClip-${position.id})`}
+                        />
+                    );
+                })()}
 
                 {/* Negative PnL area (red fill below zero line) */}
-                {zeroLineY >= 0 && zeroLineY <= height && (
-                    <path
-                        d={`${pathData} L ${width} ${zeroLineY} L 0 ${zeroLineY} Z`}
-                        fill="rgba(239, 68, 68, 0.3)"
-                        clipPath={`url(#negativePnLClip-${position.id})`}
-                    />
-                )}
+                {(() => {
+                    // Calculate effective fill boundary (clamp zero line to chart bounds)
+                    const effectiveZeroY = Math.max(0, Math.min(height, zeroLineY));
+
+                    // Determine if we should show negative fill
+                    const shouldShowNegativeFill = zeroLineY < height || // Zero line above chart (some negative area)
+                                                 (zeroLineY >= height && pnlRange.max <= 0); // Zero line below chart and all values negative
+
+                    return shouldShowNegativeFill && (
+                        <path
+                            d={`${pathData} L ${width} ${effectiveZeroY} L 0 ${effectiveZeroY} Z`}
+                            fill="rgba(239, 68, 68, 0.3)"
+                            clipPath={`url(#negativePnLClip-${position.id})`}
+                        />
+                    );
+                })()}
 
                 {/* Zero line (solid) */}
                 {zeroLineY >= 0 && zeroLineY <= height && (

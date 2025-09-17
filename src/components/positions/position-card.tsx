@@ -105,15 +105,56 @@ export function PositionCard({
         }
     };
 
-    // Check if position is stale (not refreshed for more than 30 minutes)
-    // Commented out until lastUpdated field is available
-    // const isStalePosition = () => {
-    //     if (!position.lastUpdated) return true;
-    //     const lastUpdatedTime = new Date(position.lastUpdated).getTime();
-    //     const now = Date.now();
-    //     const thirtyMinutesInMs = 30 * 60 * 1000;
-    //     return (now - lastUpdatedTime) > thirtyMinutesInMs;
-    // };
+    // Determine position status for badge
+    const getPositionStatus = () => {
+        // Check if position is closed first
+        if (position.status === "closed" || position.status === "archived") {
+            return "closed";
+        }
+
+        // Check if position is in range based on current tick
+        if (position.pool.currentTick !== undefined && position.pool.currentTick !== null) {
+            const currentTick = position.pool.currentTick;
+            if (currentTick >= position.tickLower && currentTick <= position.tickUpper) {
+                return "in-range";
+            } else {
+                return "out-of-range";
+            }
+        }
+
+        // If no current tick data, return unknown
+        return "unknown";
+    };
+
+    // Get status badge styling
+    const getStatusBadgeStyle = (status: string) => {
+        switch (status) {
+            case "in-range":
+                return "bg-green-500/20 text-green-400 border-green-500/30";
+            case "out-of-range":
+                return "bg-red-500/20 text-red-400 border-red-500/30";
+            case "closed":
+                return "bg-slate-500/20 text-slate-400 border-slate-500/30";
+            default:
+                return "bg-slate-500/20 text-slate-400 border-slate-500/30";
+        }
+    };
+
+    // Get status display text
+    const getStatusText = (status: string) => {
+        switch (status) {
+            case "in-range":
+                return t("dashboard.positions.rangeStatus.inRange");
+            case "out-of-range":
+                return t("dashboard.positions.rangeStatus.outOfRange");
+            case "closed":
+                return "Closed";
+            default:
+                return "Unknown";
+        }
+    };
+
+    const positionStatus = getPositionStatus();
 
     return (
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-6 py-4 hover:border-slate-600/50 transition-all duration-200">
@@ -150,25 +191,11 @@ export function PositionCard({
                             <h3 className="text-lg font-semibold text-white">
                                 {position.pool.token0.symbol}/{position.pool.token1.symbol}
                             </h3>
-                            {/* Range Status - Commented out until range status calculation is implemented */}
-                            {/* <span
-                                className={`px-2 py-1 rounded-md text-xs font-medium border ${getRangeStatusColor(
-                                    position.rangeStatus
-                                )}`}
+                            <span
+                                className={`px-1 py-0.5 rounded-sm text-xs font-medium border ${getStatusBadgeStyle(positionStatus)}`}
                             >
-                                {position.rangeStatus === "in-range"
-                                    ? t(
-                                          "dashboard.positions.rangeStatus.inRange"
-                                      )
-                                    : position.rangeStatus === "out-of-range"
-                                    ? t(
-                                          "dashboard.positions.rangeStatus.outOfRange"
-                                      )
-                                    : t(
-                                          "dashboard.positions.rangeStatus.unknown"
-                                      )}
+                                {getStatusText(positionStatus)}
                             </span>
-                            */}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-slate-400">
                             <span className="px-2 py-0.5 rounded text-xs font-medium border bg-slate-500/20 text-slate-400 border-slate-500/30">
@@ -256,7 +283,7 @@ export function PositionCard({
                                     position={position}
                                     width={120}
                                     height={60}
-                                    showTooltip={false}
+                                    showTooltip={true}
                                 />
                             </div>
                         </div>
