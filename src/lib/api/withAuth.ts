@@ -84,26 +84,36 @@ export function withAuth<T = any>(
 export function withAuthAndLogging<T = any>(
     handler: AuthenticatedLoggingApiHandler<T>
 ) {
-    // Import withLogging here to avoid circular dependencies
-    const { withLogging } = require('./withLogging');
-
-    return withLogging<T>(async (request: NextRequest, { log }, params?: any) => {
-        // Check authentication
+    return async (request: NextRequest, context?: RouteParams) => {
+        // Check authentication first
         const authUser = await getAuthUser(request);
         if (!authUser) {
-            return NextResponse.json(
-                { success: false, error: 'Unauthorized - Please sign in' },
-                { status: 401 }
-            );
+            // For unauthenticated requests, still log with no user info
+            const { withLogging } = require('./withLogging');
+            const unauthenticatedHandler = withLogging<T>(async (req: NextRequest, { log }) => {
+                return NextResponse.json(
+                    { success: false, error: 'Unauthorized - Please sign in' },
+                    { status: 401 }
+                );
+            });
+            return unauthenticatedHandler(request, context);
         }
 
-        log.debug({ userId: authUser.userId, authMethod: authUser.authMethod }, 'Authenticated request');
+        // Import withLogging here to avoid circular dependencies
+        const { withLogging } = require('./withLogging');
 
-        // Execute the handler with authenticated user and logger
-        return await handler(
-            request,
-            { user: authUser, log },
-            params
-        );
-    });
+        // Create authenticated logging wrapper with user info
+        const authenticatedHandler = withLogging<T>(async (req: NextRequest, { log }, params?: any) => {
+            log.debug({ userId: authUser.userId, authMethod: authUser.authMethod }, 'Authenticated request');
+
+            // Execute the handler with authenticated user and logger
+            return await handler(
+                req,
+                { user: authUser, log },
+                params
+            );
+        }, authUser); // Pass authUser to withLogging
+
+        return authenticatedHandler(request, context);
+    };
 }

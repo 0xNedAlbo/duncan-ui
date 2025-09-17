@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beginRequestLog } from "./httpLogger";
 import type { Logger } from "./logger";
+import type { AuthUser } from "@/lib/auth/getAuthUser";
 
 export interface LoggingContext {
     log: Logger;
@@ -28,13 +29,15 @@ export type RouteParams = {
  * Wrap an API route handler with structured logging
  *
  * @param handler - The API route handler function
+ * @param authUser - Optional authenticated user for access logging
  * @returns Wrapped handler with logging capabilities
  */
 export function withLogging<T = any>(
-    handler: ApiHandler<T>
+    handler: ApiHandler<T>,
+    authUser?: AuthUser
 ): (request: NextRequest, context?: RouteParams) => Promise<NextResponse<T>> {
     return async (request: NextRequest, context?: RouteParams) => {
-        const { reqId, headers, access, log } = beginRequestLog(request);
+        const { reqId, headers, access, log } = beginRequestLog(request, authUser);
 
         try {
             // Log incoming request

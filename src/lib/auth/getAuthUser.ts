@@ -6,6 +6,7 @@ import { verify } from '@node-rs/argon2';
 
 export type AuthUser = {
   userId: string;
+  username: string;
   authMethod: 'session' | 'api-key';
 };
 
@@ -14,8 +15,15 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUser | null
   const apiKeyUserId = request.headers.get("x-api-key-user-id");
 
   if (apiKeyUserId) {
+    // Fetch email for API key authentication
+    const user = await prisma.user.findUnique({
+      where: { id: apiKeyUserId },
+      select: { email: true }
+    });
+
     return {
       userId: apiKeyUserId,
+      username: user?.email || apiKeyUserId,
       authMethod: 'api-key',
     };
   }
@@ -35,7 +43,13 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUser | null
           prefix: prefix,
           revokedAt: null  // Not revoked (active)
         },
-        select: { userId: true, hash: true }
+        select: {
+          userId: true,
+          hash: true,
+          user: {
+            select: { email: true }
+          }
+        }
       });
 
       if (apiKeyRecord) {
@@ -49,6 +63,7 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUser | null
         if (isValid) {
           return {
             userId: apiKeyRecord.userId,
+            username: apiKeyRecord.user.email || apiKeyRecord.userId,
             authMethod: 'api-key',
           };
         }
@@ -64,6 +79,7 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUser | null
   if (session?.user?.id) {
     return {
       userId: session.user.id,
+      username: session.user.email || session.user.id,
       authMethod: 'session',
     };
   }
