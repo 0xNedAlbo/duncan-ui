@@ -143,14 +143,23 @@ export function useRefreshNFTPosition(
     
     onSuccess: (response, { chain, nftId }) => {
       const refreshedPosition = response.data?.position;
-      
+      const pnlBreakdown = response.data?.pnlBreakdown;
+
       if (refreshedPosition) {
         // Update the specific NFT position in cache
         queryClient.setQueryData(
           ['positions', 'nft', chain, nftId] as const,
           refreshedPosition
         );
-        
+
+        // Update PnL cache with fresh data
+        if (pnlBreakdown) {
+          queryClient.setQueryData(
+            ['positions', 'pnl', chain, nftId],
+            pnlBreakdown
+          );
+        }
+
         // Invalidate positions list to ensure it's updated
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.positions });
       }
@@ -239,30 +248,35 @@ export function useRefreshPosition(
     
     onSuccess: (response, position) => {
       const refreshedPosition = response.data?.position;
-      
+      const pnlBreakdown = response.data?.pnlBreakdown;
+
       if (refreshedPosition) {
-        // Note: Individual position cache managed by NFT-specific hooks
-        
         // Update position in all positions list queries
         queryClient.setQueriesData<PositionListResponse>(
           { queryKey: QUERY_KEYS.positions },
           (oldData) => {
             if (!oldData?.data) return oldData;
-            
+
             return {
               ...oldData,
               data: {
                 ...oldData.data,
-                positions: oldData.data.positions.map(pos => 
+                positions: oldData.data.positions.map(pos =>
                   pos.id === position.id ? refreshedPosition : pos
                 ),
               },
             };
           }
         );
+
+        // Update PnL cache with fresh data instead of invalidating
+        if (position.nftId && position.pool.chain && pnlBreakdown) {
+          queryClient.setQueryData(
+            ['positions', 'pnl', position.pool.chain, position.nftId],
+            pnlBreakdown
+          );
+        }
       }
-      
-      // Fresh data ensured via position list invalidation
     },
     
     onError: (error, position) => {

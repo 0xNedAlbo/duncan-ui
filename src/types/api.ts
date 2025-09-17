@@ -129,12 +129,11 @@ export interface PositionDetailsResponse extends ApiResponse<PositionWithPnL> {
   data?: PositionWithPnL;
 }
 
-export interface PositionRefreshResponse extends ApiResponse<{ position: PositionWithPnL }> {
+export interface PositionRefreshResponse extends ApiResponse<{ position: BasicPosition | null; pnlBreakdown: PnlBreakdown }> {
   meta: {
     requestedAt: string;
-    upgraded: boolean;
-    previousDataSource?: string;
-    newDataSource?: string;
+    positionId: string;
+    refreshedAt: string;
   };
 }
 
