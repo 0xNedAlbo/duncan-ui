@@ -346,6 +346,49 @@ export class PositionService {
     }
 
     /**
+     * Get a single position by user ID, chain, and NFT ID
+     */
+    async getPositionByUserChainAndNft(
+        userId: string,
+        chain: SupportedChainsType,
+        nftId: string
+    ): Promise<BasicPosition | null> {
+        const position = await this.prisma.position.findFirst({
+            where: {
+                userId,
+                nftId,
+                pool: {
+                    chain,
+                },
+            },
+            include: {
+                pool: {
+                    include: {
+                        token0Ref: {
+                            include: {
+                                globalToken: true,
+                                userToken: true,
+                            },
+                        },
+                        token1Ref: {
+                            include: {
+                                globalToken: true,
+                                userToken: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (!position) {
+            return null;
+        }
+
+        return this.mapToBasicPosition(position);
+    }
+
+    /**
      * Check if position exists
      */
     async positionExists(positionId: string): Promise<boolean> {

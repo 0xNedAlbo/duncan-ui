@@ -64,7 +64,7 @@ export class PositionPnLService {
   /**
    * Calculate unclaimed fees for a position
    */
-  async getUnclaimedFees(positionId: string): Promise<UnclaimedFeesWithMetadata> {
+  private async getUnclaimedFees(positionId: string): Promise<UnclaimedFeesWithMetadata> {
     // 1. Fetch position using PositionService
     const position = await this.positionService.getPosition(positionId);
 
@@ -283,7 +283,7 @@ export class PositionPnLService {
    * Calculate the current value of a position
    * Current Value = quoteAmount + baseAmount * poolPrice
    */
-  async calculateCurrentValue(positionId: string): Promise<string> {
+  private async calculateCurrentValue(positionId: string): Promise<string> {
     // 1. Fetch position using PositionService
     const position = await this.positionService.getPosition(positionId);
 
@@ -336,7 +336,7 @@ export class PositionPnLService {
   /**
    * Get the current cost basis for a position from the latest PositionEvent
    */
-  async getCurrentCostBasis(positionId: string): Promise<string> {
+  private async getCurrentCostBasis(positionId: string): Promise<string> {
     const latestEvent = await this.prisma.positionEvent.findFirst({
       where: { positionId },
       select: {
@@ -360,7 +360,7 @@ export class PositionPnLService {
   /**
    * Get total value of all collected fees for a position in quote token units
    */
-  async getTotalCollectedFeesValue(positionId: string): Promise<string> {
+  private async getTotalCollectedFeesValue(positionId: string): Promise<string> {
     const collectEvents = await this.prisma.positionEvent.findMany({
       where: {
         positionId,
@@ -383,7 +383,7 @@ export class PositionPnLService {
   /**
    * Get the current realized PnL for a position from the latest PositionEvent
    */
-  async getCurrentRealizedPnL(positionId: string): Promise<string> {
+  private async getCurrentRealizedPnL(positionId: string): Promise<string> {
     const latestEvent = await this.prisma.positionEvent.findFirst({
       where: { positionId },
       select: {
@@ -413,6 +413,9 @@ export class PositionPnLService {
     if (!position) {
       throw new Error(`Position not found: ${positionId}`);
     }
+
+    // Update pool data to ensure current prices before PnL calculation
+    await this.poolService.updatePoolState(position.pool.id);
 
     // Fetch all PnL components in parallel for efficiency
     const [currentValue, currentCostBasis, collectedFees, realizedPnL, unclaimedFeesData] = await Promise.all([
