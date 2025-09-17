@@ -70,7 +70,7 @@ This asymmetry is what most LP providers don't understand. The visualization mak
 
 **UI/UX Principles:**
 - Dark theme as primary design language
-- Informal German localization using "Ihr/eure" form (not formal "Sie") for community feel - "Plant und analysiert eure Positionen" style
+- Informal German localization using "Du/Deine" form (not formal "Sie") for personal feel - "Plane und analysiere deine Positionen" style
 - Conditional wallet connection (connect-to-use pattern)
 - Hydration-safe rendering to prevent SSR mismatches
 - Glassmorphism cards with backdrop-blur effects

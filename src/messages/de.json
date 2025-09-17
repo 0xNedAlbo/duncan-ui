@@ -14,9 +14,9 @@
   },
   "positionPlanner": {
     "title": "Positions-Planer",
-    "description": "Plant und analysiert eure Uniswap V3 Liquiditätspositionen mit erweiterten Risikometriken.",
+    "description": "Plane und analysiere deine Uniswap V3 Liquiditätspositionen mit erweiterten Risikometriken.",
     "comingSoon": "Positions-Konfigurations-Formular kommt bald...",
-    "connectWallet": "Verbindet euer Wallet, um mit der Positionsplanung zu beginnen"
+    "connectWallet": "Verbinde dein Wallet, um mit der Positionsplanung zu beginnen"
   },
   "riskVisualization": {
     "title": "Risiko-Visualisierung",
@@ -84,11 +84,11 @@
     "register": "Registrieren"
   },
   "dashboard": {
-    "title": "Eure Positionen",
-    "subtitle": "Verwaltet und analysiert eure Uniswap V3 Liquiditätspositionen",
+    "title": "Deine Positionen",
+    "subtitle": "Verwalte und analysiere deine Uniswap V3 Liquiditätspositionen",
     "emptyState": {
       "title": "Noch keine Positionen vorhanden",
-      "description": "Startet mit eurer ersten Uniswap V3 Position über den Button oben."
+      "description": "Starte mit deiner ersten Uniswap V3 Position über den Button oben."
     },
     "addPosition": {
       "button": "Position hinzufügen",
@@ -152,7 +152,7 @@
       },
       "empty": {
         "title": "Keine Positionen gefunden",
-        "activeDescription": "Startet mit dem Import eurer ersten Uniswap V3 Position",
+        "activeDescription": "Starte mit dem Import deiner ersten Uniswap V3 Position",
         "otherDescription": "Keine {status} Positionen vorhanden"
       },
       "loadMore": "Mehr laden ({count} verbleibend)",
@@ -168,7 +168,7 @@
     "signIn": {
       "title": "Anmelden",
       "orText": "Oder",
-      "registerLink": "registriert euch hier",
+      "registerLink": "registriere dich hier",
       "emailPlaceholder": "E-Mail-Adresse",
       "passwordPlaceholder": "Passwort",
       "submitButton": "Anmelden",
@@ -179,7 +179,7 @@
     "signUp": {
       "title": "Registrieren",
       "orText": "Oder",
-      "signInLink": "meldet euch hier an",
+      "signInLink": "melde dich hier an",
       "namePlaceholder": "Name (optional)",
       "emailPlaceholder": "E-Mail-Adresse",
       "passwordPlaceholder": "Passwort (mindestens 6 Zeichen)",
@@ -216,7 +216,7 @@
     },
     "events": {
       "title": "Positions-Events",
-      "description": "Kompletter Verlauf eurer Liquiditätsänderungen und Fee-Einsammlungen",
+      "description": "Kompletter Verlauf deiner Liquiditätsänderungen und Fee-Einsammlungen",
       "noEvents": "Keine Events für diese Position gefunden",
       "loadingEvents": "Lade Events...",
       "totalEvents": "Gesamt Events",
@@ -252,15 +252,15 @@
   },
   "homepage": {
     "hero": {
-      "title": "Verwaltet eure Uniswap V3 Positionen",
-      "description": "Plant, visualisiert und verwaltet eure Liquiditätspositionen mit fortgeschrittener Risikoanalyse und umfassender PnL-Kurven-Visualisierung.",
+      "title": "Verwalte deine Uniswap V3 Positionen",
+      "description": "Plane, visualisiere und verwalte deine Liquiditätspositionen mit fortgeschrittener Risikoanalyse und umfassender PnL-Kurven-Visualisierung.",
       "getStarted": "Loslegen",
       "signIn": "Anmelden"
     },
     "features": {
       "riskPlanning": {
         "title": "Risikobewusste Planung",
-        "description": "Versteht euer Positionsrisikoprofil mit unserer Drei-Phasen-PnL-Visualisierung."
+        "description": "Verstehe dein Positionsrisikoprofil mit unserer Drei-Phasen-PnL-Visualisierung."
       },
       "interactiveCharts": {
         "title": "Interaktive Charts",
@@ -272,8 +272,8 @@
       }
     },
     "cta": {
-      "title": "Bereit, eure DeFi-Strategie zu optimieren?",
-      "description": "Tretet DUNCAN bei und übernehmt die Kontrolle über eure Uniswap V3 Liquiditätspositionen.",
+      "title": "Bereit, deine DeFi-Strategie zu optimieren?",
+      "description": "Tritt DUNCAN bei und übernimm die Kontrolle über deine Uniswap V3 Liquiditätspositionen.",
       "createAccount": "Account erstellen"
     }
   }
