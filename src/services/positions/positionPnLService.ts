@@ -414,6 +414,54 @@ export class PositionPnLService {
       throw new Error(`Position not found: ${positionId}`);
     }
 
+    // Check for valid cached PnL data
+    const cachedPnL = await this.prisma.positionPnL.findUnique({
+      where: {
+        positionId,
+        isValid: true
+      }
+    });
+
+    if (cachedPnL) {
+      // Return cached data
+      return {
+        currentValue: cachedPnL.currentValue,
+        currentCostBasis: cachedPnL.currentCostBasis,
+        collectedFees: cachedPnL.collectedFees,
+        unclaimedFees: cachedPnL.unclaimedFees,
+        realizedPnL: cachedPnL.realizedPnL,
+        unrealizedPnL: cachedPnL.unrealizedPnL,
+        totalPnL: cachedPnL.totalPnL,
+        positionId,
+        calculatedAt: cachedPnL.calculatedAt,
+      };
+    }
+
+    // No valid cache found - calculate fresh PnL data
+    await this.calculateAndCachePnL(positionId, position);
+
+    // Fetch the newly cached data
+    const newCachedPnL = await this.prisma.positionPnL.findUniqueOrThrow({
+      where: { positionId }
+    });
+
+    return {
+      currentValue: newCachedPnL.currentValue,
+      currentCostBasis: newCachedPnL.currentCostBasis,
+      collectedFees: newCachedPnL.collectedFees,
+      unclaimedFees: newCachedPnL.unclaimedFees,
+      realizedPnL: newCachedPnL.realizedPnL,
+      unrealizedPnL: newCachedPnL.unrealizedPnL,
+      totalPnL: newCachedPnL.totalPnL,
+      positionId,
+      calculatedAt: newCachedPnL.calculatedAt,
+    };
+  }
+
+  /**
+   * Calculate fresh PnL data and cache it
+   */
+  private async calculateAndCachePnL(positionId: string, position: any): Promise<void> {
     // Update pool data to ensure current prices before PnL calculation
     await this.poolService.updatePoolState(position.pool.id);
 
@@ -434,22 +482,61 @@ export class PositionPnLService {
     const unrealizedPnL = (currentValueBigInt - currentCostBasisBigInt).toString();
     const totalPnL = (BigInt(unrealizedPnL) + collectedFeesBigInt).toString();
 
-    return {
-      // Core position metrics
-      currentValue,
-      currentCostBasis,
-      collectedFees,
-      unclaimedFees: unclaimedFeesData.valueInQuoteToken,
-      realizedPnL,
+    // Get current pool state for cache metadata
+    const poolData = await this.prisma.pool.findUnique({
+      where: { id: position.pool.id },
+      select: { currentTick: true, sqrtPriceX96: true }
+    });
 
-      // Derived metrics
-      unrealizedPnL,
-      totalPnL,
+    // Upsert the cache entry
+    await this.prisma.positionPnL.upsert({
+      where: { positionId },
+      update: {
+        currentValue,
+        currentCostBasis,
+        collectedFees,
+        unclaimedFees: unclaimedFeesData.valueInQuoteToken,
+        realizedPnL,
+        unrealizedPnL,
+        totalPnL,
+        isValid: true,
+        poolTick: poolData?.currentTick,
+        poolSqrtPriceX96: poolData?.sqrtPriceX96,
+      },
+      create: {
+        positionId,
+        currentValue,
+        currentCostBasis,
+        collectedFees,
+        unclaimedFees: unclaimedFeesData.valueInQuoteToken,
+        realizedPnL,
+        unrealizedPnL,
+        totalPnL,
+        isValid: true,
+        poolTick: poolData?.currentTick,
+        poolSqrtPriceX96: poolData?.sqrtPriceX96,
+      },
+    });
+  }
 
-      // Metadata
-      positionId,
-      calculatedAt: new Date(),
-    };
+  /**
+   * Invalidate cached PnL data for a position
+   */
+  async invalidateCache(positionId: string): Promise<void> {
+    await this.prisma.positionPnL.updateMany({
+      where: { positionId },
+      data: { isValid: false }
+    });
+  }
+
+  /**
+   * Invalidate all cached PnL data (useful for bulk operations or system maintenance)
+   */
+  async invalidateAllCache(): Promise<void> {
+    await this.prisma.positionPnL.updateMany({
+      where: { isValid: true },
+      data: { isValid: false }
+    });
   }
 
   /**

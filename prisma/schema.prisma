@@ -292,6 +292,7 @@ model Position {
 
   // Relations
   events PositionEvent[]
+  pnlCache PositionPnL? // Optional cached PnL data
 
   // Timestamps
   createdAt DateTime @default(now())
@@ -394,4 +395,38 @@ model PoolPriceCache {
   @@index([chain, poolAddress]) // Pool-specific queries
   @@index([expiresAt]) // TTL cleanup queries
   @@map("pool_price_cache")
+}
+
+// Position PnL Cache Model - Cached PnL calculations for performance optimization
+model PositionPnL {
+  id String @id @default(cuid())
+
+  // Relations
+  positionId String   @unique // One-to-one with Position
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  // Core PnL Metrics (all in quote token units as strings for BigInt precision)
+  currentValue     String // Current position value
+  currentCostBasis String // Latest cost basis from PositionEvent
+  collectedFees    String // Total fees collected historically
+  unclaimedFees    String // Current unclaimed fees value
+  realizedPnL      String // Current realized PnL from PositionEvent
+
+  // Derived Metrics
+  unrealizedPnL String // currentValue - currentCostBasis
+  totalPnL      String // unrealizedPnL + collectedFees
+
+  // Cache Metadata
+  calculatedAt DateTime @default(now()) // When this PnL was calculated
+  updatedAt    DateTime @updatedAt      // Auto-updated on changes
+  isValid      Boolean  @default(true)  // Cache validity flag
+
+  // Pool state at calculation time (for cache invalidation logic)
+  poolTick         Int?    // Pool tick when calculated
+  poolSqrtPriceX96 String? // Pool price when calculated
+
+  // Performance Indexes
+  @@index([positionId, isValid]) // Quick cache lookups
+  @@index([calculatedAt])        // Cleanup old cache entries
+  @@map("position_pnl_cache")
 }
