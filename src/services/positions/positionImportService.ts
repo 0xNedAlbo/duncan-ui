@@ -12,6 +12,7 @@ import { NONFUNGIBLE_POSITION_MANAGER_ABI } from "@/lib/contracts/nonfungiblePos
 import { PrismaClient } from "@prisma/client";
 import { PoolService } from "../pools/poolService";
 import { PositionService } from "./positionService";
+import { PositionPnLService } from "./positionPnLService";
 import { EtherscanEventService } from "../etherscan/etherscanEventService";
 import { QuoteTokenService } from "./quoteTokenService";
 import type { Services } from "../ServiceFactory";
@@ -51,6 +52,7 @@ export class PositionImportService {
     private rpcClients: Map<SupportedChainsType, PublicClient>;
     private pools: PoolService;
     private positions: PositionService;
+    private positionPnLService: PositionPnLService;
     private etherscanEventService: EtherscanEventService;
     private quoteTokenService: QuoteTokenService;
 
@@ -59,12 +61,13 @@ export class PositionImportService {
             Clients,
             "prisma" | "rpcClients" | "etherscanClient"
         >,
-        requiredServices: Pick<Services, "positionService" | "poolService">
+        requiredServices: Pick<Services, "positionService" | "poolService" | "positionPnLService">
     ) {
         this.prisma = requiredClients.prisma;
         this.rpcClients = requiredClients.rpcClients;
         this.positions = requiredServices.positionService;
         this.pools = requiredServices.poolService;
+        this.positionPnLService = requiredServices.positionPnLService;
         this.etherscanEventService = new EtherscanEventService({
             etherscanClient: requiredClients.etherscanClient,
         });
@@ -180,6 +183,14 @@ export class PositionImportService {
                 nftId: importedData.nftId,
                 status: positionStatus.status === "closed" ? "closed" : "active",
             });
+
+            // Step 9: Calculate PnL breakdown for the imported position
+            try {
+                await this.positionPnLService.getPnlBreakdown(savedPosition.id);
+            } catch (error) {
+                // Don't fail the import if PnL calculation fails, but log for monitoring
+                console.warn(`PnL calculation failed for imported position ${savedPosition.id}:`, error);
+            }
 
             return {
                 success: true,
