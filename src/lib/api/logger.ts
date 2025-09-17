@@ -18,6 +18,10 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const LOG_LEVEL = process.env.LOG_LEVEL || LOG_LEVELS[NODE_ENV as keyof typeof LOG_LEVELS] || 'info';
 const LOG_PRETTY = process.env.LOG_PRETTY === 'true' || NODE_ENV === 'development';
 
+// Service filtering and debug muting environment variables
+const LOG_SERVICE_FILTER = process.env.LOG_SERVICE_FILTER; // Comma-separated service names
+const LOG_MUTE_DEBUG = process.env.LOG_MUTE_DEBUG === 'true'; // Global debug muting
+
 // Base logger configuration
 const loggerConfig: pino.LoggerOptions = {
   level: LOG_LEVEL,
@@ -36,6 +40,6 @@ const loggerConfig: pino.LoggerOptions = {
 // Create and export logger instance
 export const logger = pino(loggerConfig);
 
-// Export logger utilities
+// Export logger utilities and configuration
 export type Logger = typeof logger;
-export { LOG_LEVEL, NODE_ENV };
+export { LOG_LEVEL, NODE_ENV, LOG_SERVICE_FILTER, LOG_MUTE_DEBUG };

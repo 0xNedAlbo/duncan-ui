@@ -8,6 +8,7 @@
 import { SupportedChainsType } from "@/config/chains";
 import { EtherscanClient, type EtherscanLog } from "./etherscanClient";
 import type { Clients } from "../ClientsFactory";
+import { createServiceLogger, type ServiceLogger } from "@/lib/logging/loggerFactory";
 
 // Uniswap V3 NFT Position Manager event signatures
 const EVENT_SIGNATURES = {
@@ -56,9 +57,11 @@ interface FetchOptions {
 
 export class EtherscanEventService {
     private etherscanClient: EtherscanClient;
+    private logger: ServiceLogger;
 
     constructor(requiredClients: Pick<Clients, "etherscanClient">) {
         this.etherscanClient = requiredClients.etherscanClient;
+        this.logger = createServiceLogger('EtherscanEventService');
     }
 
     /**
@@ -69,10 +72,16 @@ export class EtherscanEventService {
         tokenId: string,
         options: FetchOptions = {}
     ): Promise<RawPositionEvent[]> {
+        this.logger.debug({ tokenId, chain }, 'Starting fetchPositionEvents for NFT');
+
         const nftManagerAddress = NFT_MANAGER_ADDRESSES[chain];
         if (!nftManagerAddress) {
+            this.logger.error({ chain }, 'Unsupported chain');
             throw new Error(`Unsupported chain: ${chain}`);
         }
+
+        this.logger.debug({ nftManagerAddress }, 'Using NFT Manager address');
+        this.logger.debug({ options }, 'Fetch options');
 
         const eventTypes = options.eventTypes || [
             "INCREASE_LIQUIDITY",
@@ -88,9 +97,14 @@ export class EtherscanEventService {
         const tokenIdHex =
             "0x" + BigInt(tokenId).toString(16).padStart(64, "0");
 
+        this.logger.debug({ tokenIdHex }, 'Token ID hex');
+        this.logger.debug({ fromBlock, toBlock }, 'Block range');
+        this.logger.debug({ eventTypes }, 'Event types to fetch');
+
         // Fetch events for each event type
         for (const eventType of eventTypes) {
             try {
+                this.logger.debug({ eventType }, 'Fetching events');
                 const logs = await this.etherscanClient.fetchLogs(
                     chain,
                     nftManagerAddress,
@@ -101,6 +115,7 @@ export class EtherscanEventService {
                         topic1: tokenIdHex, // Filter by tokenId
                     }
                 );
+                this.logger.debug({ eventType, logCount: logs.length }, 'Retrieved raw logs');
 
                 // Parse each log into structured event data
                 for (const log of logs) {
@@ -126,12 +141,18 @@ export class EtherscanEventService {
                 const errorMsg = `Failed to fetch ${eventType} events: ${
                     error instanceof Error ? error.message : "Unknown error"
                 }`;
+                this.logger.error({ eventType, error: error instanceof Error ? error.message : error }, 'Error fetching events');
                 throw new Error(errorMsg);
             }
         }
 
+        this.logger.debug({ totalEventCount: result.length }, 'Total raw events before deduplication');
+
         // Remove duplicates and sort by blockchain order
-        return this.deduplicateAndSort(result);
+        const finalResult = this.deduplicateAndSort(result);
+        this.logger.debug({ finalEventCount: finalResult.length }, 'Final events after deduplication and sorting');
+
+        return finalResult;
     }
 
     /**

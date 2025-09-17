@@ -3,12 +3,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { verify } from '@node-rs/argon2';
+import { createServiceLogger } from "@/lib/logging/loggerFactory";
 
 export type AuthUser = {
   userId: string;
   username: string;
   authMethod: 'session' | 'api-key';
 };
+
+const logger = createServiceLogger('AuthUserService');
 
 export async function getAuthUser(request: NextRequest): Promise<AuthUser | null> {
   // Check for API key authentication first (from middleware)
@@ -69,7 +72,7 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUser | null
         }
       }
     } catch (error) {
-      console.error("API key validation error in getAuthUser:", error);
+      logger.error({ error: error instanceof Error ? error.message : error }, "API key validation error in getAuthUser");
     }
   }
 

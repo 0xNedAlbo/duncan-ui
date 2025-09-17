@@ -6,7 +6,6 @@ import { useTranslations } from "@/i18n/client";
 import { useImportNFT } from "@/hooks/api/usePositions";
 import { handleApiError } from "@/lib/app/apiError";
 import type { ImportNFTResponse } from "@/types/api";
-import type { ParsedNFTPosition } from "@/services/uniswap/nftPosition";
 
 interface CreatePositionDropdownProps {
   onImportSuccess?: (position: any) => void;
@@ -19,25 +18,37 @@ export function CreatePositionDropdown({ onImportSuccess }: CreatePositionDropdo
     const [nftId, setNftId] = useState("");
     const [selectedChain, setSelectedChain] = useState("ethereum");
     const [importError, setImportError] = useState<string | null>(null);
-    const [importSuccess, setImportSuccess] = useState<ParsedNFTPosition | null>(null);
+    const [importSuccess, setImportSuccess] = useState<{ chainName: string; nftId: string } | null>(null);
+
+    // Helper function to format chain name for display
+    const formatChainName = (chain: string): string => {
+        switch (chain.toLowerCase()) {
+            case 'ethereum':
+                return 'Ethereum';
+            case 'arbitrum':
+                return 'Arbitrum';
+            case 'base':
+                return 'Base';
+            default:
+                return chain.charAt(0).toUpperCase() + chain.slice(1);
+        }
+    };
 
     // Use the import NFT mutation hook
     const importNFT = useImportNFT({
         onSuccess: (response) => {
             if (response.data?.position) {
-                // Create display data for success message
+                // Create simple display data for success message
                 const displayData = {
-                    token0Address: response.data.position.pool.token0Data?.address || 'Unknown',
-                    token1Address: response.data.position.pool.token1Data?.address || 'Unknown',
-                    fee: response.data.position.pool.fee,
-                    isActive: true
+                    chainName: formatChainName(selectedChain),
+                    nftId: nftId.trim()
                 };
                 setImportSuccess(displayData);
                 setImportError(null);
-                
+
                 // Notify parent component
                 onImportSuccess?.(response.data.position);
-                
+
                 // Reset form after 2 seconds
                 setTimeout(() => {
                     setIsDropdownOpen(false);
@@ -173,12 +184,7 @@ export function CreatePositionDropdown({ onImportSuccess }: CreatePositionDropdo
                                         <div className="px-3 py-2 bg-green-500/10 border border-green-500/20 rounded text-xs text-green-400">
                                             <div className="font-medium">{t("dashboard.addPosition.nft.importSuccess")}</div>
                                             <div className="mt-1 text-slate-300">
-                                                {importSuccess.token0Address.slice(0, 6)}...{importSuccess.token0Address.slice(-4)} / 
-                                                {importSuccess.token1Address.slice(0, 6)}...{importSuccess.token1Address.slice(-4)}
-                                            </div>
-                                            <div className="text-slate-400">
-                                                Fee: {(importSuccess.fee / 10000).toFixed(2)}% • 
-                                                {importSuccess.isActive ? ` ${t("status.active")}` : ` ${t("dashboard.positions.rangeStatus.outOfRange")}`}
+                                                NFT {importSuccess.nftId} on {importSuccess.chainName}
                                             </div>
                                         </div>
                                     )}

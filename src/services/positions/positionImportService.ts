@@ -13,10 +13,12 @@ import { PrismaClient } from "@prisma/client";
 import { PoolService } from "../pools/poolService";
 import { PositionService } from "./positionService";
 import { PositionPnLService } from "./positionPnLService";
+import { PositionLedgerService } from "./positionLedgerService";
 import { EtherscanEventService } from "../etherscan/etherscanEventService";
 import { QuoteTokenService } from "./quoteTokenService";
 import type { Services } from "../ServiceFactory";
 import type { Clients } from "../ClientsFactory";
+import { createServiceLogger, type ServiceLogger } from "@/lib/logging/loggerFactory";
 
 // Contract addresses for Uniswap V3 NFT Position Manager
 const NFT_MANAGER_ADDRESSES = {
@@ -53,25 +55,29 @@ export class PositionImportService {
     private pools: PoolService;
     private positions: PositionService;
     private positionPnLService: PositionPnLService;
+    private positionLedgerService: PositionLedgerService;
     private etherscanEventService: EtherscanEventService;
     private quoteTokenService: QuoteTokenService;
+    private logger: ServiceLogger;
 
     constructor(
         requiredClients: Pick<
             Clients,
             "prisma" | "rpcClients" | "etherscanClient"
         >,
-        requiredServices: Pick<Services, "positionService" | "poolService" | "positionPnLService">
+        requiredServices: Pick<Services, "positionService" | "poolService" | "positionPnLService" | "positionLedgerService">
     ) {
         this.prisma = requiredClients.prisma;
         this.rpcClients = requiredClients.rpcClients;
         this.positions = requiredServices.positionService;
         this.pools = requiredServices.poolService;
         this.positionPnLService = requiredServices.positionPnLService;
+        this.positionLedgerService = requiredServices.positionLedgerService;
         this.etherscanEventService = new EtherscanEventService({
             etherscanClient: requiredClients.etherscanClient,
         });
         this.quoteTokenService = new QuoteTokenService();
+        this.logger = createServiceLogger('PositionImportService');
     }
 
     /**
@@ -184,12 +190,50 @@ export class PositionImportService {
                 status: positionStatus.status === "closed" ? "closed" : "active",
             });
 
-            // Step 9: Calculate PnL breakdown for the imported position
+            // Step 9: Sync position events (critical for position functionality)
+            if (savedPosition.nftId) {
+                try {
+                    this.logger.debug({ positionId: savedPosition.id, nftId: savedPosition.nftId, chain }, 'Starting event sync for position');
+
+                    // Get the imported position data for sync info
+                    const fullPosition = await this.positions.getPosition(savedPosition.id);
+                    if (fullPosition) {
+                        this.logger.debug({
+                            id: fullPosition.id,
+                            nftId: fullPosition.nftId,
+                            poolAddress: fullPosition.pool.poolAddress,
+                            chain: fullPosition.pool.chain
+                        }, 'Retrieved full position data');
+
+                        const positionSyncInfo = PositionLedgerService.createSyncInfo(fullPosition);
+                        this.logger.debug({
+                            id: positionSyncInfo.id,
+                            poolChain: positionSyncInfo.pool.chain,
+                            poolAddress: positionSyncInfo.pool.poolAddress
+                        }, 'Created position sync info');
+
+                        const syncResult = await this.positionLedgerService.syncPositionEvents(positionSyncInfo, savedPosition.nftId);
+                        this.logger.debug({ eventCount: syncResult.length }, 'Event sync completed');
+                    } else {
+                        this.logger.warn({ positionId: savedPosition.id }, 'Failed to retrieve full position data');
+                    }
+                } catch (error) {
+                    // Log detailed event sync failure but continue - some positions might work without events
+                    this.logger.error({
+                        positionId: savedPosition.id,
+                        nftId: savedPosition.nftId,
+                        error: error instanceof Error ? error.message : error,
+                        stack: error instanceof Error ? error.stack : undefined
+                    }, 'Event syncing failed for position');
+                }
+            }
+
+            // Step 10: Calculate PnL breakdown (best effort - can fail without breaking import)
             try {
                 await this.positionPnLService.getPnlBreakdown(savedPosition.id);
             } catch (error) {
                 // Don't fail the import if PnL calculation fails, but log for monitoring
-                console.warn(`PnL calculation failed for imported position ${savedPosition.id}:`, error);
+                this.logger.warn({ positionId: savedPosition.id, error: error instanceof Error ? error.message : error }, 'PnL calculation failed for imported position');
             }
 
             return {

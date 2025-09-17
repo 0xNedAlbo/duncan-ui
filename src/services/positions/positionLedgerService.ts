@@ -16,6 +16,7 @@ import { PoolPriceService } from "../prices/poolPriceService";
 import { EtherscanBlockInfoService } from "../etherscan/etherscanBlockInfoService";
 import { EvmBlockInfoService } from "../evm/evmBlockInfoService";
 import { PrismaClient, type PositionEvent } from "@prisma/client";
+import { createServiceLogger, LogPatterns, type ServiceLogger } from "@/lib/logging/loggerFactory";
 import {
     sqrtRatioX96ToToken1PerToken0,
     sqrtRatioX96ToToken0PerToken1,
@@ -55,6 +56,7 @@ export class PositionLedgerService {
     private evmBlockInfoService: EvmBlockInfoService;
     private poolPriceService: PoolPriceService;
     private etherscanEventService: EtherscanEventService;
+    private logger: ServiceLogger;
 
     /**
      * Helper method to create PositionSyncInfo from BasicPosition
@@ -85,6 +87,7 @@ export class PositionLedgerService {
         this.evmBlockInfoService = requiredServices.evmBlockInfoService;
         this.poolPriceService = requiredServices.poolPriceService;
         this.etherscanEventService = new EtherscanEventService({ etherscanClient: requiredClients.etherscanClient });
+        this.logger = createServiceLogger('PositionLedgerService');
     }
 
     /**
@@ -134,8 +137,9 @@ export class PositionLedgerService {
     }
 
     /**
-     * Fetch events from Etherscan starting from the finality boundary for optimization
-     * Uses the last finalized block as starting point to avoid re-fetching stable events
+     * Fetch events from Etherscan with smart block range selection
+     * - First-time imports: Fetch from "earliest" to get complete history
+     * - Subsequent syncs: Use finality boundary optimization to avoid re-fetching stable events
      */
     private async fetchEventsFromEtherscan(
         positionInfo: PositionSyncInfo,
@@ -143,17 +147,32 @@ export class PositionLedgerService {
     ): Promise<RawPositionEvent[]> {
         const chain = positionInfo.pool.chain as SupportedChainsType;
 
-        // Find the finality boundary to determine optimal starting block
-        const lastFinalizedBlock = await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
+        // Check if this is a first-time import (no events in database yet)
+        const existingEventCount = await this.prisma.positionEvent.count({
+            where: { positionId: positionInfo.id }
+        });
+
+        this.logger.debug({ existingEventCount, positionId: positionInfo.id }, 'Existing events for position');
 
         let fromBlock: string | number = "earliest";
 
-        if (lastFinalizedBlock !== null) {
-            // Start fetching from the finalized block to avoid re-fetching stable events
-            fromBlock = lastFinalizedBlock.toString();
+        if (existingEventCount > 0) {
+            // Position has existing events - use finality boundary optimization
+            const lastFinalizedBlock = await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
+
+            if (lastFinalizedBlock !== null) {
+                // Start fetching from the finalized block to avoid re-fetching stable events
+                fromBlock = lastFinalizedBlock.toString();
+                this.logger.debug({ fromBlock }, 'Using finality boundary optimization');
+            } else {
+                this.logger.debug('No finalized blocks available - using earliest');
+            }
+        } else {
+            // First-time import - fetch complete history from earliest block
+            this.logger.debug('First-time import detected - fetching complete history from earliest');
         }
 
-        // Fetch events from Etherscan using the optimized starting block
+        // Fetch events from Etherscan using the determined starting block
         return await this.etherscanEventService.fetchPositionEvents(
             chain,
             nftId,
@@ -237,11 +256,15 @@ export class PositionLedgerService {
             return [];
         }
 
+        this.logger.debug({ rawEventCount: rawEvents.length }, 'Filtering raw events for finality');
+
         // Get the last finalized block number with single RPC call
         const lastFinalizedBlock = await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
+        this.logger.debug({ lastFinalizedBlock }, 'Last finalized block determined');
 
         if (lastFinalizedBlock === null) {
             // No finalized blocks yet, all events are non-final
+            this.logger.debug('No finalized blocks yet - keeping all events');
             return rawEvents;
         }
 
@@ -258,15 +281,27 @@ export class PositionLedgerService {
             })).map(event => event.transactionHash)
         );
 
-        return rawEvents.filter(event => {
+        const filteredEvents = rawEvents.filter(event => {
+            this.logger.debug({ blockNumber: event.blockNumber, txHashShort: event.transactionHash.slice(0,10) }, 'Checking event block');
+
             // Keep non-final events (always process for reorg protection)
             if (event.blockNumber > lastFinalizedBlock) {
+                this.logger.debug({ blockNumber: event.blockNumber, lastFinalizedBlock }, 'Event is NON-FINAL - keeping');
                 return true;
             }
 
             // For final events: only keep if NOT already in database (catch-up sync)
-            return !existingTxHashes.has(event.transactionHash);
+            const alreadyInDB = existingTxHashes.has(event.transactionHash);
+            if (alreadyInDB) {
+                this.logger.debug({ blockNumber: event.blockNumber }, 'Event is FINAL and already in DB - skipping');
+            } else {
+                this.logger.debug({ blockNumber: event.blockNumber }, 'Event is FINAL but NOT in DB - keeping for catch-up');
+            }
+            return !alreadyInDB;
         });
+
+        this.logger.debug({ filteredCount: filteredEvents.length, totalCount: rawEvents.length }, 'Filtered result');
+        return filteredEvents;
     }
 
     /**
@@ -310,10 +345,15 @@ export class PositionLedgerService {
         positionInfo: PositionSyncInfo,
         nftId: string
     ): Promise<PositionEvent[]> {
+        this.logger.debug({ nftId, chain: positionInfo.pool.chain, positionId: positionInfo.id }, 'Starting syncPositionEvents');
+
         // Fetch events from Etherscan using finality boundary optimization
+        this.logger.debug('Fetching events from Etherscan');
         const rawEvents = await this.fetchEventsFromEtherscan(positionInfo, nftId);
+        this.logger.debug({ rawEventCount: rawEvents.length }, 'Retrieved raw events from Etherscan');
 
         if (rawEvents.length === 0) {
+            this.logger.debug({ nftId }, 'No events found for NFT - returning empty array');
             return [];
         }
 
@@ -326,10 +366,14 @@ export class PositionLedgerService {
         );
 
         // Filter input events to exclude already-final ones (but keep final events not yet in DB)
+        this.logger.debug('Filtering non-final events');
         const nonFinalRawEvents = await this.filterNonFinalEvents(rawEvents, chain, positionInfo.id);
+        this.logger.debug({ nonFinalCount: nonFinalRawEvents.length }, 'Non-final events after filtering');
+        this.logger.debug({ hasLastFinalEvent: !!lastFinalEvent }, 'Last final event status');
 
         if (nonFinalRawEvents.length === 0 && lastFinalEvent) {
             // All input events are already final, nothing to process
+            this.logger.debug('All input events are already final - returning empty array');
             return [];
         }
 

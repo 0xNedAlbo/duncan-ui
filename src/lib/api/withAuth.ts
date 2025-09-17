@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, type AuthUser } from '@/lib/auth/getAuthUser';
+import { createServiceLogger } from "@/lib/logging/loggerFactory";
 
 export interface AuthContext {
     user: AuthUser;
@@ -39,6 +40,8 @@ export type RouteParams = {
  * @param handler - The API route handler function
  * @returns Wrapped handler with authentication
  */
+const logger = createServiceLogger('WithAuthService');
+
 export function withAuth<T = any>(
     handler: AuthenticatedApiHandler<T>
 ): (request: NextRequest, context?: RouteParams) => Promise<NextResponse<T>> {
@@ -66,7 +69,7 @@ export function withAuth<T = any>(
                 resolvedParams
             );
         } catch (error) {
-            console.error("Authentication error:", error);
+            logger.error({ error: error instanceof Error ? error.message : error }, "Authentication error");
 
             return NextResponse.json(
                 { success: false, error: 'Internal server error' },
