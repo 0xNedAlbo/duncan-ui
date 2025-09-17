@@ -5,7 +5,8 @@
 import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
 import { apiClient } from '@/lib/app/apiClient';
 import type { ApiError } from '@/lib/app/apiError';
-import type { PositionPnlResponse, PnlBreakdown } from '@/types/api';
+import type { PositionPnlResponse } from '@/types/api';
+import type { PnlBreakdown } from '@/services/positions/positionPnLService';
 
 export interface UsePositionPnLOptions extends Omit<UseQueryOptions<PnlBreakdown, ApiError>, 'queryKey' | 'queryFn'> {
   enabled?: boolean;
@@ -91,11 +92,9 @@ export function usePnLDisplayValues(
     };
   }
 
-  // Calculate total PnL as: currentValue - costBasis + realizedPnL
-  // This equals: unrealizedPnL + realizedPnL
-  const unrealizedPnL = BigInt(pnlData.unrealizedPnL);
-  const realizedPnL = BigInt(pnlData.realizedPnL);
-  const totalPnL = unrealizedPnL + realizedPnL;
+  // Use the service-provided totalPnL which includes collected fees
+  // totalPnL = unrealizedPnL + collectedFees (overall position performance)
+  const totalPnL = BigInt(pnlData.totalPnL);
 
   const isPositive = totalPnL > 0n;
   const isNegative = totalPnL < 0n;
