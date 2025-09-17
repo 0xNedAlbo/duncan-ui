@@ -1,11 +1,22 @@
 "use client";
 
 import { useTranslations } from "@/i18n/client";
-import { usePositionPnL, usePnLDisplayValues } from "@/hooks/api/usePositionPnL";
-import { formatCompactValue, formatFractionHuman, FORMAT_PRESET_EN, FORMAT_PRESET_DE } from "@/lib/utils/fraction-format";
-import { useSettingsStore } from "@/store/settings-store";
+import {
+    usePositionPnL,
+    usePnLDisplayValues,
+} from "@/hooks/api/usePositionPnL";
+import {
+    formatCompactValue,
+} from "@/lib/utils/fraction-format";
 import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy";
-import { TrendingUp, TrendingDown, DollarSign, Target, BarChart3, Loader2 } from "lucide-react";
+import {
+    TrendingUp,
+    TrendingDown,
+    DollarSign,
+    Target,
+    BarChart3,
+    Loader2,
+} from "lucide-react";
 import type { BasicPosition } from "@/services/positions/positionService";
 
 interface OverviewTabProps {
@@ -16,19 +27,18 @@ interface OverviewTabProps {
 
 export function OverviewTab({ position, chainSlug, nftId }: OverviewTabProps) {
     const t = useTranslations();
-    const { locale } = useSettingsStore();
-
-    // Convert settings store locale format to simple string for formatting
-    const localeString = locale === 'de-DE' ? 'de' : 'en';
-    const formatPreset = localeString === 'de' ? FORMAT_PRESET_DE : FORMAT_PRESET_EN;
-
     // Get quote token info for formatting (must be before hook calls)
-    const quoteToken = position.token0IsQuote ? position.pool.token0 : position.pool.token1;
-    const baseToken = position.token0IsQuote ? position.pool.token1 : position.pool.token0;
+    const quoteToken = position.token0IsQuote
+        ? position.pool.token0
+        : position.pool.token1;
     const quoteTokenDecimals = quoteToken.decimals;
 
     // Fetch PnL data (position is provided as prop)
-    const { data: pnlData, isLoading: pnlLoading, error: pnlError } = usePositionPnL(chainSlug, nftId);
+    const {
+        data: pnlData,
+        isLoading: pnlLoading,
+        error: pnlError,
+    } = usePositionPnL(chainSlug, nftId);
 
     // Get formatted display values using the same hook as PositionCard
     const pnlDisplayValues = usePnLDisplayValues(pnlData, quoteTokenDecimals);
@@ -40,7 +50,9 @@ export function OverviewTab({ position, chainSlug, nftId }: OverviewTabProps) {
                 <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8">
                     <div className="flex items-center justify-center py-12">
                         <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-                        <span className="ml-3 text-slate-400">{t("common.loading")}</span>
+                        <span className="ml-3 text-slate-400">
+                            {t("common.loading")}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -66,19 +78,37 @@ export function OverviewTab({ position, chainSlug, nftId }: OverviewTabProps) {
     // Get position status
     const getPositionStatus = () => {
         if (position.status === "closed" || position.status === "archived") {
-            return { status: "closed", color: "text-slate-400 bg-slate-500/20 border-slate-500/30" };
+            return {
+                status: "closed",
+                color: "text-slate-400 bg-slate-500/20 border-slate-500/30",
+            };
         }
 
-        if (position.pool.currentTick !== undefined && position.pool.currentTick !== null) {
+        if (
+            position.pool.currentTick !== undefined &&
+            position.pool.currentTick !== null
+        ) {
             const currentTick = position.pool.currentTick;
-            if (currentTick >= position.tickLower && currentTick <= position.tickUpper) {
-                return { status: "in-range", color: "text-green-400 bg-green-500/20 border-green-500/30" };
+            if (
+                currentTick >= position.tickLower &&
+                currentTick <= position.tickUpper
+            ) {
+                return {
+                    status: "in-range",
+                    color: "text-green-400 bg-green-500/20 border-green-500/30",
+                };
             } else {
-                return { status: "out-of-range", color: "text-red-400 bg-red-500/20 border-red-500/30" };
+                return {
+                    status: "out-of-range",
+                    color: "text-red-400 bg-red-500/20 border-red-500/30",
+                };
             }
         }
 
-        return { status: "unknown", color: "text-slate-400 bg-slate-500/20 border-slate-500/30" };
+        return {
+            status: "unknown",
+            color: "text-slate-400 bg-slate-500/20 border-slate-500/30",
+        };
     };
 
     const positionStatus = getPositionStatus();
@@ -98,11 +128,13 @@ export function OverviewTab({ position, chainSlug, nftId }: OverviewTabProps) {
                         </h3>
                     </div>
                     <div className="text-2xl font-bold text-white">
-                        {pnlDisplayValues.currentValue ? (
-                            formatCompactValue(pnlDisplayValues.currentValue, quoteTokenDecimals)
-                        ) : (
-                            "0"
-                        )} {quoteToken.symbol}
+                        {pnlDisplayValues.currentValue
+                            ? formatCompactValue(
+                                  pnlDisplayValues.currentValue,
+                                  quoteTokenDecimals
+                              )
+                            : "0"}{" "}
+                        {quoteToken.symbol}
                     </div>
                     <div className="text-sm text-slate-400 mt-1">
                         {t("positionDetails.overview.valueDescription")}
@@ -112,14 +144,33 @@ export function OverviewTab({ position, chainSlug, nftId }: OverviewTabProps) {
                 {/* Total PnL */}
                 <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className={`p-2 rounded-lg ${(() => {
-                            if (!pnlData) return 'bg-slate-500/20';
-                            const totalWithUnclaimed = BigInt(pnlData.realizedPnL) + BigInt(pnlData.collectedFees) + BigInt(pnlData.unclaimedFees) + (BigInt(pnlData.currentValue) - BigInt(pnlData.currentCostBasis));
-                            return totalWithUnclaimed > 0n ? 'bg-green-500/20' : totalWithUnclaimed < 0n ? 'bg-red-500/20' : 'bg-slate-500/20';
-                        })()}`}>
+                        <div
+                            className={`p-2 rounded-lg ${(() => {
+                                if (!pnlData) return "bg-slate-500/20";
+                                const totalWithUnclaimed =
+                                    BigInt(pnlData.realizedPnL) +
+                                    BigInt(pnlData.collectedFees) +
+                                    BigInt(pnlData.unclaimedFees) +
+                                    (BigInt(pnlData.currentValue) -
+                                        BigInt(pnlData.currentCostBasis));
+                                return totalWithUnclaimed > 0n
+                                    ? "bg-green-500/20"
+                                    : totalWithUnclaimed < 0n
+                                    ? "bg-red-500/20"
+                                    : "bg-slate-500/20";
+                            })()}`}
+                        >
                             {(() => {
-                                if (!pnlData) return <BarChart3 className="w-5 h-5 text-slate-400" />;
-                                const totalWithUnclaimed = BigInt(pnlData.realizedPnL) + BigInt(pnlData.collectedFees) + BigInt(pnlData.unclaimedFees) + (BigInt(pnlData.currentValue) - BigInt(pnlData.currentCostBasis));
+                                if (!pnlData)
+                                    return (
+                                        <BarChart3 className="w-5 h-5 text-slate-400" />
+                                    );
+                                const totalWithUnclaimed =
+                                    BigInt(pnlData.realizedPnL) +
+                                    BigInt(pnlData.collectedFees) +
+                                    BigInt(pnlData.unclaimedFees) +
+                                    (BigInt(pnlData.currentValue) -
+                                        BigInt(pnlData.currentCostBasis));
                                 return totalWithUnclaimed > 0n ? (
                                     <TrendingUp className="w-5 h-5 text-green-400" />
                                 ) : totalWithUnclaimed < 0n ? (
@@ -133,19 +184,33 @@ export function OverviewTab({ position, chainSlug, nftId }: OverviewTabProps) {
                             {t("positionDetails.overview.totalPnL")}
                         </h3>
                     </div>
-                    <div className={`text-2xl font-bold ${(() => {
-                        if (!pnlData) return 'text-slate-400';
-                        const totalWithUnclaimed = BigInt(pnlData.realizedPnL) + BigInt(pnlData.collectedFees) + BigInt(pnlData.unclaimedFees) + (BigInt(pnlData.currentValue) - BigInt(pnlData.currentCostBasis));
-                        return totalWithUnclaimed > 0n ? 'text-green-400' : totalWithUnclaimed < 0n ? 'text-red-400' : 'text-slate-400';
-                    })()}`}>
-                        {pnlData ? (
-                            formatCompactValue(
-                                BigInt(pnlData.realizedPnL) + BigInt(pnlData.collectedFees) + BigInt(pnlData.unclaimedFees) + (BigInt(pnlData.currentValue) - BigInt(pnlData.currentCostBasis)),
-                                quoteTokenDecimals
-                            )
-                        ) : (
-                            "0"
-                        )} {quoteToken.symbol}
+                    <div
+                        className={`text-2xl font-bold ${(() => {
+                            if (!pnlData) return "text-slate-400";
+                            const totalWithUnclaimed =
+                                BigInt(pnlData.realizedPnL) +
+                                BigInt(pnlData.collectedFees) +
+                                BigInt(pnlData.unclaimedFees) +
+                                (BigInt(pnlData.currentValue) -
+                                    BigInt(pnlData.currentCostBasis));
+                            return totalWithUnclaimed > 0n
+                                ? "text-green-400"
+                                : totalWithUnclaimed < 0n
+                                ? "text-red-400"
+                                : "text-slate-400";
+                        })()}`}
+                    >
+                        {pnlData
+                            ? formatCompactValue(
+                                  BigInt(pnlData.realizedPnL) +
+                                      BigInt(pnlData.collectedFees) +
+                                      BigInt(pnlData.unclaimedFees) +
+                                      (BigInt(pnlData.currentValue) -
+                                          BigInt(pnlData.currentCostBasis)),
+                                  quoteTokenDecimals
+                              )
+                            : "0"}{" "}
+                        {quoteToken.symbol}
                     </div>
                     <div className="text-sm text-slate-400 mt-1">
                         {t("positionDetails.overview.pnlDescription")}
@@ -162,12 +227,21 @@ export function OverviewTab({ position, chainSlug, nftId }: OverviewTabProps) {
                             {t("positionDetails.overview.unclaimedFees")}
                         </h3>
                     </div>
-                    <div className={`text-2xl font-bold ${pnlDisplayValues.unclaimedFees && pnlDisplayValues.unclaimedFees > 0n ? 'text-amber-400' : 'text-white'}`}>
-                        {pnlDisplayValues.unclaimedFees ? (
-                            formatCompactValue(pnlDisplayValues.unclaimedFees, quoteTokenDecimals)
-                        ) : (
-                            "0"
-                        )} {quoteToken.symbol}
+                    <div
+                        className={`text-2xl font-bold ${
+                            pnlDisplayValues.unclaimedFees &&
+                            pnlDisplayValues.unclaimedFees > 0n
+                                ? "text-amber-400"
+                                : "text-white"
+                        }`}
+                    >
+                        {pnlDisplayValues.unclaimedFees
+                            ? formatCompactValue(
+                                  pnlDisplayValues.unclaimedFees,
+                                  quoteTokenDecimals
+                              )
+                            : "0"}{" "}
+                        {quoteToken.symbol}
                     </div>
                     <div className="text-sm text-slate-400 mt-1">
                         {t("positionDetails.overview.feesDescription")}
@@ -183,99 +257,214 @@ export function OverviewTab({ position, chainSlug, nftId }: OverviewTabProps) {
                         {t("positionDetails.overview.pnlBreakdown")}
                     </h3>
 
-                    {pnlData && (() => {
-                        // Calculate breakdown values
-                        const realizedPnLAmount = BigInt(pnlData.realizedPnL) + BigInt(pnlData.collectedFees);
-                        const unrealizedPnLAmount = BigInt(pnlData.unclaimedFees) + (BigInt(pnlData.currentValue) - BigInt(pnlData.currentCostBasis));
-                        const totalPnLAmount = realizedPnLAmount + unrealizedPnLAmount;
+                    {pnlData &&
+                        (() => {
+                            // Calculate breakdown values
+                            const realizedPnLAmount =
+                                BigInt(pnlData.realizedPnL) +
+                                BigInt(pnlData.collectedFees);
+                            const unrealizedPnLAmount =
+                                BigInt(pnlData.unclaimedFees) +
+                                (BigInt(pnlData.currentValue) -
+                                    BigInt(pnlData.currentCostBasis));
+                            const totalPnLAmount =
+                                realizedPnLAmount + unrealizedPnLAmount;
 
-                        const realizedColor = realizedPnLAmount > 0n ? 'text-green-400' : realizedPnLAmount < 0n ? 'text-red-400' : 'text-slate-400';
-                        const unrealizedColor = unrealizedPnLAmount > 0n ? 'text-green-400' : unrealizedPnLAmount < 0n ? 'text-red-400' : 'text-slate-400';
-                        const totalColor = totalPnLAmount > 0n ? 'text-green-400' : totalPnLAmount < 0n ? 'text-red-400' : 'text-slate-400';
+                            const realizedColor =
+                                realizedPnLAmount > 0n
+                                    ? "text-green-400"
+                                    : realizedPnLAmount < 0n
+                                    ? "text-red-400"
+                                    : "text-slate-400";
+                            const unrealizedColor =
+                                unrealizedPnLAmount > 0n
+                                    ? "text-green-400"
+                                    : unrealizedPnLAmount < 0n
+                                    ? "text-red-400"
+                                    : "text-slate-400";
+                            const totalColor =
+                                totalPnLAmount > 0n
+                                    ? "text-green-400"
+                                    : totalPnLAmount < 0n
+                                    ? "text-red-400"
+                                    : "text-slate-400";
 
-                        return (
-                            <div className="space-y-6">
-                                {/* Total PnL at top */}
-                                <div className="border-b border-slate-600/50 pb-4">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-lg font-semibold text-slate-300">{t("positionDetails.overview.totalPnLBreakdown")}</span>
-                                        <span className={`text-xl font-bold ${totalColor}`}>
-                                            {formatCompactValue(totalPnLAmount, quoteTokenDecimals)} {quoteToken.symbol}
-                                        </span>
+                            return (
+                                <div className="space-y-6">
+                                    {/* Total PnL at top */}
+                                    <div className="border-b border-slate-600/50 pb-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-lg font-semibold text-slate-300">
+                                                {t(
+                                                    "positionDetails.overview.totalPnLBreakdown"
+                                                )}
+                                            </span>
+                                            <span
+                                                className={`text-xl font-bold ${totalColor}`}
+                                            >
+                                                {formatCompactValue(
+                                                    totalPnLAmount,
+                                                    quoteTokenDecimals
+                                                )}{" "}
+                                                {quoteToken.symbol}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
 
-                                {/* Realized PnL Section */}
-                                <div className="space-y-3">
-                                    <div>
+                                    {/* Realized PnL Section */}
+                                    <div className="space-y-3">
                                         <h4 className="text-md font-semibold text-white">
-                                            {t("positionDetails.overview.realizedPnLSection")}
+                                            {t(
+                                                "positionDetails.overview.realizedPnLSection"
+                                            )}
                                         </h4>
-                                        <div className="text-xs text-slate-500 mt-1">
-                                            *) PnL from already withdrawn assets
-                                        </div>
-                                    </div>
-                                    <div className="bg-slate-700/30 rounded-lg p-4 space-y-2">
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-400">+ {t("positionDetails.overview.feesCollected")}</span>
-                                            <span className="text-white font-medium">
-                                                {formatCompactValue(BigInt(pnlData.collectedFees), quoteTokenDecimals)} {quoteToken.symbol}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-400">+ {t("positionDetails.overview.realizedPnL")}</span>
-                                            <span className="text-white font-medium">
-                                                {formatCompactValue(BigInt(pnlData.realizedPnL), quoteTokenDecimals)} {quoteToken.symbol}
-                                            </span>
-                                        </div>
-                                        <div className="border-t border-slate-600/50 pt-2 mt-2">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-white font-medium">= {t("positionDetails.overview.subtotal")}</span>
-                                                <span className={`font-bold ${realizedColor}`}>
-                                                    {formatCompactValue(realizedPnLAmount, quoteTokenDecimals)} {quoteToken.symbol}
+                                        <div className="bg-slate-700/30 rounded-lg p-4 space-y-2">
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-400">
+                                                    +{" "}
+                                                    {t(
+                                                        "positionDetails.overview.feesCollected"
+                                                    )}
                                                 </span>
+                                                <span className="text-white font-medium">
+                                                    {formatCompactValue(
+                                                        BigInt(
+                                                            pnlData.collectedFees
+                                                        ),
+                                                        quoteTokenDecimals
+                                                    )}{" "}
+                                                    {quoteToken.symbol}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-400">
+                                                    +{" "}
+                                                    {t(
+                                                        "positionDetails.overview.realizedPnL"
+                                                    )}*
+                                                </span>
+                                                <span className="text-white font-medium">
+                                                    {formatCompactValue(
+                                                        BigInt(
+                                                            pnlData.realizedPnL
+                                                        ),
+                                                        quoteTokenDecimals
+                                                    )}{" "}
+                                                    {quoteToken.symbol}
+                                                </span>
+                                            </div>
+                                            <div
+                                                className="text-xs text-slate-500 pl-2"
+                                                style={{ marginTop: "2px" }}
+                                            >
+                                                *) {t("positionDetails.overview.realizedPnLAnnotation")}
+                                            </div>
+                                            <div className="border-t border-slate-600/50 pt-2 mt-2">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-white font-medium">
+                                                        ={" "}
+                                                        {t(
+                                                            "positionDetails.overview.subtotal"
+                                                        )}
+                                                    </span>
+                                                    <span
+                                                        className={`font-bold ${realizedColor}`}
+                                                    >
+                                                        {formatCompactValue(
+                                                            realizedPnLAmount,
+                                                            quoteTokenDecimals
+                                                        )}{" "}
+                                                        {quoteToken.symbol}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* Unrealized PnL Section */}
-                                <div className="space-y-3">
-                                    <h4 className="text-md font-semibold text-white">
-                                        {t("positionDetails.overview.unrealizedPnLSection")}
-                                    </h4>
-                                    <div className="bg-slate-700/30 rounded-lg p-4 space-y-2">
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-400">+ {t("positionDetails.overview.unclaimedFees")}</span>
-                                            <span className="text-white font-medium">
-                                                {formatCompactValue(BigInt(pnlData.unclaimedFees), quoteTokenDecimals)} {quoteToken.symbol}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-400">+ {t("positionDetails.overview.currentValue")}</span>
-                                            <span className="text-white font-medium">
-                                                {formatCompactValue(BigInt(pnlData.currentValue), quoteTokenDecimals)} {quoteToken.symbol}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-400">- {t("positionDetails.overview.costBasis")}</span>
-                                            <span className="text-white font-medium">
-                                                -{formatCompactValue(BigInt(pnlData.currentCostBasis), quoteTokenDecimals)} {quoteToken.symbol}
-                                            </span>
-                                        </div>
-                                        <div className="border-t border-slate-600/50 pt-2 mt-2">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-white font-medium">= {t("positionDetails.overview.subtotal")}</span>
-                                                <span className={`font-bold ${unrealizedColor}`}>
-                                                    {formatCompactValue(unrealizedPnLAmount, quoteTokenDecimals)} {quoteToken.symbol}
+                                    {/* Unrealized PnL Section */}
+                                    <div className="space-y-3">
+                                        <h4 className="text-md font-semibold text-white">
+                                            {t(
+                                                "positionDetails.overview.unrealizedPnLSection"
+                                            )}
+                                        </h4>
+                                        <div className="bg-slate-700/30 rounded-lg p-4 space-y-2">
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-400">
+                                                    +{" "}
+                                                    {t(
+                                                        "positionDetails.overview.unclaimedFees"
+                                                    )}
                                                 </span>
+                                                <span className="text-white font-medium">
+                                                    {formatCompactValue(
+                                                        BigInt(
+                                                            pnlData.unclaimedFees
+                                                        ),
+                                                        quoteTokenDecimals
+                                                    )}{" "}
+                                                    {quoteToken.symbol}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-400">
+                                                    +{" "}
+                                                    {t(
+                                                        "positionDetails.overview.currentValue"
+                                                    )}
+                                                </span>
+                                                <span className="text-white font-medium">
+                                                    {formatCompactValue(
+                                                        BigInt(
+                                                            pnlData.currentValue
+                                                        ),
+                                                        quoteTokenDecimals
+                                                    )}{" "}
+                                                    {quoteToken.symbol}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-400">
+                                                    -{" "}
+                                                    {t(
+                                                        "positionDetails.overview.costBasis"
+                                                    )}
+                                                </span>
+                                                <span className="text-white font-medium">
+                                                    -
+                                                    {formatCompactValue(
+                                                        BigInt(
+                                                            pnlData.currentCostBasis
+                                                        ),
+                                                        quoteTokenDecimals
+                                                    )}{" "}
+                                                    {quoteToken.symbol}
+                                                </span>
+                                            </div>
+                                            <div className="border-t border-slate-600/50 pt-2 mt-2">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-white font-medium">
+                                                        ={" "}
+                                                        {t(
+                                                            "positionDetails.overview.subtotal"
+                                                        )}
+                                                    </span>
+                                                    <span
+                                                        className={`font-bold ${unrealizedColor}`}
+                                                    >
+                                                        {formatCompactValue(
+                                                            unrealizedPnLAmount,
+                                                            quoteTokenDecimals
+                                                        )}{" "}
+                                                        {quoteToken.symbol}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    })()}
+                            );
+                        })()}
                 </div>
 
                 {/* PnL Curve Visualization */}
@@ -284,8 +473,12 @@ export function OverviewTab({ position, chainSlug, nftId }: OverviewTabProps) {
                         <h3 className="text-lg font-semibold text-white">
                             {t("positionDetails.overview.pnlCurve")}
                         </h3>
-                        <span className={`px-3 py-1 rounded-lg text-sm font-medium border ${positionStatus.color}`}>
-                            {t(`positionDetails.overview.status.${positionStatus.status}`)}
+                        <span
+                            className={`px-3 py-1 rounded-lg text-sm font-medium border ${positionStatus.color}`}
+                        >
+                            {t(
+                                `positionDetails.overview.status.${positionStatus.status}` as any
+                            )}
                         </span>
                     </div>
                     <div className="flex justify-center">
@@ -301,7 +494,6 @@ export function OverviewTab({ position, chainSlug, nftId }: OverviewTabProps) {
                     </div>
                 </div>
             </div>
-
         </div>
     );
 }

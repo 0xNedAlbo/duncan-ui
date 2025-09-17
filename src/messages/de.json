@@ -71,7 +71,7 @@
     "title": "Einstellungen",
     "language": "Sprache",
     "currency": "Währung",
-    "notifications": "Benachrichtigungen", 
+    "notifications": "Benachrichtigungen",
     "enabled": "Aktiviert",
     "disabled": "Deaktiviert",
     "moreComing": "Weitere Einstellungen folgen bald..."
@@ -215,7 +215,7 @@
       "placeholder": "Übersicht-Tab-Inhalte werden hier implementiert",
       "positionNotFound": "Position nicht gefunden",
       "currentValue": "Aktueller Positionswert",
-      "valueDescription": "Aktueller Positionswert im Quote-Token",
+      "valueDescription": "Aktueller Positionswert in Quote-Tokens",
       "totalPnL": "Gesamt PnL",
       "pnlDescription": "Realisierter + unrealisierter Gewinn und Verlust",
       "unclaimedFees": "Nicht abgeholte Gebühren",
@@ -232,13 +232,14 @@
       "initialValue": "Anfangswert",
       "unrealizedPnL": "Unrealisierter PnL",
       "realizedPnL": "Realisierter PnL",
-      "feesCollected": "Gebühren eingesammelt",
+      "feesCollected": "Gebühren abgeholt",
       "realizedPnLSection": "Realisierter PnL",
       "unrealizedPnLSection": "Unrealisierter PnL",
       "totalPnLBreakdown": "Gesamt PnL",
       "costBasis": "Kostenbasis",
       "currentValueMinusCostBasis": "Aktueller Wert - Kostenbasis",
       "subtotal": "Zwischensumme",
+      "realizedPnLAnnotation": "PnL aus bereits abgehobenen Assets",
       "status": {
         "in-range": "In Range",
         "out-of-range": "Out of Range",
@@ -262,7 +263,7 @@
       "eventTypes": {
         "CREATE": "Position Erstellt",
         "INCREASE": "Liquidität Hinzugefügt",
-        "DECREASE": "Liquidität Entfernt", 
+        "DECREASE": "Liquidität Entfernt",
         "COLLECT": "Fees Eingesammelt",
         "CLOSE": "Position Geschlossen"
       },

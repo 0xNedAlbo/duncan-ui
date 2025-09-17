@@ -239,6 +239,7 @@
       "costBasis": "Cost Basis",
       "currentValueMinusCostBasis": "Current Value - Cost Basis",
       "subtotal": "Subtotal",
+      "realizedPnLAnnotation": "PnL from already withdrawn assets",
       "status": {
         "in-range": "In Range",
         "out-of-range": "Out of Range",
