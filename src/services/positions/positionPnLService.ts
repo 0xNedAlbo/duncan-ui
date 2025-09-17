@@ -27,6 +27,7 @@ import {
 import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { PositionService } from "./positionService";
 import { PoolService } from "../pools/poolService";
+import { PositionLedgerService } from "./positionLedgerService";
 
 export interface PnlBreakdown {
   // Core position metrics (all in quote token units as strings)
@@ -50,15 +51,17 @@ export class PositionPnLService {
   private rpcClients: Map<SupportedChainsType, PublicClient>;
   private positionService: PositionService;
   private poolService: PoolService;
+  private positionLedgerService: PositionLedgerService;
 
   constructor(
     requiredClients: Pick<Clients, 'prisma' | 'rpcClients'>,
-    requiredServices: Pick<Services, 'positionService' | 'poolService'>
+    requiredServices: Pick<Services, 'positionService' | 'poolService' | 'positionLedgerService'>
   ) {
     this.prisma = requiredClients.prisma;
     this.rpcClients = requiredClients.rpcClients;
     this.positionService = requiredServices.positionService;
     this.poolService = requiredServices.poolService;
+    this.positionLedgerService = requiredServices.positionLedgerService;
   }
 
   /**
@@ -88,10 +91,8 @@ export class PositionPnLService {
     const token0Data = pool.token0;
     const token1Data = pool.token1;
 
-    // 2. Update pool state to ensure we have latest fee growth globals
-    await this.poolService.updatePoolState(pool.id);
 
-    // 3. Get updated pool data with fresh fee growth globals
+    // 2. Get updated pool data with fresh fee growth globals
     const updatedPool = await this.prisma.pool.findUnique({
       where: { id: pool.id },
       select: {
@@ -109,7 +110,7 @@ export class PositionPnLService {
     const feeGrowthGlobal0X128 = BigInt(updatedPool.feeGrowthGlobal0X128);
     const feeGrowthGlobal1X128 = BigInt(updatedPool.feeGrowthGlobal1X128);
 
-    // 4. Read NFT position data from blockchain
+    // 3. Read NFT position data from blockchain
     const chainId = getChainId(chainName);
     const nfpmAddress = NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[chainId];
 
@@ -160,7 +161,7 @@ export class PositionPnLService {
       };
     }
 
-    // 5. Read tick data at position bounds
+    // 4. Read tick data at position bounds
     const [tickLowerResult, tickUpperResult] = await Promise.all([
       client.readContract({
         address: pool.poolAddress as `0x${string}`,
@@ -202,7 +203,7 @@ export class PositionPnLService {
       initialized: tickUpperData[7] as boolean,
     };
 
-    // 6. Compute fee growth inside the position range
+    // 5. Compute fee growth inside the position range
     const feeGrowthInside = computeFeeGrowthInside(
       currentTick,
       nftData.tickLower,
@@ -215,7 +216,7 @@ export class PositionPnLService {
       tickUpper.feeGrowthOutside1X128
     );
 
-    // 7. Calculate incremental fees since last checkpoint
+    // 6. Calculate incremental fees since last checkpoint
     const incremental0 = calculateIncrementalFees(
       feeGrowthInside.inside0,
       nftData.feeGrowthInside0LastX128,
@@ -228,10 +229,10 @@ export class PositionPnLService {
       nftData.liquidity
     );
 
-    // 8. Get uncollected principal to separate from pure fees
+    // 7. Get uncollected principal to separate from pure fees
     const uncollectedPrincipal = await this.getLatestUncollectedPrincipal(position.id);
 
-    // 9. Calculate pure checkpointed fees (tokensOwed includes both fees and principal)
+    // 8. Calculate pure checkpointed fees (tokensOwed includes both fees and principal)
     const pureCheckpointedFees0 = nftData.tokensOwed0 > uncollectedPrincipal.uncollectedPrincipal0
       ? nftData.tokensOwed0 - uncollectedPrincipal.uncollectedPrincipal0
       : 0n;
@@ -240,7 +241,7 @@ export class PositionPnLService {
       ? nftData.tokensOwed1 - uncollectedPrincipal.uncollectedPrincipal1
       : 0n;
 
-    // 10. Total claimable fees = pure checkpointed fees + incremental fees
+    // 9. Total claimable fees = pure checkpointed fees + incremental fees
     const totalClaimable0 = pureCheckpointedFees0 + incremental0;
     const totalClaimable1 = pureCheckpointedFees1 + incremental1;
 
@@ -253,7 +254,7 @@ export class PositionPnLService {
       totalClaimable1,
     };
 
-    // 11. Determine base/quote token amounts and calculate value
+    // 10. Determine base/quote token amounts and calculate value
     const baseTokenAmount = position.token0IsQuote ? totalClaimable1 : totalClaimable0;
     const quoteTokenAmount = position.token0IsQuote ? totalClaimable0 : totalClaimable1;
 
@@ -437,7 +438,15 @@ export class PositionPnLService {
       };
     }
 
-    // No valid cache found - calculate fresh PnL data
+    // No valid cache found - update pool state and sync position events, then calculate fresh PnL data
+    await this.poolService.updatePoolState(position.pool.id);
+
+    // Sync position events after pool state update to ensure latest ledger state
+    if (position.nftId) {
+      const positionSyncInfo = PositionLedgerService.createSyncInfo(position);
+      await this.positionLedgerService.syncPositionEvents(positionSyncInfo, position.nftId);
+    }
+
     await this.calculateAndCachePnL(positionId, position);
 
     // Fetch the newly cached data
@@ -462,8 +471,6 @@ export class PositionPnLService {
    * Calculate fresh PnL data and cache it
    */
   private async calculateAndCachePnL(positionId: string, position: any): Promise<void> {
-    // Update pool data to ensure current prices before PnL calculation
-    await this.poolService.updatePoolState(position.pool.id);
 
     // Fetch all PnL components in parallel for efficiency
     const [currentValue, currentCostBasis, collectedFees, realizedPnL, unclaimedFeesData] = await Promise.all([

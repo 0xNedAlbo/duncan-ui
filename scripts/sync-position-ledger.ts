@@ -24,7 +24,6 @@ import { getChainConfig, SupportedChainsType } from '@/config/chains';
 import { DefaultServiceFactory } from '@/services/ServiceFactory';
 import { DefaultClientsFactory } from '@/services/ClientsFactory';
 import { PositionLedgerService } from '@/services/positions/positionLedgerService';
-import { EtherscanEventService } from '@/services/etherscan/etherscanEventService';
 
 // Parse command line arguments
 function parseArguments(): { username: string; chain: SupportedChainsType; nftId: string } {
@@ -116,36 +115,18 @@ async function syncPositionLedger() {
       }
     } as any);
 
-    // Fetch events from blockchain using Etherscan
-    const { etherscanClient } = DefaultClientsFactory.getInstance().getClients();
-    const etherscanEventService = new EtherscanEventService({
-      etherscanClient
-    });
-
-    const rawEvents = await etherscanEventService.fetchPositionEvents(
-      chain,
-      nftId // tokenId as string, not BigInt
-    );
-
-    if (rawEvents.length === 0) {
-      console.log(JSON.stringify([]));
-      return;
-    }
-
+    // Sync events using the ledger service (which now handles Etherscan fetching internally)
     const syncedEvents = await positionLedgerService.syncPositionEvents(
       positionSyncInfo,
-      rawEvents
+      nftId
     );
 
     // Convert BigInt values to strings for JSON serialization
     const eventsForJson = syncedEvents.map(event => ({
       ...event,
       blockNumber: event.blockNumber.toString(),
-      liquidityBefore: event.liquidityBefore.toString(),
       liquidityAfter: event.liquidityAfter.toString(),
-      costBasisBefore: event.costBasisBefore.toString(),
       costBasisAfter: event.costBasisAfter.toString(),
-      realizedPnLBefore: event.realizedPnLBefore.toString(),
       realizedPnLAfter: event.realizedPnLAfter.toString()
     }));
 

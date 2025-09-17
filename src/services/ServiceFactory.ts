@@ -80,7 +80,7 @@ export class DefaultServiceFactory implements ServiceFactory {
         );
 
         const positionLedgerService = new PositionLedgerService(
-            { prisma },
+            { prisma, etherscanClient },
             { tokenService, poolPriceService, etherscanBlockInfoService, evmBlockInfoService }
         );
 
@@ -91,7 +91,7 @@ export class DefaultServiceFactory implements ServiceFactory {
 
         const positionPnLService = new PositionPnLService(
             { prisma, rpcClients },
-            { positionService, poolService }
+            { positionService, poolService, positionLedgerService }
         );
 
         const curveDataService = new CurveDataService(

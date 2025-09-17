@@ -137,9 +137,9 @@ export class ApiServiceFactory {
 
     public get positionLedgerService(): PositionLedgerService {
         if (!this.serviceInstances.positionLedgerService) {
-            const { prisma } = this.clients;
+            const { prisma, etherscanClient } = this.clients;
             this.serviceInstances.positionLedgerService = new PositionLedgerService(
-                { prisma },
+                { prisma, etherscanClient },
                 {
                     tokenService: this.tokenService,
                     poolPriceService: this.poolPriceService,
@@ -167,7 +167,7 @@ export class ApiServiceFactory {
             const { prisma, rpcClients } = this.clients;
             this.serviceInstances.positionPnLService = new PositionPnLService(
                 { prisma, rpcClients },
-                { positionService: this.positionService, poolService: this.poolService }
+                { positionService: this.positionService, poolService: this.poolService, positionLedgerService: this.positionLedgerService }
             );
         }
         return this.serviceInstances.positionPnLService;

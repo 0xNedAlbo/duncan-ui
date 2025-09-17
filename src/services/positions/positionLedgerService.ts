@@ -11,6 +11,7 @@ import { SupportedChainsType } from "@/config/chains";
 import type { Clients } from "../ClientsFactory";
 import type { Services } from "../ServiceFactory";
 import type { RawPositionEvent } from "../etherscan/etherscanEventService";
+import { EtherscanEventService } from "../etherscan/etherscanEventService";
 import { PoolPriceService } from "../prices/poolPriceService";
 import { EtherscanBlockInfoService } from "../etherscan/etherscanBlockInfoService";
 import { EvmBlockInfoService } from "../evm/evmBlockInfoService";
@@ -53,6 +54,7 @@ export class PositionLedgerService {
     private etherscanBlockInfoService: EtherscanBlockInfoService;
     private evmBlockInfoService: EvmBlockInfoService;
     private poolPriceService: PoolPriceService;
+    private etherscanEventService: EtherscanEventService;
 
     /**
      * Helper method to create PositionSyncInfo from BasicPosition
@@ -75,13 +77,14 @@ export class PositionLedgerService {
     }
 
     constructor(
-        requiredClients: Pick<Clients, "prisma">,
+        requiredClients: Pick<Clients, "prisma" | "etherscanClient">,
         requiredServices: Pick<Services, "tokenService" | "poolPriceService" | "etherscanBlockInfoService" | "evmBlockInfoService">
     ) {
         this.prisma = requiredClients.prisma;
         this.etherscanBlockInfoService = requiredServices.etherscanBlockInfoService;
         this.evmBlockInfoService = requiredServices.evmBlockInfoService;
         this.poolPriceService = requiredServices.poolPriceService;
+        this.etherscanEventService = new EtherscanEventService({ etherscanClient: requiredClients.etherscanClient });
     }
 
     /**
@@ -128,6 +131,34 @@ export class PositionLedgerService {
     ): string {
         const input = `${blockNumber.toString()}${transactionIndex.toString()}${logIndex.toString()}`;
         return createHash("md5").update(input).digest("hex");
+    }
+
+    /**
+     * Fetch events from Etherscan starting from the finality boundary for optimization
+     * Uses the last finalized block as starting point to avoid re-fetching stable events
+     */
+    private async fetchEventsFromEtherscan(
+        positionInfo: PositionSyncInfo,
+        nftId: string
+    ): Promise<RawPositionEvent[]> {
+        const chain = positionInfo.pool.chain as SupportedChainsType;
+
+        // Find the finality boundary to determine optimal starting block
+        const lastFinalizedBlock = await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
+
+        let fromBlock: string | number = "earliest";
+
+        if (lastFinalizedBlock !== null) {
+            // Start fetching from the finalized block to avoid re-fetching stable events
+            fromBlock = lastFinalizedBlock.toString();
+        }
+
+        // Fetch events from Etherscan using the optimized starting block
+        return await this.etherscanEventService.fetchPositionEvents(
+            chain,
+            nftId,
+            { fromBlock }
+        );
     }
 
     /**
@@ -271,13 +302,17 @@ export class PositionLedgerService {
     }
 
     /**
-     * Sync position events from raw blockchain events to database
+     * Sync position events from blockchain to database
+     * Fetches events internally using finality boundary optimization
      * Validates chronological ordering with failsafe checks during iteration
      */
     async syncPositionEvents(
         positionInfo: PositionSyncInfo,
-        rawEvents: RawPositionEvent[]
+        nftId: string
     ): Promise<PositionEvent[]> {
+        // Fetch events from Etherscan using finality boundary optimization
+        const rawEvents = await this.fetchEventsFromEtherscan(positionInfo, nftId);
+
         if (rawEvents.length === 0) {
             return [];
         }
