@@ -5,10 +5,12 @@
  * from PositionPnLService and dependency injection patterns.
  */
 
+import { PrismaClient } from "@prisma/client";
 import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 import type { CurvePoint, CurveData } from "@/components/charts/mini-pnl-curve";
 import type { Services } from "../ServiceFactory";
+import type { Clients } from "../ClientsFactory";
 import type { BasicPosition } from "./positionService";
 import { PositionPnLService } from "./positionPnLService";
 
@@ -28,11 +30,25 @@ interface CurvePositionParams {
 }
 
 export class CurveDataService {
+    private prisma: PrismaClient;
     private positionPnLService: PositionPnLService;
 
+    /**
+     * Service for generating and caching PnL curve visualization data.
+     *
+     * Design Pattern: Updated to include database caching capabilities:
+     * - Provides cache-first pattern for expensive curve calculations
+     * - Uses database storage for persistence across sessions
+     * - Maintains dependency on PositionPnLService for cost basis calculations
+     * - Includes cache invalidation logic linked to pool state changes
+     *
+     * Cache Strategy: Complete curve data stored as JSON for atomic operations.
+     */
     constructor(
+        requiredClients: Pick<Clients, 'prisma'>,
         requiredServices: Pick<Services, 'positionPnLService'>
     ) {
+        this.prisma = requiredClients.prisma;
         this.positionPnLService = requiredServices.positionPnLService;
     }
 
@@ -163,9 +179,35 @@ export class CurveDataService {
     }
 
     /**
-     * Generate optimized curve data with proper Uniswap V3 calculations
+     * Get cached curve data or generate fresh data with caching
+     * Cache-first pattern similar to PositionPnLService
      */
-    async generateCurveData(position: BasicPosition): Promise<CurveData> {
+    async getCurveData(position: BasicPosition): Promise<CurveData> {
+        // Check for valid cached curve data
+        const cachedCurve = await this.prisma.positionCurve.findUnique({
+            where: {
+                positionId: position.id,
+                isValid: true
+            }
+        });
+
+        if (cachedCurve) {
+            // Return cached data
+            return cachedCurve.curveData as CurveData;
+        }
+
+        // No valid cache found - generate fresh curve data and cache it
+        const freshCurveData = await this.generateCurveData(position);
+        await this.cacheCurveData(position.id, freshCurveData, position);
+
+        return freshCurveData;
+    }
+
+    /**
+     * Generate optimized curve data with proper Uniswap V3 calculations
+     * Private method - use getCurveData() for cache-first access
+     */
+    private async generateCurveData(position: BasicPosition): Promise<CurveData> {
         const params = await this.extractPositionParams(position);
         
         // Calculate price range for curve using proper token addresses  
@@ -258,6 +300,44 @@ export class CurveDataService {
     }
 
     /**
+     * Cache curve data to database
+     */
+    private async cacheCurveData(positionId: string, curveData: CurveData, position: BasicPosition): Promise<void> {
+        // Get current pool state for cache metadata
+        const poolData = await this.prisma.pool.findUnique({
+            where: { id: position.pool.id },
+            select: { currentTick: true, sqrtPriceX96: true }
+        });
+
+        // Get PnL cache version for dependency tracking
+        const pnlCache = await this.prisma.positionPnL.findUnique({
+            where: { positionId },
+            select: { id: true, updatedAt: true }
+        });
+
+        // Upsert the cache entry
+        await this.prisma.positionCurve.upsert({
+            where: { positionId },
+            update: {
+                curveData: curveData as any, // Prisma Json type
+                poolTick: poolData?.currentTick,
+                poolSqrtPriceX96: poolData?.sqrtPriceX96,
+                pnlCacheVersion: pnlCache?.id,
+                isValid: true,
+                updatedAt: new Date()
+            },
+            create: {
+                positionId,
+                curveData: curveData as any, // Prisma Json type
+                poolTick: poolData?.currentTick,
+                poolSqrtPriceX96: poolData?.sqrtPriceX96,
+                pnlCacheVersion: pnlCache?.id,
+                isValid: true
+            }
+        });
+    }
+
+    /**
      * Calculate PnL at a specific price using Uniswap V3 math
      * PnL = current value - current cost basis (not initial value)
      */
@@ -329,7 +409,7 @@ export class CurveDataService {
     /**
      * Validate position data before curve generation
      */
-    private validatePosition(position: BasicPosition): boolean {
+    validatePosition(position: BasicPosition): boolean {
         try {
             // Check required fields
             if (!position.liquidity || position.liquidity === "0") return false;
@@ -341,5 +421,70 @@ export class CurveDataService {
         } catch {
             return false;
         }
+    }
+
+    /**
+     * Invalidate cached curve data for a position
+     */
+    async invalidateCache(positionId: string): Promise<void> {
+        await this.prisma.positionCurve.updateMany({
+            where: { positionId },
+            data: { isValid: false }
+        });
+    }
+
+    /**
+     * Invalidate curve cache for multiple positions (batch operation)
+     */
+    async invalidateBatchCache(positionIds: string[]): Promise<void> {
+        await this.prisma.positionCurve.updateMany({
+            where: { positionId: { in: positionIds } },
+            data: { isValid: false }
+        });
+    }
+
+    /**
+     * Invalidate all curve cache for positions in a specific pool
+     * Useful when pool state changes significantly
+     */
+    async invalidatePoolCache(poolId: string): Promise<void> {
+        await this.prisma.positionCurve.updateMany({
+            where: {
+                position: {
+                    poolId: poolId
+                }
+            },
+            data: { isValid: false }
+        });
+    }
+
+    /**
+     * Invalidate all cached curve data (useful for maintenance or system updates)
+     */
+    async invalidateAllCache(): Promise<void> {
+        await this.prisma.positionCurve.updateMany({
+            where: { isValid: true },
+            data: { isValid: false }
+        });
+    }
+
+    /**
+     * Clean up old invalid cache entries
+     * Should be called periodically to maintain database hygiene
+     */
+    async cleanupOldCache(olderThanDays: number = 7): Promise<number> {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+
+        const result = await this.prisma.positionCurve.deleteMany({
+            where: {
+                isValid: false,
+                updatedAt: {
+                    lt: cutoffDate
+                }
+            }
+        });
+
+        return result.count;
     }
 }

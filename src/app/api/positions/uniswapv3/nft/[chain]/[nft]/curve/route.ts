@@ -3,24 +3,34 @@ import { withAuthAndLogging } from "@/lib/api/withAuth";
 import { logError } from "@/lib/api/withLogging";
 import { ApiServiceFactory } from "@/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
-import type { PositionRefreshResponse } from "@/types/api";
+import type { CurveData } from "@/components/charts/mini-pnl-curve";
+import type { ApiResponse } from "@/types/api";
+
+export interface PositionCurveResponse extends ApiResponse<CurveData> {
+    meta: {
+        requestedAt: string;
+        positionId: string;
+        cached: boolean;
+    };
+}
 
 /**
- * POST /api/positions/uniswapv3/nft/[chain]/[nft]/refresh - Refresh position data
+ * GET /api/positions/uniswapv3/nft/[chain]/[nft]/curve - Get position PnL curve data
  *
- * Refreshes position data by:
- * - Updating pool state with latest blockchain data
- * - Syncing position events from blockchain
- * - Invalidating cached PnL and curve data
- * - Recalculating PnL breakdown with fresh data
- * - Pre-calculating fresh curve data for visualization
- * - Updating cached position, PnL, and curve data
+ * Returns PnL curve visualization data for a specific Uniswap V3 position including:
+ * - Curve points (price vs PnL across range)
+ * - Price range metadata
+ * - PnL range metadata
+ * - Current price index
+ * - Range boundary indices
+ *
+ * Uses database caching for performance optimization.
  *
  * Path parameters:
  * - chain: Blockchain network (ethereum, arbitrum, base)
  * - nft: NFT token ID of the position
  */
-export const POST = withAuthAndLogging<PositionRefreshResponse>(
+export const GET = withAuthAndLogging<PositionCurveResponse>(
     async (
         request: NextRequest,
         { user, log },
@@ -38,7 +48,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                         error: "Chain and NFT ID are required",
                         meta: {
                             requestedAt: new Date().toISOString(),
-                            positionId: ""
+                            positionId: "",
+                            cached: false
                         }
                     },
                     { status: 400 }
@@ -55,7 +66,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                         )}`,
                         meta: {
                             requestedAt: new Date().toISOString(),
-                            positionId: ""
+                            positionId: "",
+                            cached: false
                         }
                     },
                     { status: 400 }
@@ -70,7 +82,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                         error: "Invalid NFT ID format. Must be a positive integer.",
                         meta: {
                             requestedAt: new Date().toISOString(),
-                            positionId: ""
+                            positionId: "",
+                            cached: false
                         }
                     },
                     { status: 400 }
@@ -79,13 +92,12 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
 
             log.debug(
                 { chain, nftId, userId: user.userId },
-                "Starting position refresh"
+                "Fetching curve data for position"
             );
 
             // Get service instances
             const apiFactory = ApiServiceFactory.getInstance();
             const positionService = apiFactory.positionService;
-            const positionPnLService = apiFactory.positionPnLService;
             const curveDataService = apiFactory.curveDataService;
 
             // Find the position by user ID, chain, and NFT ID
@@ -106,84 +118,60 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                         error: "Position not found",
                         meta: {
                             requestedAt: new Date().toISOString(),
-                            positionId: ""
+                            positionId: "",
+                            cached: false
                         }
                     },
                     { status: 404 }
                 );
             }
 
-            // Invalidate existing caches to force fresh calculation
-            await positionPnLService.invalidateCache(position.id);
-            await curveDataService.invalidateCache(position.id);
-
-            log.debug(
-                { positionId: position.id },
-                "Invalidated PnL and curve caches, starting fresh calculation"
-            );
-
-            // Trigger fresh PnL calculation - this handles:
-            // - Pool state update via poolService.updatePoolState()
-            // - Position events sync via positionLedgerService.syncPositionEvents()
-            // - Fresh PnL calculation with current prices and unclaimed fees
-            // - Cache update with new data
-            const pnlBreakdown = await positionPnLService.getPnlBreakdown(
-                position.id
-            );
-
-            // Fetch the updated position data
-            const refreshedPosition = await positionService.getPosition(position.id);
-
-            // Pre-calculate fresh curve data to warm the cache
-            // This ensures the curve visualization is immediately available after refresh
-            try {
-                if (refreshedPosition && curveDataService.validatePosition(refreshedPosition)) {
-                    await curveDataService.getCurveData(refreshedPosition);
-                    log.debug(
-                        { positionId: position.id },
-                        "Successfully pre-calculated fresh curve data"
-                    );
-                } else {
-                    log.debug(
-                        { positionId: position.id },
-                        "Skipped curve data pre-calculation due to invalid position data"
-                    );
-                }
-            } catch (curveError) {
-                // Log curve calculation error but don't fail the refresh
+            // Validate position data before curve generation
+            if (!curveDataService.validatePosition(position)) {
                 log.debug(
-                    { positionId: position.id, error: curveError },
-                    "Failed to pre-calculate curve data, but refresh completed successfully"
+                    { positionId: position.id, chain, nftId },
+                    "Invalid position data for curve generation"
+                );
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Position data invalid for curve generation",
+                        meta: {
+                            requestedAt: new Date().toISOString(),
+                            positionId: position.id,
+                            cached: false
+                        }
+                    },
+                    { status: 422 }
                 );
             }
+
+            // Get curve data using cache-first pattern
+            const curveData = await curveDataService.getCurveData(position);
 
             log.debug(
                 {
                     positionId: position.id,
                     chain,
                     nftId,
-                    currentValue: pnlBreakdown.currentValue,
-                    totalPnL: pnlBreakdown.totalPnL,
-                    calculatedAt: pnlBreakdown.calculatedAt,
+                    pointsCount: curveData.points.length,
+                    priceRange: curveData.priceRange,
                 },
-                "Successfully refreshed position data"
+                "Successfully generated curve data"
             );
 
             return NextResponse.json({
                 success: true,
-                data: {
-                    position: refreshedPosition,
-                    pnlBreakdown: pnlBreakdown,
-                },
+                data: curveData,
                 meta: {
                     requestedAt: new Date().toISOString(),
                     positionId: position.id,
-                    refreshedAt: pnlBreakdown.calculatedAt.toISOString(),
+                    cached: true // Note: we don't distinguish cache hit/miss in response
                 },
             });
         } catch (error) {
             logError(log, error, {
-                endpoint: "positions/uniswapv3/nft/[chain]/[nft]/refresh",
+                endpoint: "positions/uniswapv3/nft/[chain]/[nft]/curve",
                 chain: params?.chain,
                 nftId: params?.nft,
             });
@@ -197,7 +185,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                             error: "Position not found",
                             meta: {
                                 requestedAt: new Date().toISOString(),
-                                positionId: ""
+                                positionId: "",
+                                cached: false
                             }
                         },
                         { status: 404 }
@@ -208,27 +197,14 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                     return NextResponse.json(
                         {
                             success: false,
-                            error: "Position refresh not available for this position type",
+                            error: "Curve generation not available for this position type",
                             meta: {
                                 requestedAt: new Date().toISOString(),
-                                positionId: ""
+                                positionId: "",
+                                cached: false
                             }
                         },
                         { status: 422 }
-                    );
-                }
-
-                if (error.message.includes("No RPC client available")) {
-                    return NextResponse.json(
-                        {
-                            success: false,
-                            error: "Blockchain data temporarily unavailable",
-                            meta: {
-                                requestedAt: new Date().toISOString(),
-                                positionId: ""
-                            }
-                        },
-                        { status: 503 }
                     );
                 }
 
@@ -239,7 +215,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                             error: "Pool data temporarily unavailable",
                             meta: {
                                 requestedAt: new Date().toISOString(),
-                                positionId: ""
+                                positionId: "",
+                                cached: false
                             }
                         },
                         { status: 503 }
@@ -253,7 +230,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                     error: "Internal server error",
                     meta: {
                         requestedAt: new Date().toISOString(),
-                        positionId: ""
+                        positionId: "",
+                        cached: false
                     }
                 },
                 { status: 500 }
@@ -261,8 +239,3 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
         }
     }
 );
-
-// Keep the cache clearing function for potential future use
-export function clearRefreshCache() {
-  // Cache clearing logic would go here in the future implementation
-}

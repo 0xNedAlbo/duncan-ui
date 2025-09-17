@@ -95,6 +95,7 @@ export class DefaultServiceFactory implements ServiceFactory {
         );
 
         const curveDataService = new CurveDataService(
+            { prisma },
             { positionPnLService }
         );
 

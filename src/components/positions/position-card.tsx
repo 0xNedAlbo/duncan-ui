@@ -8,7 +8,7 @@ import { useTranslations } from "@/i18n/client";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import type { BasicPosition } from "@/services/positions/positionService";
 import { usePositionPnL, usePnLDisplayValues } from "@/hooks/api/usePositionPnL";
-// import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy"; // Commented out until PnL service is implemented
+import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy";
 
 interface PositionCardProps {
     position: BasicPosition;
@@ -246,13 +246,18 @@ export function PositionCard({
                             </div>
                         </div>
 
-                        {/* Range (Ticks) */}
+                        {/* PnL Curve Visualization */}
                         <div className="text-right">
                             <div className="text-xs text-slate-400 mb-0.5">
-                                Range (Ticks)
+                                PnL Curve
                             </div>
-                            <div className="text-lg font-semibold text-white">
-                                {position.tickLower} - {position.tickUpper}
+                            <div className="flex justify-end">
+                                <MiniPnLCurveLazy
+                                    position={position}
+                                    width={120}
+                                    height={60}
+                                    showTooltip={false}
+                                />
                             </div>
                         </div>
 

@@ -175,7 +175,9 @@ export class ApiServiceFactory {
 
     public get curveDataService(): CurveDataService {
         if (!this.serviceInstances.curveDataService) {
+            const { prisma } = this.clients;
             this.serviceInstances.curveDataService = new CurveDataService(
+                { prisma },
                 { positionPnLService: this.positionPnLService }
             );
         }

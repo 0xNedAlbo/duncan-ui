@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MiniPnLCurve } from "./mini-pnl-curve";
-import type { PositionWithPnL } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/services/positions/positionService";
 
 interface MiniPnLCurveLazyProps {
-    position: PositionWithPnL;
+    position: BasicPosition;
     width?: number;
     height?: number;
     className?: string;

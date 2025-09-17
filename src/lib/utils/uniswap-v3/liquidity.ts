@@ -176,3 +176,44 @@ function getLiquidityFromAmount1(
 
     return (amount1 * Q96) / (sqrtPriceUpper - sqrtPriceLower);
 }
+
+/**
+ * Calculate position value at current price
+ * @param liquidity The position liquidity
+ * @param tickCurrent Current price tick
+ * @param tickLower Lower bound tick
+ * @param tickUpper Upper bound tick
+ * @param currentPrice Current price (quote per base)
+ * @param baseIsToken0 Whether base token is token0
+ * @param baseDecimals Decimals of base token
+ * @returns Position value in quote token units
+ */
+export function calculatePositionValue(
+    liquidity: bigint,
+    tickCurrent: number,
+    tickLower: number,
+    tickUpper: number,
+    currentPrice: bigint,
+    baseIsToken0: boolean,
+    baseDecimals: number
+): bigint {
+    if (liquidity === 0n) return 0n;
+
+    const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
+        liquidity,
+        tickCurrent,
+        tickLower,
+        tickUpper
+    );
+
+    // Convert to value in quote token
+    if (baseIsToken0) {
+        // token0 = base, token1 = quote
+        // Value = token0Amount * price + token1Amount
+        return (token0Amount * currentPrice) / (10n ** BigInt(baseDecimals)) + token1Amount;
+    } else {
+        // token0 = quote, token1 = base
+        // Value = token0Amount + token1Amount * price
+        return token0Amount + (token1Amount * currentPrice) / (10n ** BigInt(baseDecimals));
+    }
+}

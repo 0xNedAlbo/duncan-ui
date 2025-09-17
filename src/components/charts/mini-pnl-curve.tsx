@@ -1,13 +1,12 @@
 "use client";
 
-import { useMemo, useState, memo } from "react";
-import type { PositionWithPnL } from "@/services/positions/positionService";
-import { curveDataService } from "@/services/positions/curveDataService";
-import { curveCache } from "@/lib/utils/curve-cache";
+import { useState, memo } from "react";
+import type { BasicPosition } from "@/services/positions/positionService";
+import { usePositionCurve } from "@/hooks/api/usePositionCurve";
 import { useTranslations } from "@/i18n/client";
 
 interface MiniPnLCurveProps {
-    position: PositionWithPnL;
+    position: BasicPosition;
     width?: number;
     height?: number;
     className?: string;
@@ -42,53 +41,53 @@ function MiniPnLCurveComponent({
     const [hoveredPoint, setHoveredPoint] = useState<CurvePoint | null>(null);
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
-    const curveData = useMemo(() => {
-        try {
-            // Validate position data first
-            if (!curveDataService.validatePosition(position)) {
-                console.warn("Invalid position data for curve generation");
-                return null;
-            }
+    // Extract chain and nftId from position for API call
+    const chain = position.chain;
+    const nftId = position.nftId;
 
-            const currentPrice = position.pool.currentPrice || "0";
+    // Fetch curve data from API with caching
+    const {
+        data: curveData,
+        isLoading,
+        error,
+        isError
+    } = usePositionCurve(chain, nftId, {
+        // Only fetch if we have the required identifiers
+        enabled: Boolean(chain && nftId)
+    });
 
-            // Try cache first (if available)
-            if (curveCache.isAvailable()) {
-                const cached = curveCache.get(position.id, currentPrice);
-                if (cached) {
-                    return cached;
-                }
-            }
+    // Handle error state
+    if (isError && error) {
+        console.warn("Failed to fetch curve data:", error);
+    }
 
-            // Generate new curve data
-            const newCurveData = curveDataService.generateCurveData(position);
-
-            // Cache the result (if available)
-            if (curveCache.isAvailable()) {
-                curveCache.set(position.id, currentPrice, newCurveData);
-            }
-
-            return newCurveData;
-        } catch (error) {
-            console.warn("Failed to generate curve data:", error);
-            return null;
-        }
-    }, [position, position.pool.currentPrice]);
-
-    if (!curveData) {
-        // Fallback UI
+    // Show loading state
+    if (isLoading) {
         return (
             <div
                 className={`flex items-center justify-center bg-slate-800/30 rounded ${className}`}
                 style={{ width, height }}
-                title={t("miniPnlCurve.error")}
+                title="Loading curve data..."
+            >
+                <span className="text-xs text-slate-500">Loading...</span>
+            </div>
+        );
+    }
+
+    // Show error or no data state
+    if (!curveData || isError) {
+        return (
+            <div
+                className={`flex items-center justify-center bg-slate-800/30 rounded ${className}`}
+                style={{ width, height }}
+                title={isError ? "Error loading curve data" : t("miniPnlCurve.error")}
             >
                 <span className="text-xs text-slate-500">N/A</span>
             </div>
         );
     }
 
-    const { points, priceRange, pnlRange, currentPriceIndex, rangeIndices } =
+    const { points, priceRange, pnlRange, currentPriceIndex } =
         curveData;
 
     // SVG coordinate conversion
@@ -307,7 +306,7 @@ function arePropsEqual(
         return false;
     if (prevProps.position.tickUpper !== nextProps.position.tickUpper)
         return false;
-    if (prevProps.position.initialValue !== nextProps.position.initialValue)
+    if (prevProps.position.pool.currentPrice !== nextProps.position.pool.currentPrice)
         return false;
 
     return true;
