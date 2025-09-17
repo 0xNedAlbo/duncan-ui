@@ -7,10 +7,11 @@ import { useTranslations } from "@/i18n/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ChainConfig } from "@/config/chains";
-import { useNFTPosition, useRefreshNFTPosition } from "@/hooks/api/usePositions";
-import { handleApiError } from "@/lib/app/apiError";
+import type { BasicPosition } from "@/services/positions/positionService";
+import { useRefreshNFTPosition } from "@/hooks/api/usePositions";
 
 interface PositionHeaderProps {
+    position: BasicPosition;
     chainSlug: string;
     nftId: string;
     chainConfig: ChainConfig;
@@ -29,13 +30,11 @@ function getTokenData(token: any) {
     };
 }
 
-export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeaderProps) {
+export function PositionHeader({ position, chainSlug, nftId, chainConfig }: PositionHeaderProps) {
     const t = useTranslations();
     const router = useRouter();
     const [copied, setCopied] = useState(false);
 
-    // Fetch position data using the NFT-specific hook
-    const { data: position, error, isLoading } = useNFTPosition(chainSlug, nftId);
     const refreshPosition = useRefreshNFTPosition();
 
     const handleRefresh = async () => {
@@ -84,89 +83,6 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
                 return "text-slate-400 bg-slate-500/10 border-slate-500/20";
         }
     };
-
-    // Show loading state
-    if (isLoading) {
-        return (
-            <div className="mb-8">
-                {/* Back Navigation */}
-                <div className="mb-6">
-                    <Link 
-                        href="/dashboard"
-                        className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        {t("positionDetails.header.backToDashboard")}
-                    </Link>
-                </div>
-
-                {/* Loading Header */}
-                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-8 py-6">
-                    <div className="flex items-center justify-center py-12">
-                        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-                        <span className="ml-3 text-slate-400">{t("common.loading")}</span>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // Show error state
-    if (error) {
-        return (
-            <div className="mb-8">
-                {/* Back Navigation */}
-                <div className="mb-6">
-                    <Link 
-                        href="/dashboard"
-                        className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        {t("positionDetails.header.backToDashboard")}
-                    </Link>
-                </div>
-
-                {/* Error Header */}
-                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-8 py-6">
-                    <div className="flex items-center justify-center py-12">
-                        <div className="text-center">
-                            <div className="text-red-400 mb-2">{t("common.error")}</div>
-                            <div className="text-slate-400 text-sm">
-                                {handleApiError(error, "Failed to load position")}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // Show position not found state
-    if (!position) {
-        return (
-            <div className="mb-8">
-                {/* Back Navigation */}
-                <div className="mb-6">
-                    <Link 
-                        href="/dashboard"
-                        className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        {t("positionDetails.header.backToDashboard")}
-                    </Link>
-                </div>
-
-                {/* Not Found Header */}
-                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-8 py-6">
-                    <div className="flex items-center justify-center py-12">
-                        <div className="text-center">
-                            <div className="text-slate-400">{t("positionDetails.header.positionNotFound")}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="mb-8">
@@ -217,7 +133,7 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
                         <div>
                             <div className="flex items-center gap-3 mb-2">
                                 <h1 className="text-2xl font-bold text-white">
-                                    {position.tokenPair || 'Unknown Pair'}
+                                    {position.pool?.token0?.symbol || 'Token0'}/{position.pool?.token1?.symbol || 'Token1'}
                                 </h1>
                                 <span className={`px-3 py-1 rounded-lg text-sm font-medium border ${getStatusColor(position.status || 'active')}`}>
                                     {t(`positionDetails.status.${position.status || 'active'}`)}
@@ -272,7 +188,7 @@ export function PositionHeader({ chainSlug, nftId, chainConfig }: PositionHeader
                         {/* Last Updated */}
                         <div className="text-right text-sm text-slate-400">
                             <div>{t("positionDetails.header.lastUpdated")}</div>
-                            <div>{position.lastUpdated ? new Date(position.lastUpdated).toLocaleString() : '-'}</div>
+                            <div>{position.updatedAt ? new Date(position.updatedAt).toLocaleString() : '-'}</div>
                         </div>
 
                         {/* Refresh Button */}

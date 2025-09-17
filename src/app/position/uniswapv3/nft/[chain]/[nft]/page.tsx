@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { redirect, notFound } from "next/navigation";
 import { useTranslations } from "@/i18n/client";
 import { isValidChainSlug, getChainConfigBySlug } from "@/config/chains";
+import { usePosition } from "@/hooks/api/usePositions";
 import { PositionHeader } from "./components/position-header";
 import { PositionTabs } from "./components/position-tabs";
 import { OverviewTab } from "./components/overview-tab";
@@ -15,10 +16,14 @@ export default function UniswapV3PositionPage() {
     const { data: session, status } = useSession();
     const params = useParams();
     const searchParams = useSearchParams();
-    
+
     const chainSlug = params.chain as string;
     const nftId = params.nft as string;
     const activeTab = searchParams.get("tab") || "overview";
+
+    // Fetch the specific position using the individual position API
+    // This must be called at the top level, before any conditional returns
+    const { data: position, isLoading: positionLoading, error: positionError } = usePosition(chainSlug, nftId);
 
     // Validate chain slug
     if (!isValidChainSlug(chainSlug)) {
@@ -48,10 +53,42 @@ export default function UniswapV3PositionPage() {
         redirect("/auth/signin");
     }
 
+    // Show loading state while fetching position
+    if (positionLoading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+                <div className="text-white">{t("common.loading")}</div>
+            </div>
+        );
+    }
+
+    // Show error if position failed to load
+    if (positionError) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="text-red-400 mb-2">{t("common.error")}</div>
+                    <div className="text-slate-400 text-sm">Failed to load position</div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show not found if position doesn't exist
+    if (!position) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="text-slate-400">{t("positionDetails.header.positionNotFound")}</div>
+                </div>
+            </div>
+        );
+    }
+
     const renderTabContent = () => {
         switch (activeTab) {
             case "overview":
-                return <OverviewTab chainSlug={chainSlug} nftId={nftId} />;
+                return <OverviewTab position={position} chainSlug={chainSlug} nftId={nftId} />;
             case "events":
                 return <EventsTab chainSlug={chainSlug} nftId={nftId} />;
             case "range":
@@ -61,7 +98,7 @@ export default function UniswapV3PositionPage() {
             case "analytics":
                 return <div className="text-slate-400 text-center py-12">{t("positionDetails.tabs.analytics")} - {t("common.comingSoon")}</div>;
             default:
-                return <OverviewTab chainSlug={chainSlug} nftId={nftId} />;
+                return <OverviewTab position={position} chainSlug={chainSlug} nftId={nftId} />;
         }
     };
 
@@ -69,7 +106,7 @@ export default function UniswapV3PositionPage() {
         <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
             <div className="container mx-auto px-4 py-8">
                 {/* Position Header */}
-                <PositionHeader chainSlug={chainSlug} nftId={nftId} chainConfig={chainConfig} />
+                <PositionHeader position={position} chainSlug={chainSlug} nftId={nftId} chainConfig={chainConfig} />
                 
                 {/* Tab Navigation */}
                 <PositionTabs activeTab={activeTab} chainSlug={chainSlug} nftId={nftId} />

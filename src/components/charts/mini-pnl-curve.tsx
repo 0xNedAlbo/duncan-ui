@@ -269,7 +269,7 @@ function MiniPnLCurveComponent({
                 <circle
                     cx={currentX}
                     cy={currentY}
-                    r={3}
+                    r={6}
                     fill="#60a5fa"
                     stroke="#1e293b"
                     strokeWidth={1}

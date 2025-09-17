@@ -7,83 +7,70 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { apiClient } from '@/lib/app/apiClient';
 import { ApiError } from '@/lib/app/apiError';
-import type { 
-  PositionListParams, 
-  PositionListResponse, 
-  PositionDetailsResponse,
+import type {
+  PositionListParams,
+  PositionListResponse,
   PositionRefreshResponse,
   ImportNFTRequest,
   ImportNFTResponse,
   PositionEventsParams,
-  PositionEventsResponse
+  PositionEventsResponse,
+  ApiResponse
 } from '@/types/api';
 import { QUERY_KEYS, MUTATION_KEYS, QUERY_OPTIONS } from '@/types/api';
 import type { BasicPosition } from '@/services/positions/positionService';
+
+/**
+ * Hook to fetch a single position by chain and NFT ID
+ * Returns BasicPosition data from the individual position API
+ */
+export function usePosition(
+  chain: string,
+  nftId: string,
+  options?: Omit<UseQueryOptions<ApiResponse<BasicPosition>, ApiError, BasicPosition>, 'queryKey' | 'queryFn' | 'select'>
+) {
+  return useQuery({
+    queryKey: ['position', chain, nftId] as const,
+    queryFn: () => apiClient.get<ApiResponse<BasicPosition>>(`/api/positions/uniswapv3/nft/${chain}/${nftId}`),
+
+    // Default options
+    staleTime: QUERY_OPTIONS.positionDetails.staleTime,
+    gcTime: QUERY_OPTIONS.positionDetails.cacheTime,
+
+    // Only run query if chain and nftId are provided
+    enabled: !!chain && !!nftId,
+
+    // Transform response to extract just the position data
+    select: (response: ApiResponse<BasicPosition>) => response.data!,
+
+    ...options,
+  });
+}
 
 /**
  * Hook to fetch positions list with filtering, sorting, and pagination
  */
 export function usePositions(
   params: PositionListParams = {},
-  options?: Omit<UseQueryOptions<PositionListResponse, ApiError>, 'queryKey' | 'queryFn'>
+  options?: Omit<UseQueryOptions<PositionListResponse, ApiError, PositionListResponse['data']>, 'queryKey' | 'queryFn' | 'select'>
 ) {
   return useQuery({
     queryKey: QUERY_KEYS.positionsList(params),
     queryFn: () => apiClient.get<PositionListResponse>('/api/positions/uniswapv3/list', { params }),
-    
+
     // Default options from types
     staleTime: QUERY_OPTIONS.positions.staleTime,
     gcTime: QUERY_OPTIONS.positions.cacheTime,
-    
+
     // Transform the response to extract data
-    select: (response) => ({
-      positions: response.data?.positions || [],
-      pagination: response.data?.pagination || {
-        total: 0,
-        limit: 20,
-        offset: 0,
-        hasMore: false,
-        nextOffset: null,
-      },
-      dataQuality: response.meta?.dataQuality || {
-        subgraphPositions: 0,
-        snapshotPositions: 0,
-        upgradedPositions: 0,
-      },
-      filters: response.meta?.filters,
-    }),
-    
+    select: (response: PositionListResponse) => response.data!,
+
     // Merge with custom options
     ...options,
   });
 }
 
 
-/**
- * Hook to fetch a single NFT position by chain and NFT ID
- */
-export function useNFTPosition(
-  chain: string,
-  nftId: string,
-  options?: Omit<UseQueryOptions<PositionDetailsResponse, ApiError>, 'queryKey' | 'queryFn'>
-) {
-  return useQuery({
-    queryKey: ['positions', 'nft', chain, nftId] as const,
-    queryFn: () => apiClient.get<PositionDetailsResponse>(`/api/positions/uniswapv3/nft/${chain}/${nftId}`),
-    
-    // Default options
-    staleTime: QUERY_OPTIONS.positionDetails.staleTime,
-    gcTime: QUERY_OPTIONS.positionDetails.cacheTime,
-    
-    // Only run query if chain and nftId are provided
-    enabled: !!chain && !!nftId,
-    
-    // Transform response - extract position from data
-    select: (response) => response.data.position,
-    
-    ...options,
-  });
-}
 
 /**
  * Hook to fetch position events for a specific NFT position
@@ -92,7 +79,7 @@ export function usePositionEvents(
   chain: string,
   nftId: string,
   params: PositionEventsParams = {},
-  options?: Omit<UseQueryOptions<PositionEventsResponse, ApiError>, 'queryKey' | 'queryFn'>
+  options?: Omit<UseQueryOptions<PositionEventsResponse, ApiError, PositionEventsResponse['data']>, 'queryKey' | 'queryFn' | 'select'>
 ) {
   return useQuery({
     queryKey: QUERY_KEYS.positionEvents(chain, nftId, params),
@@ -100,27 +87,17 @@ export function usePositionEvents(
       `/api/positions/uniswapv3/nft/${chain}/${nftId}/events`,
       { params }
     ),
-    
+
     // Default options
     staleTime: QUERY_OPTIONS.positionEvents.staleTime,
     gcTime: QUERY_OPTIONS.positionEvents.cacheTime,
-    
+
     // Only run query if chain and nftId are provided
     enabled: !!chain && !!nftId,
-    
+
     // Transform response to extract data
-    select: (response) => ({
-      events: response.data?.events || [],
-      pagination: response.data?.pagination || {
-        total: 0,
-        limit: 20,
-        offset: 0,
-        hasMore: false,
-        nextOffset: null,
-      },
-      meta: response.meta,
-    }),
-    
+    select: (response: PositionEventsResponse) => response.data!,
+
     ...options,
   });
 }
@@ -186,25 +163,25 @@ export function useImportNFT(
     mutationFn: (data: ImportNFTRequest) => 
       apiClient.post<ImportNFTResponse>('/api/positions/uniswapv3/import-nft', data),
     
-    onSuccess: (response, variables) => {
+    onSuccess: (response) => {
       // Invalidate positions list to refetch with new position
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.positions });
       
       // Note: Position details are now accessed via chain/NFT, not database ID
       // Individual position cache invalidation handled by NFT-specific hooks
       if (response.data?.position) {
-        
+
         // Update positions list cache if it exists
         queryClient.setQueriesData<PositionListResponse>(
           { queryKey: QUERY_KEYS.positions },
           (oldData) => {
             if (!oldData?.data) return oldData;
-            
+
             return {
               ...oldData,
               data: {
                 ...oldData.data,
-                positions: [response.data.position as BasicPosition, ...oldData.data.positions],
+                positions: [response.data!.position as BasicPosition, ...oldData.data.positions],
                 pagination: {
                   ...oldData.data.pagination,
                   total: oldData.data.pagination.total + 1,

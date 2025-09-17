@@ -212,7 +212,39 @@
       "liquidated": "Liquidated"
     },
     "overview": {
-      "placeholder": "Overview tab content will be implemented here"
+      "placeholder": "Overview tab content will be implemented here",
+      "positionNotFound": "Position not found",
+      "currentValue": "Current Position Value",
+      "valueDescription": "Current position value in quote token",
+      "totalPnL": "Total PnL",
+      "pnlDescription": "Realized + unrealized profit and loss",
+      "unclaimedFees": "Unclaimed Fees",
+      "feesDescription": "Trading fees available for collection",
+      "positionInfo": "Position Information",
+      "rangeStatus": "Range Status",
+      "liquidity": "Liquidity",
+      "feeTier": "Fee Tier",
+      "tokenPair": "Token Pair",
+      "currentTick": "Current Tick",
+      "pnlCurve": "PnL Curve",
+      "curveDescription": "Visual representation of profit/loss at different prices",
+      "pnlBreakdown": "PnL Breakdown",
+      "initialValue": "Initial Value",
+      "unrealizedPnL": "Unrealized PnL",
+      "realizedPnL": "Realized PnL",
+      "feesCollected": "Fees Collected",
+      "realizedPnLSection": "Realized PnL",
+      "unrealizedPnLSection": "Unrealized PnL",
+      "totalPnLBreakdown": "Total PnL",
+      "costBasis": "Cost Basis",
+      "currentValueMinusCostBasis": "Current Value - Cost Basis",
+      "subtotal": "Subtotal",
+      "status": {
+        "in-range": "In Range",
+        "out-of-range": "Out of Range",
+        "closed": "Closed",
+        "unknown": "Unknown"
+      }
     },
     "events": {
       "title": "Position Events",

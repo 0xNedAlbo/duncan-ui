@@ -261,23 +261,18 @@ export function formatCompactValue(
     const decimalSep = opts?.decimalSep ?? FORMAT_PRESET_EN.decimalSep;
     const parts = fullFormatted.split(decimalSep);
     
-    // If no decimal part, return as-is
+    // If no decimal part, add .00
     if (parts.length === 1) {
-        return fullFormatted;
+        return fullFormatted + decimalSep + "00";
     }
     
     // Truncate decimal part to 2 digits (no rounding, just truncation)
     const truncatedDecimal = parts[1].substring(0, 2);
-    
-    // Remove trailing zeros from the decimal part
-    const cleanDecimal = truncatedDecimal.replace(/0+$/, '');
-    
-    // If decimal part is empty after cleaning, return just the integer part
-    if (cleanDecimal === '') {
-        return parts[0];
-    }
-    
-    return parts[0] + decimalSep + cleanDecimal;
+
+    // Always pad to 2 decimal places with zeros
+    const paddedDecimal = truncatedDecimal.padEnd(2, '0');
+
+    return parts[0] + decimalSep + paddedDecimal;
 }
 
 /**

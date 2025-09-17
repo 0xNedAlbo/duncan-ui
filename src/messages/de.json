@@ -212,7 +212,39 @@
       "liquidated": "Liquidiert"
     },
     "overview": {
-      "placeholder": "Übersicht-Tab-Inhalte werden hier implementiert"
+      "placeholder": "Übersicht-Tab-Inhalte werden hier implementiert",
+      "positionNotFound": "Position nicht gefunden",
+      "currentValue": "Aktueller Positionswert",
+      "valueDescription": "Aktueller Positionswert im Quote-Token",
+      "totalPnL": "Gesamt PnL",
+      "pnlDescription": "Realisierter + unrealisierter Gewinn und Verlust",
+      "unclaimedFees": "Nicht abgeholte Gebühren",
+      "feesDescription": "Trading-Gebühren verfügbar zum Abholen",
+      "positionInfo": "Positions-Informationen",
+      "rangeStatus": "Range-Status",
+      "liquidity": "Liquidität",
+      "feeTier": "Gebühren-Stufe",
+      "tokenPair": "Token-Paar",
+      "currentTick": "Aktueller Tick",
+      "pnlCurve": "PnL-Kurve",
+      "curveDescription": "Visuelle Darstellung von Gewinn/Verlust bei verschiedenen Preisen",
+      "pnlBreakdown": "PnL-Aufschlüsselung",
+      "initialValue": "Anfangswert",
+      "unrealizedPnL": "Unrealisierter PnL",
+      "realizedPnL": "Realisierter PnL",
+      "feesCollected": "Gebühren eingesammelt",
+      "realizedPnLSection": "Realisierter PnL",
+      "unrealizedPnLSection": "Unrealisierter PnL",
+      "totalPnLBreakdown": "Gesamt PnL",
+      "costBasis": "Kostenbasis",
+      "currentValueMinusCostBasis": "Aktueller Wert - Kostenbasis",
+      "subtotal": "Zwischensumme",
+      "status": {
+        "in-range": "In Range",
+        "out-of-range": "Out of Range",
+        "closed": "Geschlossen",
+        "unknown": "Unbekannt"
+      }
     },
     "events": {
       "title": "Positions-Events",

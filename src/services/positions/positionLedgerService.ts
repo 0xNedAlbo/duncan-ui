@@ -1119,6 +1119,91 @@ export class PositionLedgerService {
     }
 
     /**
+     * Get position events with pagination and filtering
+     * Returns events in chronological order (oldest first)
+     *
+     * @param positionId - ID of the position
+     * @param options - Query options for filtering, sorting, and pagination
+     * @returns Paginated list of position events
+     */
+    async getPositionEvents(
+        positionId: string,
+        options: {
+            eventType?: 'CREATE' | 'INCREASE' | 'DECREASE' | 'COLLECT' | 'CLOSE';
+            sortOrder?: 'asc' | 'desc';
+            limit?: number;
+            offset?: number;
+        } = {}
+    ): Promise<{
+        events: PositionEvent[];
+        pagination: {
+            total: number;
+            limit: number;
+            offset: number;
+            hasMore: boolean;
+            nextOffset: number | null;
+        };
+    }> {
+        const {
+            eventType,
+            sortOrder = 'desc', // Default to newest first
+            limit = 20,
+            offset = 0
+        } = options;
+
+        // Build where clause
+        const whereClause: any = {
+            positionId
+        };
+
+        if (eventType) {
+            whereClause.eventType = eventType;
+        }
+
+        // Get total count for pagination
+        const total = await this.prisma.positionEvent.count({
+            where: whereClause
+        });
+
+        // Get events with pagination
+        const events = await this.prisma.positionEvent.findMany({
+            where: whereClause,
+            orderBy: [
+                { blockNumber: sortOrder },
+                { transactionIndex: sortOrder },
+                { logIndex: sortOrder },
+            ],
+            take: limit,
+            skip: offset,
+        });
+
+        const hasMore = offset + limit < total;
+        const nextOffset = hasMore ? offset + limit : null;
+
+        this.logger.debug({
+            positionId,
+            eventType,
+            sortOrder,
+            limit,
+            offset,
+            total,
+            returnedCount: events.length,
+            hasMore
+        }, 'Retrieved position events');
+
+        return {
+            events,
+            pagination: {
+                total,
+                limit,
+                offset,
+                hasMore,
+                nextOffset
+            }
+        };
+    }
+
+    /**
      * Generate blockchain-like identifiers for manual PositionEvents
      * Creates blockNumber from timestamp, uses -1 for transactionIndex,
      * and sequential negative logIndex values to avoid conflicts with onchain events
