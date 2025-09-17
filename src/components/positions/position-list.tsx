@@ -176,25 +176,14 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
           </button>
         </div>
 
-        {/* Data Quality Info */}
-        <div className="flex items-center gap-2 text-xs text-slate-400 ml-auto">
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            <span>{dataQuality.subgraphPositions} exact</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-            <span>{dataQuality.snapshotPositions} estimated</span>
-          </div>
-        </div>
       </div>
 
       {/* Results Summary */}
       <div className="text-sm text-slate-400 mb-4">
-        Showing {positions.length} of {total} positions
+        {t("dashboard.positions.showing", { current: positions.length, total })}
         {dataQuality.upgradedPositions > 0 && (
           <span className="ml-2 text-green-400">
-            • {dataQuality.upgradedPositions} upgraded to exact data
+            • {t("dashboard.positions.upgraded", { count: dataQuality.upgradedPositions })}
           </span>
         )}
       </div>

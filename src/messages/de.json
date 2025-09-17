@@ -55,9 +55,9 @@
     "loading": "Lade Kurve...",
     "error": "Kurve kann nicht geladen werden",
     "phases": {
-      "below": "unterhalb range",
-      "in-range": "in range", 
-      "above": "oberhalb range"
+      "below": "unterhalb Range",
+      "in-range": "in Range",
+      "above": "oberhalb Range"
     }
   },
   "status": {
@@ -158,7 +158,10 @@
       "loadMore": "Mehr laden ({count} verbleibend)",
       "showing": "Zeige {current} von {total} Positionen",
       "upgraded": "{count} auf exakte Daten aktualisiert",
-      "unclaimedFees": "Nicht abgeholte Gebühren"
+      "unclaimedFees": "Nicht abgeholte Gebühren",
+      "pnlCurve": "PnL Curve",
+      "totalPnl": "Total PnL",
+      "claimableFees": "Claimable Fees"
     }
   },
   "auth": {

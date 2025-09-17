@@ -259,7 +259,7 @@ export function PositionCard({
                         {/* Current Value */}
                         <div className="text-right">
                             <div className="text-xs text-slate-400 mb-0.5">
-                                Current Value ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
+                                {t("dashboard.positions.currentValue")} ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
                             </div>
                             <div className="text-lg font-semibold text-white">
                                 {pnlDisplayValues.currentValue ? (
@@ -276,7 +276,7 @@ export function PositionCard({
                         {/* PnL Curve Visualization */}
                         <div className="text-right">
                             <div className="text-xs text-slate-400 mb-0.5">
-                                PnL Curve
+                                {t("dashboard.positions.pnlCurve")}
                             </div>
                             <div className="flex justify-end">
                                 <MiniPnLCurveLazy
@@ -292,7 +292,7 @@ export function PositionCard({
                         {pnlDisplayValues.totalPnL !== null ? (
                             <div className="text-right">
                                 <div className="text-xs text-slate-400 mb-0.5">
-                                    Total PnL ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
+                                    {t("dashboard.positions.totalPnl")} ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
                                 </div>
                                 <div className={`text-lg font-semibold ${pnlDisplayValues.pnlColor}`}>
                                     <div className="flex items-center justify-end gap-1">
@@ -333,7 +333,7 @@ export function PositionCard({
                         {/* Unclaimed Fees */}
                         <div className="text-right">
                             <div className="text-xs text-slate-400 mb-0.5">
-                                Claimable Fees ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
+                                {t("dashboard.positions.claimableFees")} ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
                             </div>
                             <div className={`text-lg font-semibold ${pnlDisplayValues.unclaimedFees ? 'text-amber-400' : 'text-white'}`}>
                                 {pnlDisplayValues.unclaimedFees ? (

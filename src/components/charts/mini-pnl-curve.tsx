@@ -45,6 +45,17 @@ function MiniPnLCurveComponent({
     const chain = position.chain;
     const nftId = position.nftId;
 
+    // Client-side validation to match server-side logic
+    // This prevents unnecessary API calls for positions that would fail validation
+    const isValidForCurve = Boolean(
+        position.liquidity &&
+        position.liquidity !== "0" &&
+        position.tickLower < position.tickUpper &&
+        position.pool &&
+        position.pool.token0 &&
+        position.pool.token1
+    );
+
     // Fetch curve data from API with caching
     const {
         data: curveData,
@@ -52,8 +63,8 @@ function MiniPnLCurveComponent({
         error,
         isError
     } = usePositionCurve(chain, nftId, {
-        // Only fetch if we have the required identifiers
-        enabled: Boolean(chain && nftId)
+        // Only fetch if we have the required identifiers AND position is valid for curve generation
+        enabled: Boolean(chain && nftId && isValidForCurve)
     });
 
     // Handle error state
@@ -74,7 +85,20 @@ function MiniPnLCurveComponent({
         );
     }
 
-    // Show error or no data state
+    // Show N/A state for positions that can't have curves (closed, invalid data, etc.)
+    if (!isValidForCurve) {
+        return (
+            <div
+                className={`flex items-center justify-center bg-slate-800/30 rounded ${className}`}
+                style={{ width, height }}
+                title="Curve not available for this position"
+            >
+                <span className="text-xs text-slate-500">N/A</span>
+            </div>
+        );
+    }
+
+    // Show error or no data state (only for positions that should have curves)
     if (!curveData || isError) {
         return (
             <div
@@ -273,22 +297,20 @@ function MiniPnLCurveComponent({
                         top: mousePosition.y - 40,
                     }}
                 >
-                    <div className="text-slate-300">
-                        {t("miniPnlCurve.tooltip.currentPrice")}: $
-                        {hoveredPoint.price.toFixed(2)}
+                    <div className="text-slate-300 whitespace-nowrap">
+                        {t("miniPnlCurve.tooltip.currentPrice")}: {hoveredPoint.price.toFixed(2)}
                     </div>
                     <div
-                        className={
+                        className={`whitespace-nowrap ${
                             hoveredPoint.pnl >= 0
                                 ? "text-green-400"
                                 : "text-red-400"
-                        }
+                        }`}
                     >
                         {t("miniPnlCurve.tooltip.pnlAtPrice")}:{" "}
-                        {hoveredPoint.pnl >= 0 ? "+" : ""}$
-                        {hoveredPoint.pnl.toFixed(0)}
+                        {hoveredPoint.pnl >= 0 ? "+" : ""}{hoveredPoint.pnl.toFixed(0)}
                     </div>
-                    <div className="text-slate-400">
+                    <div className="text-slate-400 whitespace-nowrap">
                         {t("miniPnlCurve.tooltip.phase")}:{" "}
                         {t(`miniPnlCurve.phases.${hoveredPoint.phase}`)}
                     </div>

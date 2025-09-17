@@ -158,7 +158,10 @@
       "loadMore": "Load More ({count} remaining)",
       "showing": "Showing {current} of {total} positions",
       "upgraded": "{count} upgraded to exact data",
-      "unclaimedFees": "Unclaimed Fees"
+      "unclaimedFees": "Unclaimed Fees",
+      "pnlCurve": "PnL Curve",
+      "totalPnl": "Total PnL",
+      "claimableFees": "Claimable Fees"
     }
   },
   "auth": {
