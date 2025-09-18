@@ -137,13 +137,7 @@ export function AprTab({
                                     >
                                         <td className="py-3 px-2">
                                             <div className="text-white">
-                                                {event.timestamp.toLocaleDateString()}
-                                            </div>
-                                            <div className="text-xs text-slate-400">
-                                                {event.periodEndDate
-                                                    ? `to ${event.periodEndDate.toLocaleDateString()}`
-                                                    : t("positionDetails.overview.ongoing")
-                                                }
+                                                {event.timestamp.toLocaleDateString()} {event.timestamp.toLocaleTimeString()}
                                             </div>
                                         </td>
                                         <td className="py-3 px-2 text-right text-slate-300">
