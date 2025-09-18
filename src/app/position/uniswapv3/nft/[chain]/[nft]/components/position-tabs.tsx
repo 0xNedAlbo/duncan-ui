@@ -17,9 +17,9 @@ const tabs = [
         translationKey: "overview",
     },
     {
-        id: "events",
+        id: "ledger",
         icon: Clock,
-        translationKey: "events",
+        translationKey: "ledger",
     },
     {
         id: "range",

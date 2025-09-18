@@ -89,7 +89,7 @@ export default function UniswapV3PositionPage() {
         switch (activeTab) {
             case "overview":
                 return <OverviewTab position={position} chainSlug={chainSlug} nftId={nftId} />;
-            case "events":
+            case "ledger":
                 return <EventsTab chainSlug={chainSlug} nftId={nftId} />;
             case "range":
                 return <div className="text-slate-400 text-center py-12">{t("positionDetails.tabs.range")} - {t("common.comingSoon")}</div>;
