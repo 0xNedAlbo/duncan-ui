@@ -13,6 +13,7 @@ import { devtools, persist } from "zustand/middleware";
 import { apiClient } from "@/lib/app/apiClient";
 import type { BasicPosition } from "@/services/positions/positionService";
 import type { PnlBreakdown } from "@/services/positions/positionPnLService";
+import type { AprBreakdown } from "@/services/positions/positionAprService";
 import type { CurveData } from "@/components/charts/mini-pnl-curve";
 import type {
     PositionListParams,
@@ -27,6 +28,9 @@ export interface PositionWithDetails {
 
     // PnL breakdown (optional - may not be loaded yet)
     pnlBreakdown?: PnlBreakdown;
+
+    // APR breakdown (optional - may not be loaded yet)
+    aprBreakdown?: AprBreakdown;
 
     // Curve data (optional - may not be loaded yet)
     curveData?: CurveData;

@@ -360,11 +360,41 @@ model PositionEvent {
   inputHash   String // manual: MD5("manual-rnd()), onchain: MD5(CONCAT(blocknumber, txIndex, logIndex))")
   calcVersion Int // Increasing number per calculation run, should be the same within each position
 
+  // APR Calculation
+  aprData PositionEventApr? // 1:1 relationship
+
   @@unique([transactionHash, logIndex, positionId]) // Prevent exact duplicates
   @@unique([inputHash]) // Prvent duplicates during sync
   // Indexes for performance and ordering
   @@index([positionId, blockNumber, transactionIndex, logIndex]) // Natural blockchain ordering
   @@map("position_events")
+}
+
+// Position Event APR Model - APR calculation data for each position event (1:1 relationship)
+model PositionEventApr {
+  id String @id @default(cuid())
+
+  // 1:1 Relationship with PositionEvent
+  eventId String @unique
+  event   PositionEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  // Period Definition
+  periodStartDate DateTime // This event's timestamp
+  periodEndDate   DateTime? // Next event's timestamp (null for latest event)
+  periodDays      Float?   // Period duration in days (null for latest)
+
+  // Financial Data for this Period (BigInt as String)
+  periodCostBasis String // Cost basis during this period (from costBasisAfter)
+  allocatedFees   String @default("0") // Fees allocated to this period
+  periodApr       Float? // APR contribution from this period
+
+  // Calculation Metadata
+  calculatedAt DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  isValid      Boolean  @default(true)
+
+  @@index([eventId, isValid])
+  @@map("position_event_apr")
 }
 
 // Pool Price Cache Model - Database-backed price caching for PoolPriceService

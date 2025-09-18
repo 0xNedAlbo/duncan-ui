@@ -9,6 +9,7 @@ import { PositionImportService } from "./positions/positionImportService";
 import { PositionLedgerService } from "./positions/positionLedgerService";
 import { PositionService } from "./positions/positionService";
 import { PositionPnLService } from "./positions/positionPnLService";
+import { PositionAprService } from "./positions/positionAprService";
 import { CurveDataService } from "./positions/curveDataService";
 import { TokenService } from "./tokens/tokenService";
 import { TokenReferenceService } from "./tokens/tokenReferenceService";
@@ -28,6 +29,7 @@ export interface Services {
     positionLedgerService: PositionLedgerService;
     positionService: PositionService;
     positionPnLService: PositionPnLService;
+    positionAprService: PositionAprService;
     curveDataService: CurveDataService;
     tokenService: TokenService;
     tokenReferenceService: TokenReferenceService;
@@ -79,9 +81,11 @@ export class DefaultServiceFactory implements ServiceFactory {
             { tokenResolutionService, tokenReferenceService }
         );
 
+        const positionAprService = new PositionAprService(prisma);
+
         const positionLedgerService = new PositionLedgerService(
             { prisma, etherscanClient },
-            { tokenService, poolPriceService, etherscanBlockInfoService, evmBlockInfoService }
+            { tokenService, poolPriceService, etherscanBlockInfoService, evmBlockInfoService, positionAprService }
         );
 
         const positionPnLService = new PositionPnLService(
@@ -113,6 +117,7 @@ export class DefaultServiceFactory implements ServiceFactory {
             positionLedgerService,
             positionService,
             positionPnLService,
+            positionAprService,
             curveDataService,
             tokenService,
             tokenReferenceService,

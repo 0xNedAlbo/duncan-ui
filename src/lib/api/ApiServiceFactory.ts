@@ -9,6 +9,7 @@ import { PositionImportService } from "@/services/positions/positionImportServic
 import { PositionLedgerService } from "@/services/positions/positionLedgerService";
 import { PositionService } from "@/services/positions/positionService";
 import { PositionPnLService } from "@/services/positions/positionPnLService";
+import { PositionAprService } from "@/services/positions/positionAprService";
 import { CurveDataService } from "@/services/positions/curveDataService";
 import { TokenService } from "@/services/tokens/tokenService";
 import { TokenReferenceService } from "@/services/tokens/tokenReferenceService";
@@ -144,7 +145,8 @@ export class ApiServiceFactory {
                     tokenService: this.tokenService,
                     poolPriceService: this.poolPriceService,
                     etherscanBlockInfoService: this.etherscanBlockInfoService,
-                    evmBlockInfoService: this.evmBlockInfoService
+                    evmBlockInfoService: this.evmBlockInfoService,
+                    positionAprService: this.positionAprService
                 }
             );
         }
@@ -171,6 +173,14 @@ export class ApiServiceFactory {
             );
         }
         return this.serviceInstances.positionPnLService;
+    }
+
+    public get positionAprService(): PositionAprService {
+        if (!this.serviceInstances.positionAprService) {
+            const { prisma } = this.clients;
+            this.serviceInstances.positionAprService = new PositionAprService(prisma);
+        }
+        return this.serviceInstances.positionAprService;
     }
 
     public get curveDataService(): CurveDataService {

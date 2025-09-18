@@ -1,0 +1,674 @@
+/**
+ * Position APR Service
+ *
+ * Calculates "actual" or "realized" APR for Uniswap V3 positions based on
+ * time-weighted cost basis and proportional fee distribution across capital periods.
+ *
+ * Algorithm:
+ * 1. Create periods from INCREASE/DECREASE events using costBasisAfter
+ * 2. Distribute fees from COLLECT events proportionally across periods
+ * 3. Calculate APR for each period: (allocated_fees / cost_basis) / (days / 365) * 100
+ * 4. Return time-weighted total APR
+ */
+
+import { PrismaClient, type PositionEvent, type PositionEventApr } from "@prisma/client";
+import { createServiceLogger, type ServiceLogger } from "@/lib/logging/loggerFactory";
+
+export interface AprCalculationResult {
+    positionId: string;
+    totalApr: number;
+    timeWeightedCostBasis: string;
+    totalFeesCollected: string;
+    totalActiveDays: number;
+    calculatedAt: Date;
+    periods: PositionEventApr[];
+}
+
+export interface AprBreakdown {
+    positionId: string;
+    realizedApr: number;       // APR from collected fees only
+    unrealizedApr: number;     // APR from unclaimed fees only
+    totalApr: number;          // Combined APR
+    calculatedAt: Date;
+}
+
+export interface CapitalPeriod {
+    eventId: string;
+    startDate: Date;
+    endDate: Date | null;
+    durationDays: number | null;
+    costBasis: string;
+    weight: number; // durationDays * costBasis (for fee distribution)
+}
+
+export class PositionAprService {
+    private prisma: PrismaClient;
+    private logger: ServiceLogger;
+
+    constructor(requiredClients: Pick<PrismaClient, 'positionEvent' | 'positionEventApr'>) {
+        this.prisma = requiredClients as PrismaClient;
+        this.logger = createServiceLogger('PositionAprService');
+    }
+
+    /**
+     * Calculate APR for a position
+     * Creates/updates PositionEventApr records and returns aggregated results
+     */
+    async calculatePositionApr(positionId: string): Promise<AprCalculationResult> {
+        this.logger.debug({ positionId }, 'Starting APR calculation');
+
+        // Get all position events in chronological order
+        const events = await this.prisma.positionEvent.findMany({
+            where: { positionId },
+            orderBy: [
+                { blockNumber: 'asc' },
+                { transactionIndex: 'asc' },
+                { logIndex: 'asc' },
+            ],
+        });
+
+        if (events.length === 0) {
+            throw new Error(`No events found for position ${positionId}`);
+        }
+
+        // Create or update APR periods for all events
+        await this.createEventPeriods(events);
+
+        // Distribute fees from COLLECT events
+        await this.distributeFees(positionId);
+
+        // Calculate period APRs
+        await this.calculatePeriodAprs(positionId);
+
+        // Get final results and calculate totals
+        const aprPeriods = await this.prisma.positionEventApr.findMany({
+            where: {
+                event: { positionId },
+                isValid: true
+            },
+            include: { event: true },
+            orderBy: { periodStartDate: 'asc' },
+        });
+
+        const result = this.aggregateAprResults(positionId, aprPeriods);
+
+        this.logger.debug({
+            positionId,
+            totalApr: result.totalApr,
+            periodsCount: result.periods.length
+        }, 'APR calculation completed');
+
+        return result;
+    }
+
+    /**
+     * Create PositionEventApr records for all events
+     * Each event defines a period from its timestamp to the next event
+     */
+    private async createEventPeriods(events: PositionEvent[]): Promise<void> {
+        for (let i = 0; i < events.length; i++) {
+            const currentEvent = events[i];
+            const nextEvent = events[i + 1] || null;
+
+            const periodEndDate = nextEvent?.blockTimestamp || null;
+            const periodDays = periodEndDate
+                ? (periodEndDate.getTime() - currentEvent.blockTimestamp.getTime()) / (1000 * 60 * 60 * 24)
+                : null;
+
+            // Create or update APR record
+            await this.prisma.positionEventApr.upsert({
+                where: { eventId: currentEvent.id },
+                update: {
+                    periodStartDate: currentEvent.blockTimestamp,
+                    periodEndDate,
+                    periodDays,
+                    periodCostBasis: currentEvent.costBasisAfter,
+                    // Reset calculation fields - will be recalculated
+                    allocatedFees: "0",
+                    periodApr: 0,
+                    isValid: true,
+                    updatedAt: new Date(),
+                },
+                create: {
+                    eventId: currentEvent.id,
+                    periodStartDate: currentEvent.blockTimestamp,
+                    periodEndDate,
+                    periodDays,
+                    periodCostBasis: currentEvent.costBasisAfter,
+                    allocatedFees: "0",
+                    periodApr: 0,
+                    isValid: true,
+                },
+            });
+        }
+    }
+
+    /**
+     * Distribute fees from COLLECT events across preceding capital periods
+     */
+    private async distributeFees(positionId: string): Promise<void> {
+        // Get all COLLECT events with fees
+        const collectEvents = await this.prisma.positionEvent.findMany({
+            where: {
+                positionId,
+                eventType: 'COLLECT',
+                feeValueInQuote: { not: '0' }
+            },
+            orderBy: [
+                { blockNumber: 'asc' },
+                { transactionIndex: 'asc' },
+                { logIndex: 'asc' },
+            ],
+        });
+
+        for (const collectEvent of collectEvents) {
+            await this.distributeSingleCollectEvent(collectEvent);
+        }
+    }
+
+    /**
+     * Distribute fees from a single COLLECT event
+     */
+    private async distributeSingleCollectEvent(collectEvent: PositionEvent): Promise<void> {
+        const totalFees = BigInt(collectEvent.feeValueInQuote);
+
+        if (totalFees === BigInt(0)) {
+            return; // No fees to distribute
+        }
+
+        // Get all periods that existed before this collect event
+        const eligiblePeriods = await this.prisma.positionEventApr.findMany({
+            where: {
+                event: { positionId: collectEvent.positionId },
+                periodStartDate: { lt: collectEvent.blockTimestamp },
+                periodDays: { not: null }, // Exclude open periods
+                periodCostBasis: { not: '0' }, // Exclude zero cost basis periods
+                isValid: true,
+            },
+            include: { event: true },
+        });
+
+        if (eligiblePeriods.length === 0) {
+            this.logger.debug({
+                collectEventId: collectEvent.id,
+                collectDate: collectEvent.blockTimestamp
+            }, 'No eligible periods for fee distribution');
+            return;
+        }
+
+        // Calculate total weight for proportional distribution
+        let totalWeight = 0;
+        const periodWeights: { period: typeof eligiblePeriods[0]; weight: number }[] = [];
+
+        for (const period of eligiblePeriods) {
+            const costBasis = BigInt(period.periodCostBasis);
+            const days = period.periodDays!; // We filtered out null values
+            const weight = Number(costBasis) * days; // Convert BigInt to number for weight calculation
+
+            periodWeights.push({ period, weight });
+            totalWeight += weight;
+        }
+
+        if (totalWeight === 0) {
+            return; // No weight to distribute against
+        }
+
+        // Distribute fees proportionally
+        for (const { period, weight } of periodWeights) {
+            const proportion = weight / totalWeight;
+            const allocatedFees = BigInt(Math.floor(Number(totalFees) * proportion));
+
+            // Add to existing allocated fees
+            const currentAllocated = BigInt(period.allocatedFees);
+            const newAllocated = currentAllocated + allocatedFees;
+
+            await this.prisma.positionEventApr.update({
+                where: { id: period.id },
+                data: {
+                    allocatedFees: newAllocated.toString(),
+                    updatedAt: new Date(),
+                },
+            });
+        }
+    }
+
+    /**
+     * Calculate APR for each period based on allocated fees
+     */
+    private async calculatePeriodAprs(positionId: string): Promise<void> {
+        const periods = await this.prisma.positionEventApr.findMany({
+            where: {
+                event: { positionId },
+                periodDays: { not: null },
+                periodCostBasis: { not: '0' },
+                isValid: true,
+            },
+        });
+
+        for (const period of periods) {
+            const allocatedFees = BigInt(period.allocatedFees);
+            const costBasis = BigInt(period.periodCostBasis);
+            const days = period.periodDays!;
+
+            let periodApr = 0;
+
+            // Only calculate APR if we have valid cost basis and days
+            if (costBasis > BigInt(0) && days > 0) {
+                if (allocatedFees > BigInt(0)) {
+                    // Calculate APR: (allocated_fees / cost_basis) / (days / 365) * 100
+                    const feeRatio = Number(allocatedFees) / Number(costBasis);
+                    const annualizedRatio = feeRatio / (days / 365);
+                    periodApr = annualizedRatio * 100;
+                }
+                // If allocatedFees is 0, periodApr stays 0 (not null)
+            }
+
+            await this.prisma.positionEventApr.update({
+                where: { id: period.id },
+                data: {
+                    periodApr: periodApr,
+                    updatedAt: new Date(),
+                },
+            });
+        }
+    }
+
+    /**
+     * Aggregate APR results from all periods
+     */
+    private aggregateAprResults(
+        positionId: string,
+        aprPeriods: (PositionEventApr & { event: PositionEvent })[]
+    ): AprCalculationResult {
+        // Filter only closed periods with valid APR calculations
+        const activePeriods = aprPeriods.filter(p =>
+            p.periodDays !== null &&
+            p.periodDays > 0 &&
+            BigInt(p.periodCostBasis) > BigInt(0)
+        );
+
+        if (activePeriods.length === 0) {
+            return {
+                positionId,
+                totalApr: 0,
+                timeWeightedCostBasis: '0',
+                totalFeesCollected: '0',
+                totalActiveDays: 0,
+                calculatedAt: new Date(),
+                periods: aprPeriods,
+            };
+        }
+
+        // Calculate time-weighted average cost basis and total metrics
+        let totalWeightedCostBasis = 0;
+        let totalDays = 0;
+        let totalFeesCollected = BigInt(0);
+
+        for (const period of activePeriods) {
+            const costBasis = Number(BigInt(period.periodCostBasis));
+            const days = period.periodDays!;
+            const fees = BigInt(period.allocatedFees);
+
+            totalWeightedCostBasis += costBasis * days;
+            totalDays += days;
+            totalFeesCollected += fees;
+        }
+
+        const timeWeightedCostBasis = totalDays > 0
+            ? BigInt(Math.floor(totalWeightedCostBasis / totalDays))
+            : BigInt(0);
+
+        // Calculate total APR using time-weighted average
+        const totalApr = timeWeightedCostBasis > BigInt(0) && totalDays > 0
+            ? (Number(totalFeesCollected) / Number(timeWeightedCostBasis)) / (totalDays / 365) * 100
+            : 0;
+
+        return {
+            positionId,
+            totalApr,
+            timeWeightedCostBasis: timeWeightedCostBasis.toString(),
+            totalFeesCollected: totalFeesCollected.toString(),
+            totalActiveDays: Math.round(totalDays),
+            calculatedAt: new Date(),
+            periods: aprPeriods,
+        };
+    }
+
+    /**
+     * Invalidate APR cache for a position
+     * Call this when position events change
+     */
+    async invalidatePositionApr(positionId: string): Promise<void> {
+        await this.prisma.positionEventApr.updateMany({
+            where: {
+                event: { positionId },
+            },
+            data: {
+                isValid: false,
+                updatedAt: new Date(),
+            },
+        });
+
+        this.logger.debug({ positionId }, 'APR cache invalidated');
+    }
+
+    /**
+     * Create APR record for a single position event (for incremental processing)
+     * Called during position event sync to build APR data incrementally
+     */
+    async createEventAprRecord(
+        eventId: string,
+        periodStartDate: Date,
+        periodEndDate: Date | null,
+        costBasisAfter: string
+    ): Promise<void> {
+        const periodDays = periodEndDate
+            ? (periodEndDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24)
+            : null;
+
+        await this.prisma.positionEventApr.upsert({
+            where: { eventId },
+            update: {
+                periodStartDate,
+                periodEndDate,
+                periodDays,
+                periodCostBasis: costBasisAfter,
+                // Reset fees - will be distributed by collect events
+                allocatedFees: "0",
+                periodApr: 0,
+                isValid: true,
+                updatedAt: new Date(),
+            },
+            create: {
+                eventId,
+                periodStartDate,
+                periodEndDate,
+                periodDays,
+                periodCostBasis: costBasisAfter,
+                allocatedFees: "0",
+                periodApr: 0,
+                isValid: true,
+            },
+        });
+
+        this.logger.debug({ eventId, periodDays }, 'APR record created for event');
+    }
+
+    /**
+     * Update period end dates when a new event creates a new period
+     * Called when processing events to close previous periods
+     */
+    async updatePreviousEventPeriodEnd(
+        positionId: string,
+        newEventDate: Date
+    ): Promise<void> {
+        // Find the most recent event that doesn't have an end date (open period)
+        const openPeriods = await this.prisma.positionEventApr.findMany({
+            where: {
+                event: { positionId },
+                periodEndDate: null,
+                isValid: true,
+            },
+            include: { event: true },
+            orderBy: { periodStartDate: 'desc' },
+        });
+
+        for (const period of openPeriods) {
+            const periodDays = (newEventDate.getTime() - period.periodStartDate.getTime()) / (1000 * 60 * 60 * 24);
+
+            await this.prisma.positionEventApr.update({
+                where: { id: period.id },
+                data: {
+                    periodEndDate: newEventDate,
+                    periodDays,
+                    updatedAt: new Date(),
+                },
+            });
+
+            this.logger.debug({
+                eventId: period.eventId,
+                periodDays,
+                closedAt: newEventDate
+            }, 'Closed period for previous event');
+        }
+    }
+
+    /**
+     * Distribute fees from a single COLLECT event across existing periods
+     * Called during sync when processing COLLECT events
+     */
+    async distributeSingleCollectEventFees(
+        positionId: string,
+        collectEventDate: Date,
+        feeValueInQuote: string
+    ): Promise<void> {
+        const totalFees = BigInt(feeValueInQuote);
+
+        if (totalFees === BigInt(0)) {
+            return; // No fees to distribute
+        }
+
+        // Get all periods that existed before this collect event and are closed
+        const eligiblePeriods = await this.prisma.positionEventApr.findMany({
+            where: {
+                event: { positionId },
+                periodStartDate: { lt: collectEventDate },
+                periodDays: { not: null }, // Only closed periods
+                periodCostBasis: { not: '0' }, // Only periods with capital
+                isValid: true,
+            },
+            include: { event: true },
+        });
+
+        if (eligiblePeriods.length === 0) {
+            this.logger.debug({
+                positionId,
+                collectDate: collectEventDate,
+                feeValue: feeValueInQuote
+            }, 'No eligible periods for fee distribution');
+            return;
+        }
+
+        // Calculate total weight for proportional distribution
+        let totalWeight = 0;
+        const periodWeights: { period: typeof eligiblePeriods[0]; weight: number }[] = [];
+
+        for (const period of eligiblePeriods) {
+            const costBasis = BigInt(period.periodCostBasis);
+            const days = period.periodDays!;
+            const weight = Number(costBasis) * days;
+
+            periodWeights.push({ period, weight });
+            totalWeight += weight;
+        }
+
+        if (totalWeight === 0) {
+            return; // No weight to distribute against
+        }
+
+        // Distribute fees proportionally and calculate APR
+        for (const { period, weight } of periodWeights) {
+            const proportion = weight / totalWeight;
+            const allocatedFees = BigInt(Math.floor(Number(totalFees) * proportion));
+
+            // Add to existing allocated fees
+            const currentAllocated = BigInt(period.allocatedFees);
+            const newAllocated = currentAllocated + allocatedFees;
+
+            // Calculate period APR
+            const costBasis = BigInt(period.periodCostBasis);
+            const days = period.periodDays!;
+            const periodApr = days > 0 && costBasis > BigInt(0)
+                ? (Number(newAllocated) / Number(costBasis)) / (days / 365) * 100
+                : 0;
+
+            await this.prisma.positionEventApr.update({
+                where: { id: period.id },
+                data: {
+                    allocatedFees: newAllocated.toString(),
+                    periodApr,
+                    updatedAt: new Date(),
+                },
+            });
+
+            this.logger.debug({
+                eventId: period.eventId,
+                allocatedFees: allocatedFees.toString(),
+                totalAllocated: newAllocated.toString(),
+                periodApr
+            }, 'Distributed fees to period');
+        }
+    }
+
+    /**
+     * Delete APR data for a position (when position events are deleted)
+     */
+    async deletePositionAprData(positionId: string): Promise<number> {
+        const result = await this.prisma.positionEventApr.deleteMany({
+            where: {
+                event: { positionId },
+            },
+        });
+
+        this.logger.debug({ positionId, deletedCount: result.count }, 'APR data deleted');
+        return result.count;
+    }
+
+    /**
+     * Get cached APR data if valid, otherwise calculate fresh
+     */
+    async getPositionApr(positionId: string, forceRecalculate: boolean = false): Promise<AprCalculationResult> {
+        if (!forceRecalculate) {
+            // Check if we have valid cached data
+            const cachedPeriods = await this.prisma.positionEventApr.findMany({
+                where: {
+                    event: { positionId },
+                    isValid: true
+                },
+                include: { event: true },
+                orderBy: { periodStartDate: 'asc' },
+            });
+
+            // If we have cached data and all events have APR records, return cached results
+            const eventCount = await this.prisma.positionEvent.count({
+                where: { positionId }
+            });
+
+            if (cachedPeriods.length === eventCount && cachedPeriods.length > 0) {
+                this.logger.debug({ positionId }, 'Returning cached APR data');
+                return this.aggregateAprResults(positionId, cachedPeriods);
+            }
+        }
+
+        // Calculate fresh APR data
+        return this.calculatePositionApr(positionId);
+    }
+
+    /**
+     * Calculate APR breakdown separating realized vs unrealized returns
+     *
+     * Realized APR: Based on fees that have been collected (COLLECT events)
+     * Unrealized APR: Based on unclaimed fees from the most recent position state
+     *
+     * The unrealized portion covers the period after the last collect event
+     * (or from the beginning if no collects have occurred yet).
+     *
+     * @param positionId - The position ID
+     * @param unclaimedFeesValue - Current unclaimed fees value in quote token (from PnL breakdown)
+     */
+    async getAprBreakdown(positionId: string, unclaimedFeesValue: string): Promise<AprBreakdown> {
+        // Get all APR periods (realized portion)
+        const aprData = await this.getPositionApr(positionId, false);
+        const realizedApr = aprData.totalApr;
+
+        // Get position events to find the last collect and current unclaimed fees
+        const events = await this.prisma.positionEvent.findMany({
+            where: { positionId },
+            orderBy: [
+                { blockNumber: 'asc' },
+                { transactionIndex: 'asc' },
+                { logIndex: 'asc' }
+            ]
+        });
+
+        if (events.length === 0) {
+            return {
+                positionId,
+                realizedApr: 0,
+                unrealizedApr: 0,
+                totalApr: 0,
+                calculatedAt: new Date()
+            };
+        }
+
+        // Find the last COLLECT event and the most recent event
+        const lastCollectEvent = events.reverse().find(e => e.eventType === 'COLLECT');
+        const mostRecentEvent = events[0]; // events are already reversed
+
+        // If no collect events, all current position value is unrealized
+        if (!lastCollectEvent) {
+            // Calculate unrealized APR for the entire position lifetime
+            const unrealizedApr = this.calculateUnrealizedApr(
+                events[events.length - 1], // First event (when reversed)
+                mostRecentEvent,
+                unclaimedFeesValue
+            );
+
+            return {
+                positionId,
+                realizedApr: 0,
+                unrealizedApr: unrealizedApr,
+                totalApr: unrealizedApr,
+                calculatedAt: new Date()
+            };
+        }
+
+        // Calculate unrealized APR for period after last collect
+        const unrealizedApr = this.calculateUnrealizedApr(
+            lastCollectEvent,
+            mostRecentEvent,
+            unclaimedFeesValue
+        );
+
+        const totalApr = realizedApr + unrealizedApr;
+
+        return {
+            positionId,
+            realizedApr,
+            unrealizedApr,
+            totalApr,
+            calculatedAt: new Date()
+        };
+    }
+
+    /**
+     * Calculate unrealized APR for a specific period using unclaimed fees
+     */
+    private calculateUnrealizedApr(
+        periodStartEvent: PositionEvent,
+        currentEvent: PositionEvent,
+        unclaimedFeesValue: string
+    ): number {
+        // Calculate days in the unrealized period
+        const periodDays = (currentEvent.blockTimestamp.getTime() - periodStartEvent.blockTimestamp.getTime())
+            / (1000 * 60 * 60 * 24);
+
+        if (periodDays <= 0) {
+            return 0;
+        }
+
+        const unclaimedFeesBigInt = BigInt(unclaimedFeesValue);
+        const currentCostBasis = BigInt(currentEvent.costBasisAfter);
+
+        if (currentCostBasis === BigInt(0) || unclaimedFeesBigInt === BigInt(0)) {
+            return 0;
+        }
+
+        // Calculate annualized APR: (unclaimed_fees / cost_basis) / (days / 365) * 100
+        const feeRatio = Number(unclaimedFeesBigInt) / Number(currentCostBasis);
+        const annualizedRatio = feeRatio / (periodDays / 365);
+        const unrealizedApr = annualizedRatio * 100;
+
+        return unrealizedApr;
+    }
+}

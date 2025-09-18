@@ -35,21 +35,34 @@ export function PositionCard({
         ? position.pool.token0.decimals
         : position.pool.token1.decimals;
 
-    // Get PnL data from position store
+    // Get PnL and APR data from position store
     const getPosition = usePositionStore(state => state.getPosition);
     const positionWithDetails = position.nftId ?
         getPosition(position.pool.chain, position.nftId) : null;
     const pnlData = positionWithDetails?.pnlBreakdown;
+    const aprData = positionWithDetails?.aprBreakdown;
     const pnlLoading = !pnlData && Boolean(position.nftId); // Loading if no PnL data and position has NFT ID
+    const aprLoading = !aprData && Boolean(position.nftId); // Loading if no APR data and position has NFT ID
     // const pnlError = null; // Store doesn't track individual PnL errors
 
     // Get formatted display values
     const pnlDisplayValues = usePnLDisplayValues(pnlData, quoteTokenDecimals);
 
-    // Load PnL and curve data when position card becomes visible
+    // Format APR for display
+    const formatApr = (apr: number): string => {
+        if (apr === 0) return "0%";
+        if (Math.abs(apr) < 0.01) return "<0.01%";
+        return `${apr.toFixed(2)}%`;
+    };
+
+    // APR is always non-negative (no negative fees) so we use white text
+    const aprColorClass = "text-white";
+
+    // Load PnL, APR, and curve data when position card becomes visible
     useEffect(() => {
         const curveData = positionWithDetails?.curveData;
-        const needsData = (!pnlData || !curveData) && !pnlLoaded && position.nftId && position.pool?.chain;
+        const aprData = positionWithDetails?.aprBreakdown;
+        const needsData = (!pnlData || !curveData || !aprData) && !pnlLoaded && position.nftId && position.pool?.chain;
 
         if (needsData) {
             const observer = new IntersectionObserver(
@@ -58,9 +71,10 @@ export function PositionCard({
                         setPnlLoaded(true);
                         observer.disconnect();
 
-                        // Load both PnL and curve data in parallel
-                        const [pnlResponse, curveResponse] = await Promise.allSettled([
+                        // Load PnL, APR, and curve data in parallel
+                        const [pnlResponse, aprResponse, curveResponse] = await Promise.allSettled([
                             apiClient.get(`/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/pnl`),
+                            apiClient.get(`/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/apr`),
                             apiClient.get(`/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/curve`)
                         ]);
 
@@ -79,6 +93,13 @@ export function PositionCard({
                                 console.debug(`PnL load failed for position ${position.nftId}:`, pnlResponse.reason);
                             }
 
+                            // Add APR data if successful and not already present
+                            if (aprResponse.status === 'fulfilled' && aprResponse.value.data && !updatedPosition.aprBreakdown) {
+                                updatedPosition.aprBreakdown = aprResponse.value.data;
+                            } else if (aprResponse.status === 'rejected') {
+                                console.debug(`APR load failed for position ${position.nftId}:`, aprResponse.reason);
+                            }
+
                             // Add curve data if successful and not already present
                             if (curveResponse.status === 'fulfilled' && curveResponse.value.data && !updatedPosition.curveData) {
                                 updatedPosition.curveData = curveResponse.value.data;
@@ -88,6 +109,7 @@ export function PositionCard({
 
                             // Only update if we got at least some data or made changes
                             if (updatedPosition.pnlBreakdown !== existingPosition.pnlBreakdown ||
+                                updatedPosition.aprBreakdown !== existingPosition.aprBreakdown ||
                                 updatedPosition.curveData !== existingPosition.curveData) {
                                 updatePositionEverywhere(key, updatedPosition);
                             }
@@ -106,7 +128,7 @@ export function PositionCard({
 
             return () => observer.disconnect();
         }
-    }, [pnlData, positionWithDetails?.curveData, pnlLoaded, position.nftId, position.pool?.chain]);
+    }, [pnlData, positionWithDetails?.curveData, positionWithDetails?.aprBreakdown, pnlLoaded, position.nftId, position.pool?.chain]);
 
     // Check if PnL data failed to load (for debugging)
     // const pnlFailed = false; // Store doesn't track individual errors
@@ -413,6 +435,27 @@ export function PositionCard({
                                 )}
                             </div>
                         </div>
+
+                        {/* Total APR */}
+                        {aprData && aprData.totalApr !== undefined ? (
+                            <div className="text-right">
+                                <div className="text-xs text-slate-400 mb-0.5">
+                                    Total APR
+                                </div>
+                                <div className={`text-lg font-semibold ${aprColorClass}`}>
+                                    {formatApr(aprData.totalApr)}
+                                </div>
+                            </div>
+                        ) : aprLoading ? (
+                            <div className="text-right">
+                                <div className="text-xs text-slate-400 mb-0.5">
+                                    Total APR
+                                </div>
+                                <div className="text-lg font-semibold text-slate-400">
+                                    --
+                                </div>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
 

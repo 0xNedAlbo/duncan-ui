@@ -16,13 +16,17 @@ import { PoolPriceService } from "../prices/poolPriceService";
 import { EtherscanBlockInfoService } from "../etherscan/etherscanBlockInfoService";
 import { EvmBlockInfoService } from "../evm/evmBlockInfoService";
 import { PrismaClient, type PositionEvent } from "@prisma/client";
-import { createServiceLogger, LogPatterns, type ServiceLogger } from "@/lib/logging/loggerFactory";
+import {
+    createServiceLogger,
+    type ServiceLogger,
+} from "@/lib/logging/loggerFactory";
 import {
     sqrtRatioX96ToToken1PerToken0,
     sqrtRatioX96ToToken0PerToken1,
 } from "@/lib/utils/uniswap-v3/price";
 import JSBI from "jsbi";
 import type { BasicPosition } from "./positionService";
+import type { PositionAprService } from "./positionAprService";
 
 // Unified event interface for processing mixed manual/onchain events
 interface ProcessableEvent {
@@ -56,6 +60,7 @@ export class PositionLedgerService {
     private evmBlockInfoService: EvmBlockInfoService;
     private poolPriceService: PoolPriceService;
     private etherscanEventService: EtherscanEventService;
+    private positionAprService: PositionAprService;
     private logger: ServiceLogger;
 
     /**
@@ -80,14 +85,25 @@ export class PositionLedgerService {
 
     constructor(
         requiredClients: Pick<Clients, "prisma" | "etherscanClient">,
-        requiredServices: Pick<Services, "tokenService" | "poolPriceService" | "etherscanBlockInfoService" | "evmBlockInfoService">
+        requiredServices: Pick<
+            Services,
+            | "tokenService"
+            | "poolPriceService"
+            | "etherscanBlockInfoService"
+            | "evmBlockInfoService"
+            | "positionAprService"
+        >
     ) {
         this.prisma = requiredClients.prisma;
-        this.etherscanBlockInfoService = requiredServices.etherscanBlockInfoService;
+        this.etherscanBlockInfoService =
+            requiredServices.etherscanBlockInfoService;
         this.evmBlockInfoService = requiredServices.evmBlockInfoService;
         this.poolPriceService = requiredServices.poolPriceService;
-        this.etherscanEventService = new EtherscanEventService({ etherscanClient: requiredClients.etherscanClient });
-        this.logger = createServiceLogger('PositionLedgerService');
+        this.positionAprService = requiredServices.positionAprService;
+        this.etherscanEventService = new EtherscanEventService({
+            etherscanClient: requiredClients.etherscanClient,
+        });
+        this.logger = createServiceLogger("PositionLedgerService");
     }
 
     /**
@@ -149,27 +165,40 @@ export class PositionLedgerService {
 
         // Check if this is a first-time import (no events in database yet)
         const existingEventCount = await this.prisma.positionEvent.count({
-            where: { positionId: positionInfo.id }
+            where: { positionId: positionInfo.id },
         });
 
-        this.logger.debug({ existingEventCount, positionId: positionInfo.id }, 'Existing events for position');
+        this.logger.debug(
+            { existingEventCount, positionId: positionInfo.id },
+            "Existing events for position"
+        );
 
         let fromBlock: string | number = "earliest";
 
         if (existingEventCount > 0) {
             // Position has existing events - use finality boundary optimization
-            const lastFinalizedBlock = await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
+            const lastFinalizedBlock =
+                await this.evmBlockInfoService.getLastFinalizedBlockNumber(
+                    chain
+                );
 
             if (lastFinalizedBlock !== null) {
                 // Start fetching from the finalized block to avoid re-fetching stable events
                 fromBlock = lastFinalizedBlock.toString();
-                this.logger.debug({ fromBlock }, 'Using finality boundary optimization');
+                this.logger.debug(
+                    { fromBlock },
+                    "Using finality boundary optimization"
+                );
             } else {
-                this.logger.debug('No finalized blocks available - using earliest');
+                this.logger.debug(
+                    "No finalized blocks available - using earliest"
+                );
             }
         } else {
             // First-time import - fetch complete history from earliest block
-            this.logger.debug('First-time import detected - fetching complete history from earliest');
+            this.logger.debug(
+                "First-time import detected - fetching complete history from earliest"
+            );
         }
 
         // Fetch events from Etherscan using the determined starting block
@@ -198,15 +227,16 @@ export class PositionLedgerService {
         };
     }> {
         // Get the last finalized block number
-        const lastFinalizedBlock = await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
+        const lastFinalizedBlock =
+            await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
 
         // Query all position events ordered by blockchain order
         const allEvents = await this.prisma.positionEvent.findMany({
             where: { positionId },
             orderBy: [
-                { blockNumber: 'asc' },
-                { transactionIndex: 'asc' },
-                { logIndex: 'asc' },
+                { blockNumber: "asc" },
+                { transactionIndex: "asc" },
+                { logIndex: "asc" },
             ],
         });
 
@@ -224,19 +254,21 @@ export class PositionLedgerService {
         }
 
         // Return the initial state based on the last final event
-        const initialState = lastFinalEvent ? {
-            liquidityAfter: lastFinalEvent.liquidityAfter,
-            costBasisAfter: lastFinalEvent.costBasisAfter,
-            realizedPnLAfter: lastFinalEvent.realizedPnLAfter,
-            uncollectedPrincipal0: lastFinalEvent.uncollectedPrincipal0,
-            uncollectedPrincipal1: lastFinalEvent.uncollectedPrincipal1,
-        } : {
-            liquidityAfter: "0",
-            costBasisAfter: "0",
-            realizedPnLAfter: "0",
-            uncollectedPrincipal0: "0",
-            uncollectedPrincipal1: "0",
-        };
+        const initialState = lastFinalEvent
+            ? {
+                  liquidityAfter: lastFinalEvent.liquidityAfter,
+                  costBasisAfter: lastFinalEvent.costBasisAfter,
+                  realizedPnLAfter: lastFinalEvent.realizedPnLAfter,
+                  uncollectedPrincipal0: lastFinalEvent.uncollectedPrincipal0,
+                  uncollectedPrincipal1: lastFinalEvent.uncollectedPrincipal1,
+              }
+            : {
+                  liquidityAfter: "0",
+                  costBasisAfter: "0",
+                  realizedPnLAfter: "0",
+                  uncollectedPrincipal0: "0",
+                  uncollectedPrincipal1: "0",
+              };
 
         return { lastFinalEvent, initialState };
     }
@@ -256,51 +288,81 @@ export class PositionLedgerService {
             return [];
         }
 
-        this.logger.debug({ rawEventCount: rawEvents.length }, 'Filtering raw events for finality');
+        this.logger.debug(
+            { rawEventCount: rawEvents.length },
+            "Filtering raw events for finality"
+        );
 
         // Get the last finalized block number with single RPC call
-        const lastFinalizedBlock = await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
-        this.logger.debug({ lastFinalizedBlock }, 'Last finalized block determined');
+        const lastFinalizedBlock =
+            await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
+        this.logger.debug(
+            { lastFinalizedBlock },
+            "Last finalized block determined"
+        );
 
         if (lastFinalizedBlock === null) {
             // No finalized blocks yet, all events are non-final
-            this.logger.debug('No finalized blocks yet - keeping all events');
+            this.logger.debug("No finalized blocks yet - keeping all events");
             return rawEvents;
         }
 
         // Get unique existing transaction hashes ONLY after finalized block
         // (events <= finalized block are either correctly processed or need processing anyway)
         const existingTxHashes = new Set(
-            (await this.prisma.positionEvent.findMany({
-                where: {
-                    positionId,
-                    blockNumber: { gt: lastFinalizedBlock }
-                },
-                select: { transactionHash: true },
-                distinct: ['transactionHash']
-            })).map(event => event.transactionHash)
+            (
+                await this.prisma.positionEvent.findMany({
+                    where: {
+                        positionId,
+                        blockNumber: { gt: lastFinalizedBlock },
+                    },
+                    select: { transactionHash: true },
+                    distinct: ["transactionHash"],
+                })
+            ).map((event) => event.transactionHash)
         );
 
-        const filteredEvents = rawEvents.filter(event => {
-            this.logger.debug({ blockNumber: event.blockNumber, txHashShort: event.transactionHash.slice(0,10) }, 'Checking event block');
+        const filteredEvents = rawEvents.filter((event) => {
+            this.logger.debug(
+                {
+                    blockNumber: event.blockNumber,
+                    txHashShort: event.transactionHash.slice(0, 10),
+                },
+                "Checking event block"
+            );
 
             // Keep non-final events (always process for reorg protection)
             if (event.blockNumber > lastFinalizedBlock) {
-                this.logger.debug({ blockNumber: event.blockNumber, lastFinalizedBlock }, 'Event is NON-FINAL - keeping');
+                this.logger.debug(
+                    { blockNumber: event.blockNumber, lastFinalizedBlock },
+                    "Event is NON-FINAL - keeping"
+                );
                 return true;
             }
 
             // For final events: only keep if NOT already in database (catch-up sync)
             const alreadyInDB = existingTxHashes.has(event.transactionHash);
             if (alreadyInDB) {
-                this.logger.debug({ blockNumber: event.blockNumber }, 'Event is FINAL and already in DB - skipping');
+                this.logger.debug(
+                    { blockNumber: event.blockNumber },
+                    "Event is FINAL and already in DB - skipping"
+                );
             } else {
-                this.logger.debug({ blockNumber: event.blockNumber }, 'Event is FINAL but NOT in DB - keeping for catch-up');
+                this.logger.debug(
+                    { blockNumber: event.blockNumber },
+                    "Event is FINAL but NOT in DB - keeping for catch-up"
+                );
             }
             return !alreadyInDB;
         });
 
-        this.logger.debug({ filteredCount: filteredEvents.length, totalCount: rawEvents.length }, 'Filtered result');
+        this.logger.debug(
+            {
+                filteredCount: filteredEvents.length,
+                totalCount: rawEvents.length,
+            },
+            "Filtered result"
+        );
         return filteredEvents;
     }
 
@@ -313,7 +375,8 @@ export class PositionLedgerService {
         chain: SupportedChainsType
     ): Promise<number> {
         // Get the last finalized block number
-        const lastFinalizedBlock = await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
+        const lastFinalizedBlock =
+            await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
 
         if (lastFinalizedBlock === null) {
             // No finalized blocks yet, all events are non-final, delete all onchain events
@@ -345,35 +408,61 @@ export class PositionLedgerService {
         positionInfo: PositionSyncInfo,
         nftId: string
     ): Promise<PositionEvent[]> {
-        this.logger.debug({ nftId, chain: positionInfo.pool.chain, positionId: positionInfo.id }, 'Starting syncPositionEvents');
+        this.logger.debug(
+            {
+                nftId,
+                chain: positionInfo.pool.chain,
+                positionId: positionInfo.id,
+            },
+            "Starting syncPositionEvents"
+        );
 
         // Fetch events from Etherscan using finality boundary optimization
-        this.logger.debug('Fetching events from Etherscan');
-        const rawEvents = await this.fetchEventsFromEtherscan(positionInfo, nftId);
-        this.logger.debug({ rawEventCount: rawEvents.length }, 'Retrieved raw events from Etherscan');
+        this.logger.debug("Fetching events from Etherscan");
+        const rawEvents = await this.fetchEventsFromEtherscan(
+            positionInfo,
+            nftId
+        );
+        this.logger.debug(
+            { rawEventCount: rawEvents.length },
+            "Retrieved raw events from Etherscan"
+        );
 
         if (rawEvents.length === 0) {
-            this.logger.debug({ nftId }, 'No events found for NFT - returning empty array');
+            this.logger.debug(
+                { nftId },
+                "No events found for NFT - returning empty array"
+            );
             return [];
         }
 
         const chain = positionInfo.pool.chain as SupportedChainsType;
 
         // Find the finality boundary and establish initial state from last final event
-        const { lastFinalEvent, initialState } = await this.findFinalityBoundary(
-            positionInfo.id,
-            chain
-        );
+        const { lastFinalEvent, initialState } =
+            await this.findFinalityBoundary(positionInfo.id, chain);
 
         // Filter input events to exclude already-final ones (but keep final events not yet in DB)
-        this.logger.debug('Filtering non-final events');
-        const nonFinalRawEvents = await this.filterNonFinalEvents(rawEvents, chain, positionInfo.id);
-        this.logger.debug({ nonFinalCount: nonFinalRawEvents.length }, 'Non-final events after filtering');
-        this.logger.debug({ hasLastFinalEvent: !!lastFinalEvent }, 'Last final event status');
+        this.logger.debug("Filtering non-final events");
+        const nonFinalRawEvents = await this.filterNonFinalEvents(
+            rawEvents,
+            chain,
+            positionInfo.id
+        );
+        this.logger.debug(
+            { nonFinalCount: nonFinalRawEvents.length },
+            "Non-final events after filtering"
+        );
+        this.logger.debug(
+            { hasLastFinalEvent: !!lastFinalEvent },
+            "Last final event status"
+        );
 
         if (nonFinalRawEvents.length === 0 && lastFinalEvent) {
             // All input events are already final, nothing to process
-            this.logger.debug('All input events are already final - returning empty array');
+            this.logger.debug(
+                "All input events are already final - returning empty array"
+            );
             return [];
         }
 
@@ -391,15 +480,17 @@ export class PositionLedgerService {
 
         // Filter to only process events after the finality boundary
         const eventsToProcess = lastFinalEvent
-            ? allEvents.filter(event =>
-                event.blockNumber > lastFinalEvent.blockNumber ||
-                (event.blockNumber === lastFinalEvent.blockNumber &&
-                 (event.transactionIndex > lastFinalEvent.transactionIndex ||
-                  (event.transactionIndex === lastFinalEvent.transactionIndex &&
-                   event.logIndex > lastFinalEvent.logIndex)))
+            ? allEvents.filter(
+                  (event) =>
+                      event.blockNumber > lastFinalEvent.blockNumber ||
+                      (event.blockNumber === lastFinalEvent.blockNumber &&
+                          (event.transactionIndex >
+                              lastFinalEvent.transactionIndex ||
+                              (event.transactionIndex ===
+                                  lastFinalEvent.transactionIndex &&
+                                  event.logIndex > lastFinalEvent.logIndex)))
               )
             : allEvents;
-
 
         // Process each event in chronological order (only non-final events)
         for (let i = 0; i < eventsToProcess.length; i++) {
@@ -477,9 +568,10 @@ export class PositionLedgerService {
                 calculatedFeeValue = stateResult.feeValue || "0";
 
                 // Save event with calculated state
+                let eventId: string;
                 if (event.rawEvent) {
                     // Create new onchain event in DB with pre-calculated values
-                    await this.createPositionEventFromRaw(
+                    eventId = await this.createPositionEventFromRaw(
                         event.rawEvent,
                         positionInfo,
                         newState,
@@ -504,6 +596,37 @@ export class PositionLedgerService {
                                 newState.uncollectedPrincipal1,
                         },
                     });
+                    eventId = event.dbEvent.id;
+                } else {
+                    throw new Error('Event must have either rawEvent or dbEvent');
+                }
+
+                // Create APR record for this event (incremental processing)
+                const nextEvent = eventsToProcess[i + 1];
+                const periodEndDate = nextEvent?.blockTimestamp || null;
+
+                await this.positionAprService.createEventAprRecord(
+                    eventId,
+                    event.blockTimestamp,
+                    periodEndDate,
+                    newState.costBasisAfter
+                );
+
+                // If there was a previous event, close its period
+                if (i > 0) {
+                    await this.positionAprService.updatePreviousEventPeriodEnd(
+                        positionInfo.id,
+                        event.blockTimestamp
+                    );
+                }
+
+                // If this is a COLLECT event, distribute fees across existing periods
+                if (event.eventType === 'COLLECT' && calculatedFeeValue !== '0') {
+                    await this.positionAprService.distributeSingleCollectEventFees(
+                        positionInfo.id,
+                        event.blockTimestamp,
+                        calculatedFeeValue
+                    );
                 }
 
                 // Update current state for next iteration
@@ -511,13 +634,20 @@ export class PositionLedgerService {
             }
         }
 
+        // APR records are already calculated incrementally during sync
+        // No need to invalidate cache since records are created/updated in real-time
+        this.logger.debug(
+            { positionId: positionInfo.id },
+            "APR records updated incrementally during event sync"
+        );
+
         // Return the processed events for reporting
         const processedEvents = await this.prisma.positionEvent.findMany({
             where: { positionId: positionInfo.id },
             orderBy: [
-                { blockNumber: 'asc' },
-                { transactionIndex: 'asc' },
-                { logIndex: 'asc' },
+                { blockNumber: "asc" },
+                { transactionIndex: "asc" },
+                { logIndex: "asc" },
             ],
         });
 
@@ -551,6 +681,15 @@ export class PositionLedgerService {
             },
         });
 
+        // Invalidate APR cache since events have been deleted
+        if (result.count > 0) {
+            await this.positionAprService.invalidatePositionApr(positionId);
+            this.logger.debug(
+                { positionId, deletedCount: result.count },
+                "APR cache invalidated after event deletion"
+            );
+        }
+
         return result.count;
     }
 
@@ -567,6 +706,15 @@ export class PositionLedgerService {
         const result = await this.prisma.positionEvent.deleteMany({
             where: { positionId },
         });
+
+        // Invalidate APR cache since all events have been deleted
+        if (result.count > 0) {
+            await this.positionAprService.invalidatePositionApr(positionId);
+            this.logger.debug(
+                { positionId, deletedCount: result.count },
+                "APR cache invalidated after hard reset"
+            );
+        }
 
         return result.count;
     }
@@ -656,7 +804,7 @@ export class PositionLedgerService {
             uncollectedPrincipal0: string;
             uncollectedPrincipal1: string;
         }
-    ): Promise<void> {
+    ): Promise<string> {
         const inputHash = this.generateOnchainInputHash(
             rawEvent.blockNumber,
             rawEvent.transactionIndex,
@@ -666,7 +814,7 @@ export class PositionLedgerService {
         // Use calculated deltaPnL
         const deltaPnL = calculatedDeltaPnL || "0";
 
-        await this.prisma.positionEvent.create({
+        const createdEvent = await this.prisma.positionEvent.create({
             data: {
                 positionId: positionInfo.id,
                 ledgerIgnore: false, // New events are never ignored by default
@@ -696,12 +844,22 @@ export class PositionLedgerService {
                 // Fees (for COLLECT events) - pure fees only, excluding principal
                 feesCollected0:
                     rawEvent.eventType === "COLLECT" && previousState
-                        ? this.calculatePureFees(rawEvent, previousState).feeToken0.toString()
-                        : rawEvent.eventType === "COLLECT" ? rawEvent.amount0 || "0" : "0",
+                        ? this.calculatePureFees(
+                              rawEvent,
+                              previousState
+                          ).feeToken0.toString()
+                        : rawEvent.eventType === "COLLECT"
+                        ? rawEvent.amount0 || "0"
+                        : "0",
                 feesCollected1:
                     rawEvent.eventType === "COLLECT" && previousState
-                        ? this.calculatePureFees(rawEvent, previousState).feeToken1.toString()
-                        : rawEvent.eventType === "COLLECT" ? rawEvent.amount1 || "0" : "0",
+                        ? this.calculatePureFees(
+                              rawEvent,
+                              previousState
+                          ).feeToken1.toString()
+                        : rawEvent.eventType === "COLLECT"
+                        ? rawEvent.amount1 || "0"
+                        : "0",
                 feeValueInQuote:
                     rawEvent.eventType === "COLLECT"
                         ? calculatedFeeValue || "0"
@@ -724,6 +882,8 @@ export class PositionLedgerService {
                 calcVersion: 1, // TODO: Use proper version
             },
         });
+
+        return createdEvent.id;
     }
 
     /**
@@ -1031,7 +1191,10 @@ export class PositionLedgerService {
         positionInfo: PositionSyncInfo
     ): string {
         // Calculate pure fee amounts using the helper method
-        const { feeToken0, feeToken1 } = this.calculatePureFees(rawEvent, currentState);
+        const { feeToken0, feeToken1 } = this.calculatePureFees(
+            rawEvent,
+            currentState
+        );
 
         // Calculate fee value in quote token using current price
         return this.calculateTokenValueInQuote(
@@ -1150,8 +1313,13 @@ export class PositionLedgerService {
     async getPositionEvents(
         positionId: string,
         options: {
-            eventType?: 'CREATE' | 'INCREASE' | 'DECREASE' | 'COLLECT' | 'CLOSE';
-            sortOrder?: 'asc' | 'desc';
+            eventType?:
+                | "CREATE"
+                | "INCREASE"
+                | "DECREASE"
+                | "COLLECT"
+                | "CLOSE";
+            sortOrder?: "asc" | "desc";
             limit?: number;
             offset?: number;
         } = {}
@@ -1167,14 +1335,14 @@ export class PositionLedgerService {
     }> {
         const {
             eventType,
-            sortOrder = 'desc', // Default to newest first
+            sortOrder = "desc", // Default to newest first
             limit = 20,
-            offset = 0
+            offset = 0,
         } = options;
 
         // Build where clause
         const whereClause: any = {
-            positionId
+            positionId,
         };
 
         if (eventType) {
@@ -1183,7 +1351,7 @@ export class PositionLedgerService {
 
         // Get total count for pagination
         const total = await this.prisma.positionEvent.count({
-            where: whereClause
+            where: whereClause,
         });
 
         // Get events with pagination
@@ -1201,16 +1369,19 @@ export class PositionLedgerService {
         const hasMore = offset + limit < total;
         const nextOffset = hasMore ? offset + limit : null;
 
-        this.logger.debug({
-            positionId,
-            eventType,
-            sortOrder,
-            limit,
-            offset,
-            total,
-            returnedCount: events.length,
-            hasMore
-        }, 'Retrieved position events');
+        this.logger.debug(
+            {
+                positionId,
+                eventType,
+                sortOrder,
+                limit,
+                offset,
+                total,
+                returnedCount: events.length,
+                hasMore,
+            },
+            "Retrieved position events"
+        );
 
         return {
             events,
@@ -1219,8 +1390,8 @@ export class PositionLedgerService {
                 limit,
                 offset,
                 hasMore,
-                nextOffset
-            }
+                nextOffset,
+            },
         };
     }
 

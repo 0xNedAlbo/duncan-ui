@@ -5,11 +5,13 @@ import { ApiServiceFactory } from "@/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
 import type { BasicPosition, PnLBreakdown } from "@/services/positions/positionService";
 import type { CurveData } from "@/components/charts/mini-pnl-curve";
+import type { AprBreakdown } from "@/services/positions/positionAprService";
 import type { ApiResponse } from "@/types/api";
 
 export interface PositionDetailsData {
     basicData: BasicPosition;
     pnlBreakdown: PnLBreakdown | null;
+    aprBreakdown: AprBreakdown | null;
     curveData: CurveData | null;
 }
 
@@ -27,10 +29,11 @@ export interface PositionDetailsResponse extends ApiResponse<PositionDetailsData
  * Returns complete position data including:
  * - Basic position information
  * - PnL breakdown data
+ * - APR breakdown (realized vs unrealized)
  * - Curve visualization data
  *
  * This is a unified endpoint that provides all position data in a single response,
- * eliminating the need for separate API calls for PnL and curve data.
+ * eliminating the need for separate API calls for PnL, APR, and curve data.
  *
  * Path parameters:
  * - chain: Blockchain network (ethereum, arbitrum, base)
@@ -105,6 +108,7 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
             const apiFactory = ApiServiceFactory.getInstance();
             const positionService = apiFactory.positionService;
             const positionPnLService = apiFactory.positionPnLService;
+            const positionAprService = apiFactory.positionAprService;
             const curveDataService = apiFactory.curveDataService;
 
             // Find the position by user ID, chain, and NFT ID
@@ -135,18 +139,36 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
 
             log.debug(
                 { positionId: position.id, chain, nftId },
-                "Loading complete position data (PnL + curve)"
+                "Loading complete position data (PnL + APR + curve)"
             );
 
-            // Load PnL and curve data in parallel
-            const [pnlResult, curveResult] = await Promise.allSettled([
+            // First, load PnL data since APR breakdown depends on unclaimed fees
+            let pnlBreakdown = null;
+            try {
+                pnlBreakdown = await positionPnLService.getPnlBreakdown(position.id);
+            } catch (error) {
+                log.debug(
+                    { positionId: position.id, error: error instanceof Error ? error.message : String(error) },
+                    "PnL calculation failed"
+                );
+            }
+
+            // Load APR breakdown and curve data in parallel (APR needs unclaimed fees from PnL)
+            const [aprResult, curveResult] = await Promise.allSettled([
                 (async () => {
                     try {
-                        return await positionPnLService.getPnlBreakdown(position.id);
+                        if (!pnlBreakdown) {
+                            log.debug(
+                                { positionId: position.id },
+                                "APR breakdown skipped - PnL data not available"
+                            );
+                            return null;
+                        }
+                        return await positionAprService.getAprBreakdown(position.id, pnlBreakdown.unclaimedFees);
                     } catch (error) {
                         log.debug(
                             { positionId: position.id, error: error instanceof Error ? error.message : String(error) },
-                            "PnL calculation failed"
+                            "APR breakdown calculation failed"
                         );
                         return null;
                     }
@@ -172,7 +194,7 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
             ]);
 
             // Extract results
-            const pnlBreakdown = pnlResult.status === 'fulfilled' ? pnlResult.value : null;
+            const aprBreakdown = aprResult.status === 'fulfilled' ? aprResult.value : null;
             const curveData = curveResult.status === 'fulfilled' ? curveResult.value : null;
 
             log.debug(
@@ -181,8 +203,11 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
                     chain,
                     nftId,
                     hasPnl: !!pnlBreakdown,
+                    hasApr: !!aprBreakdown,
                     hasCurve: !!curveData,
-                    curvePoints: curveData?.points?.length || 0
+                    curvePoints: curveData?.points?.length || 0,
+                    aprRealizedApr: aprBreakdown?.realizedApr || 0,
+                    aprUnrealizedApr: aprBreakdown?.unrealizedApr || 0
                 },
                 "Successfully loaded complete position details"
             );
@@ -190,6 +215,7 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
             const responseData: PositionDetailsData = {
                 basicData: position,
                 pnlBreakdown,
+                aprBreakdown,
                 curveData
             };
 

@@ -13,8 +13,9 @@ import type { PositionRefreshResponse } from "@/types/api";
  * - Syncing position events from blockchain
  * - Invalidating cached PnL and curve data
  * - Recalculating PnL breakdown with fresh data
+ * - Calculating fresh APR breakdown (realized vs unrealized)
  * - Pre-calculating fresh curve data for visualization
- * - Updating cached position, PnL, and curve data
+ * - Updating cached position, PnL, APR, and curve data
  *
  * Path parameters:
  * - chain: Blockchain network (ethereum, arbitrum, base)
@@ -86,6 +87,7 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
             const apiFactory = ApiServiceFactory.getInstance();
             const positionService = apiFactory.positionService;
             const positionPnLService = apiFactory.positionPnLService;
+            const positionAprService = apiFactory.positionAprService;
             const curveDataService = apiFactory.curveDataService;
 
             // Find the position by user ID, chain, and NFT ID
@@ -131,6 +133,25 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                 position.id
             );
 
+            // Calculate fresh APR breakdown using unclaimed fees from PnL
+            let aprBreakdown = undefined;
+            try {
+                aprBreakdown = await positionAprService.getAprBreakdown(
+                    position.id,
+                    pnlBreakdown.unclaimedFees
+                );
+                log.debug(
+                    { positionId: position.id, realizedApr: aprBreakdown.realizedApr, unrealizedApr: aprBreakdown.unrealizedApr },
+                    "Successfully calculated fresh APR breakdown"
+                );
+            } catch (aprError) {
+                // Log APR calculation error but don't fail the refresh
+                log.debug(
+                    { positionId: position.id, error: aprError },
+                    "Failed to calculate APR breakdown, but refresh completed successfully"
+                );
+            }
+
             // Fetch the updated position data
             const refreshedPosition = await positionService.getPosition(position.id);
 
@@ -166,6 +187,9 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                     currentValue: pnlBreakdown.currentValue,
                     totalPnL: pnlBreakdown.totalPnL,
                     calculatedAt: pnlBreakdown.calculatedAt,
+                    includedAprBreakdown: !!aprBreakdown,
+                    aprRealizedApr: aprBreakdown?.realizedApr || 0,
+                    aprUnrealizedApr: aprBreakdown?.unrealizedApr || 0,
                     includedCurveData: !!curveData,
                 },
                 "Successfully refreshed position data"
@@ -176,6 +200,7 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                 data: {
                     position: refreshedPosition,
                     pnlBreakdown: pnlBreakdown,
+                    ...(aprBreakdown && { aprBreakdown }),
                     ...(curveData && { curveData }),
                 },
                 meta: {
