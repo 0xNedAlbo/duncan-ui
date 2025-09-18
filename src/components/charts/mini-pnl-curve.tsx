@@ -2,11 +2,11 @@
 
 import { useState, memo } from "react";
 import type { BasicPosition } from "@/services/positions/positionService";
-import { usePositionCurve } from "@/hooks/api/usePositionCurve";
 import { useTranslations } from "@/i18n/client";
 
 interface MiniPnLCurveProps {
     position: BasicPosition;
+    curveData?: CurveData | null;
     width?: number;
     height?: number;
     className?: string;
@@ -32,6 +32,7 @@ export interface CurveData {
 
 function MiniPnLCurveComponent({
     position,
+    curveData,
     width = 120,
     height = 60,
     className = "",
@@ -41,12 +42,7 @@ function MiniPnLCurveComponent({
     const [hoveredPoint, setHoveredPoint] = useState<CurvePoint | null>(null);
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
-    // Extract chain and nftId from position for API call
-    const chain = position.chain;
-    const nftId = position.nftId;
-
     // Client-side validation to match server-side logic
-    // This prevents unnecessary API calls for positions that would fail validation
     const isValidForCurve = Boolean(
         position.liquidity &&
         position.liquidity !== "0" &&
@@ -56,24 +52,8 @@ function MiniPnLCurveComponent({
         position.pool.token1
     );
 
-    // Fetch curve data from API with caching
-    const {
-        data: curveData,
-        isLoading,
-        error,
-        isError
-    } = usePositionCurve(chain, nftId, {
-        // Only fetch if we have the required identifiers AND position is valid for curve generation
-        enabled: Boolean(chain && nftId && isValidForCurve)
-    });
-
-    // Handle error state
-    if (isError && error) {
-        console.warn("Failed to fetch curve data:", error);
-    }
-
-    // Show loading state
-    if (isLoading) {
+    // Show loading state when curve data is not available but position should have one
+    if (!curveData && isValidForCurve) {
         return (
             <div
                 className={`flex items-center justify-center bg-slate-800/30 rounded ${className}`}
@@ -98,13 +78,14 @@ function MiniPnLCurveComponent({
         );
     }
 
-    // Show error or no data state (only for positions that should have curves)
-    if (!curveData || isError) {
+    // Show no data state when curve data is explicitly null or missing
+    // This handles both API errors and positions not eligible for curves
+    if (!curveData) {
         return (
             <div
                 className={`flex items-center justify-center bg-slate-800/30 rounded ${className}`}
                 style={{ width, height }}
-                title={isError ? "Error loading curve data" : t("miniPnlCurve.error")}
+                title="Curve data not available for this position"
             >
                 <span className="text-xs text-slate-500">N/A</span>
             </div>
@@ -338,6 +319,9 @@ function arePropsEqual(
     if (prevProps.height !== nextProps.height) return false;
     if (prevProps.className !== nextProps.className) return false;
     if (prevProps.showTooltip !== nextProps.showTooltip) return false;
+
+    // CRITICAL: Check curve data changes
+    if (prevProps.curveData !== nextProps.curveData) return false;
 
     // For performance, only check key position fields that affect curve shape
     if (prevProps.position.liquidity !== nextProps.position.liquidity)

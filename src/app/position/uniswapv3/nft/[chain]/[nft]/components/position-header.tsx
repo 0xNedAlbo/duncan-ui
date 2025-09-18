@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ChainConfig } from "@/config/chains";
 import type { BasicPosition } from "@/services/positions/positionService";
-import { useRefreshNFTPosition } from "@/hooks/api/usePositions";
+import { usePositionRefresh } from "@/store/position-store";
 
 interface PositionHeaderProps {
     position: BasicPosition;
@@ -35,14 +35,14 @@ export function PositionHeader({ position, chainSlug, nftId, chainConfig }: Posi
     const router = useRouter();
     const [copied, setCopied] = useState(false);
 
-    const refreshPosition = useRefreshNFTPosition();
+    const { refreshPosition, isRefreshing } = usePositionRefresh();
 
     const handleRefresh = async () => {
         try {
-            await refreshPosition.mutateAsync({ chain: chainSlug, nftId });
+            await refreshPosition(chainSlug, nftId);
         } catch (error) {
             console.error("Failed to refresh position:", error);
-            // Error handling is managed by the hook's onError callback
+            // TODO: Show error toast/notification
         }
     };
 
@@ -194,11 +194,11 @@ export function PositionHeader({ position, chainSlug, nftId, chainConfig }: Posi
                         {/* Refresh Button */}
                         <button
                             onClick={handleRefresh}
-                            disabled={refreshPosition.isPending}
+                            disabled={isRefreshing}
                             className="p-3 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                             title={t("positionDetails.header.refresh")}
                         >
-                            <RefreshCw className={`w-5 h-5 ${refreshPosition.isPending ? "animate-spin" : ""}`} />
+                            <RefreshCw className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`} />
                         </button>
                     </div>
                 </div>

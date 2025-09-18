@@ -1,8 +1,8 @@
 "use client";
 
 import { useTranslations } from "@/i18n/client";
-import { usePositionEvents, usePosition } from "@/hooks/api/usePositions";
-import { usePositionPnL } from "@/hooks/api/usePositionPnL";
+import { usePositionEvents } from "@/hooks/api/usePositions";
+import { useActivePosition } from "@/store/position-store";
 import { PnLBreakdown } from "@/components/positions/pnl-breakdown";
 import { EventsTable } from "./events-table";
 
@@ -14,15 +14,13 @@ interface EventsTabProps {
 export function EventsTab({ chainSlug, nftId }: EventsTabProps) {
     const t = useTranslations();
 
-    // Fetch position data for PnL breakdown
-    const { data: position } = usePosition(chainSlug, nftId);
-
-    // Fetch PnL data
-    const {
-        data: pnlData,
-        isLoading: pnlLoading,
-        error: pnlError,
-    } = usePositionPnL(chainSlug, nftId);
+    // Get position and PnL data from store
+    const positionWithDetails = useActivePosition();
+    const position = positionWithDetails?.basicData;
+    const pnlData = positionWithDetails?.pnlBreakdown;
+    // Loading and error states not used in this component currently
+    // const pnlLoading = !pnlData;
+    // const pnlError = null; // Store doesn't track individual errors
 
     const {
         data: eventsData,

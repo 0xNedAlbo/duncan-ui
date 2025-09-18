@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MiniPnLCurve } from "./mini-pnl-curve";
+import { MiniPnLCurve, type CurveData } from "./mini-pnl-curve";
 import type { BasicPosition } from "@/services/positions/positionService";
+import { usePositionStore } from "@/store/position-store";
 
 interface MiniPnLCurveLazyProps {
     position: BasicPosition;
@@ -37,56 +38,28 @@ function CurveSkeleton({ width = 120, height = 60, className = "" }: { width?: n
     );
 }
 
-export function MiniPnLCurveLazy({ 
-    position, 
-    width = 120, 
-    height = 60, 
+export function MiniPnLCurveLazy({
+    position,
+    width = 120,
+    height = 60,
     className = "",
-    showTooltip = false 
+    showTooltip = false
 }: MiniPnLCurveLazyProps) {
-    const [isVisible, setIsVisible] = useState(false);
-    const [isLoaded, setIsLoaded] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting && !isLoaded) {
-                    setIsVisible(true);
-                    setIsLoaded(true);
-                    observer.disconnect(); // Stop observing once loaded
-                }
-            },
-            { 
-                threshold: 0.1, // Trigger when 10% visible
-                rootMargin: '50px' // Start loading 50px before entering viewport
-            }
-        );
-
-        if (containerRef.current) {
-            observer.observe(containerRef.current);
-        }
-
-        return () => {
-            observer.disconnect();
-        };
-    }, [isLoaded]);
+    // Get curve data from position store
+    const getPosition = usePositionStore(state => state.getPosition);
+    const positionWithDetails = position.nftId ?
+        getPosition(position.pool.chain, position.nftId) : null;
+    const curveData = positionWithDetails?.curveData;
 
     return (
-        <div ref={containerRef} className={className}>
-            {isVisible ? (
-                <MiniPnLCurve 
-                    position={position}
-                    width={width}
-                    height={height}
-                    showTooltip={showTooltip}
-                />
-            ) : (
-                <CurveSkeleton 
-                    width={width}
-                    height={height}
-                />
-            )}
+        <div className={className}>
+            <MiniPnLCurve
+                position={position}
+                curveData={curveData}
+                width={width}
+                height={height}
+                showTooltip={showTooltip}
+            />
         </div>
     );
 }

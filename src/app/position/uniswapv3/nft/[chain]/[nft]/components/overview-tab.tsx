@@ -1,10 +1,8 @@
 "use client";
 
 import { useTranslations } from "@/i18n/client";
-import {
-    usePositionPnL,
-    usePnLDisplayValues,
-} from "@/hooks/api/usePositionPnL";
+import { usePnLDisplayValues } from "@/hooks/api/usePositionPnL";
+import { useActivePosition } from "@/store/position-store";
 import {
     formatCompactValue,
 } from "@/lib/utils/fraction-format";
@@ -25,7 +23,7 @@ interface OverviewTabProps {
     nftId: string;
 }
 
-export function OverviewTab({ position, chainSlug, nftId }: OverviewTabProps) {
+export function OverviewTab({ position }: OverviewTabProps) {
     const t = useTranslations();
     // Get quote token info for formatting (must be before hook calls)
     const quoteToken = position.token0IsQuote
@@ -33,12 +31,12 @@ export function OverviewTab({ position, chainSlug, nftId }: OverviewTabProps) {
         : position.pool.token1;
     const quoteTokenDecimals = quoteToken.decimals;
 
-    // Fetch PnL data (position is provided as prop)
-    const {
-        data: pnlData,
-        isLoading: pnlLoading,
-        error: pnlError,
-    } = usePositionPnL(chainSlug, nftId);
+    // Get position data from store (includes PnL and curve data)
+    const positionWithDetails = useActivePosition();
+
+    // Extract PnL data from store
+    const pnlData = positionWithDetails?.pnlBreakdown;
+    const pnlLoading = !pnlData; // Loading if no PnL data available
 
     // Get formatted display values using the same hook as PositionCard
     const pnlDisplayValues = usePnLDisplayValues(pnlData, quoteTokenDecimals);
@@ -59,19 +57,7 @@ export function OverviewTab({ position, chainSlug, nftId }: OverviewTabProps) {
         );
     }
 
-    // Error state
-    if (pnlError) {
-        return (
-            <div className="space-y-6">
-                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8 text-center">
-                    <div className="text-red-400 mb-2">{t("common.error")}</div>
-                    <div className="text-slate-400 text-sm">
-                        {pnlError?.message || "Failed to load PnL data"}
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    // Note: MiniPnLCurveLazy will automatically use curve data from store when available
 
     // Position is provided as prop, no need to check if it exists
 

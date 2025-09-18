@@ -7,6 +7,7 @@
 import type { BasicPosition } from '@/services/positions/positionService';
 import type { ParsedNFTPosition } from '@/services/uniswap/nftPosition';
 import type { PnlBreakdown } from '@/services/positions/positionPnLService';
+import type { CurveData } from '@/components/charts/mini-pnl-curve';
 
 // Enhanced position interface for API responses (includes PnL data)
 export interface PositionWithPnL extends BasicPosition {
@@ -129,7 +130,7 @@ export interface PositionDetailsResponse extends ApiResponse<PositionWithPnL> {
   data?: PositionWithPnL;
 }
 
-export interface PositionRefreshResponse extends ApiResponse<{ position: BasicPosition | null; pnlBreakdown: PnlBreakdown }> {
+export interface PositionRefreshResponse extends ApiResponse<{ position: BasicPosition | null; pnlBreakdown: PnlBreakdown; curveData?: CurveData }> {
   meta: {
     requestedAt: string;
     positionId: string;

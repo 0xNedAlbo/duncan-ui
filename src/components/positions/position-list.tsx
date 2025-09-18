@@ -4,8 +4,8 @@ import { useState, useEffect, useMemo } from "react";
 import { Loader2, Filter, SortAsc, SortDesc, AlertCircle } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import { PositionCard } from "./position-card";
-import { usePositions, useRefreshPosition } from "@/hooks/api/usePositions";
-import { handleApiError } from "@/lib/app/apiError";
+import { usePositionStore, useCurrentListState, usePositionRefresh } from "@/store/position-store";
+import { apiClient } from "@/lib/app/apiClient";
 import type { BasicPosition } from "@/services/positions/positionService";
 import type { PositionListParams } from "@/types/api";
 
@@ -37,36 +37,119 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
     offset,
   }), [status, chain, sortBy, sortOrder, limit, offset]);
 
-  // Use position hooks
-  const { data, error, isLoading, refetch } = usePositions(queryParams, {
-    // Refetch when refreshTrigger changes
-    refetchOnMount: true,
-  });
-  
-  const refreshPosition = useRefreshPosition();
+  // Use position store
+  const { setCurrentList, setListLoading, setListError } = usePositionStore();
+  const currentListState = useCurrentListState();
+  const { refreshPosition } = usePositionRefresh();
 
-  // Extract data from query result
-  const positions = data?.positions || [];
-  const pagination = data?.pagination;
-  const dataQuality = data?.dataQuality || {
+  // Extract data from store
+  const { positions: positionsMap, pagination, isLoading, error } = currentListState;
+  const positions = Object.values(positionsMap).map(p => p.basicData);
+
+  // Extract pagination data
+  const hasMore = pagination?.hasMore || false;
+  const total = pagination?.total || 0;
+
+  // TODO: Add dataQuality to store if needed
+  const dataQuality = {
     subgraphPositions: 0,
     snapshotPositions: 0,
     upgradedPositions: 0
   };
-  const hasMore = pagination?.hasMore || false;
-  const total = pagination?.total || 0;
 
   // Reset pagination when filters change
   useEffect(() => {
     setOffset(0);
   }, [status, chain, sortBy, sortOrder]);
 
+  // Load positions when component mounts or filters change
+  useEffect(() => {
+    const loadPositions = async () => {
+      try {
+        setListLoading(true);
+        setListError(null);
+
+        const response = await apiClient.get('/api/positions/uniswapv3/list', {
+          params: queryParams
+        });
+
+        if (response.data) {
+          setCurrentList(
+            response.data.positions || [],
+            response.data.pagination || {
+              total: 0,
+              limit: 20,
+              offset: 0,
+              hasMore: false,
+              nextOffset: null
+            },
+            queryParams
+          );
+
+          // Load PnL data for the first few positions in the background
+          const positions = response.data.positions || [];
+          const limitedPositions = positions.slice(0, 5); // Load PnL for first 5 positions
+
+          limitedPositions.forEach(async (position) => {
+            if (position.nftId && position.pool?.chain) {
+              // Load both PnL and curve data in parallel
+              const [pnlResponse, curveResponse] = await Promise.allSettled([
+                apiClient.get(`/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/pnl`),
+                apiClient.get(`/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/curve`)
+              ]);
+
+              // Update position with loaded data in store
+              const key = `${position.pool.chain}-${position.nftId}`;
+              const getPosition = usePositionStore.getState().getPosition;
+              const updatePositionEverywhere = usePositionStore.getState().updatePositionEverywhere;
+
+              const existingPosition = getPosition(position.pool.chain, position.nftId);
+              if (existingPosition) {
+                const updatedPosition = { ...existingPosition };
+
+                // Add PnL data if successful
+                if (pnlResponse.status === 'fulfilled' && pnlResponse.value.data) {
+                  updatedPosition.pnlBreakdown = pnlResponse.value.data;
+                } else if (pnlResponse.status === 'rejected') {
+                  console.debug(`PnL load failed for position ${position.nftId}:`, pnlResponse.reason);
+                }
+
+                // Add curve data if successful (including null data for closed positions)
+                if (curveResponse.status === 'fulfilled' && curveResponse.value.success) {
+                  updatedPosition.curveData = curveResponse.value.data; // Can be null for closed positions
+                } else if (curveResponse.status === 'rejected') {
+                  console.debug(`Curve load failed for position ${position.nftId}:`, curveResponse.reason);
+                }
+
+                // Update if we got any response (PnL data or curve response)
+                const hasPnlData = pnlResponse.status === 'fulfilled' && pnlResponse.value.data;
+                const hasCurveResponse = curveResponse.status === 'fulfilled' && curveResponse.value.success;
+
+                if (hasPnlData || hasCurveResponse) {
+                  updatePositionEverywhere(key, updatedPosition);
+                }
+              }
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load positions:', error);
+        setListError('Failed to load positions');
+      } finally {
+        setListLoading(false);
+      }
+    };
+
+    loadPositions();
+  }, [queryParams, setCurrentList, setListLoading, setListError]);
+
   // Handle external refresh trigger
   useEffect(() => {
     if (refreshTrigger && refreshTrigger > 0) {
-      refetch();
+      // TODO: Implement list refresh in store
+      console.log('Refresh trigger received:', refreshTrigger);
     }
-  }, [refreshTrigger]); // Remove refetch from dependencies to prevent infinite loops
+  }, [refreshTrigger]);
 
   // Load more positions
   const loadMore = () => {
@@ -77,9 +160,8 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
   // Handle single position refresh
   const handleRefreshPosition = async (position: BasicPosition) => {
     try {
-      await refreshPosition.mutateAsync(position);
-      // Success is handled by the hook's onSuccess callback
-      // which updates the cache automatically
+      await refreshPosition(position.pool.chain, position.nftId || '');
+      // Store will automatically update position everywhere
     } catch (error) {
       console.error("Failed to refresh position:", error);
       // TODO: Show error toast
@@ -88,11 +170,12 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
 
   // Check if a specific position is being refreshed
   const isPositionRefreshing = (position: BasicPosition) => {
-    return refreshPosition.isPending && refreshPosition.variables?.id === position.id;
+    const key = `${position.pool.chain}-${position.nftId}`;
+    return positionsMap[key]?.isRefreshing || false;
   };
 
   // Get user-friendly error message
-  const errorMessage = error ? handleApiError(error, "Failed to load positions") : null;
+  const errorMessage = error || null;
 
   if (isLoading && positions.length === 0) {
     return (
@@ -110,7 +193,10 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
           <h3 className="text-lg font-semibold text-white mb-2">Error Loading Positions</h3>
           <p className="text-slate-400 mb-4">{errorMessage}</p>
           <button
-            onClick={() => refetch()}
+            onClick={() => {
+              // TODO: Implement retry logic for store
+              console.log('Retry clicked');
+            }}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
           >
             Try Again

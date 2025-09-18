@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { RefreshCw, Copy, Search, TrendingUp, TrendingDown } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import type { BasicPosition } from "@/services/positions/positionService";
-import { usePositionPnL, usePnLDisplayValues } from "@/hooks/api/usePositionPnL";
+import { usePnLDisplayValues } from "@/hooks/api/usePositionPnL";
+import { usePositionStore } from "@/store/position-store";
+import { apiClient } from "@/lib/app/apiClient";
 import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy";
 
 interface PositionCardProps {
@@ -25,24 +27,89 @@ export function PositionCard({
     const [copied, setCopied] = useState(false);
     const [token0ImageError, setToken0ImageError] = useState(false);
     const [token1ImageError, setToken1ImageError] = useState(false);
+    const cardRef = useRef<HTMLDivElement>(null);
+    const [pnlLoaded, setPnlLoaded] = useState(false);
 
     // Get quote token decimals for proper formatting
     const quoteTokenDecimals = position.token0IsQuote
         ? position.pool.token0.decimals
         : position.pool.token1.decimals;
 
-    // Fetch PnL data for this position
-    const { data: pnlData, isLoading: pnlLoading, error: pnlError } = usePositionPnL(
-        position.pool.chain,
-        position.nftId,
-        { enabled: Boolean(position.nftId) } // Only fetch if position has NFT ID
-    );
+    // Get PnL data from position store
+    const getPosition = usePositionStore(state => state.getPosition);
+    const positionWithDetails = position.nftId ?
+        getPosition(position.pool.chain, position.nftId) : null;
+    const pnlData = positionWithDetails?.pnlBreakdown;
+    const pnlLoading = !pnlData && Boolean(position.nftId); // Loading if no PnL data and position has NFT ID
+    // const pnlError = null; // Store doesn't track individual PnL errors
 
     // Get formatted display values
     const pnlDisplayValues = usePnLDisplayValues(pnlData, quoteTokenDecimals);
 
+    // Load PnL and curve data when position card becomes visible
+    useEffect(() => {
+        const curveData = positionWithDetails?.curveData;
+        const needsData = (!pnlData || !curveData) && !pnlLoaded && position.nftId && position.pool?.chain;
+
+        if (needsData) {
+            const observer = new IntersectionObserver(
+                async ([entry]) => {
+                    if (entry.isIntersecting) {
+                        setPnlLoaded(true);
+                        observer.disconnect();
+
+                        // Load both PnL and curve data in parallel
+                        const [pnlResponse, curveResponse] = await Promise.allSettled([
+                            apiClient.get(`/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/pnl`),
+                            apiClient.get(`/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/curve`)
+                        ]);
+
+                        // Update position with loaded data in store
+                        const key = `${position.pool.chain}-${position.nftId}`;
+                        const { getPosition, updatePositionEverywhere } = usePositionStore.getState();
+
+                        const existingPosition = getPosition(position.pool.chain, position.nftId);
+                        if (existingPosition) {
+                            const updatedPosition = { ...existingPosition };
+
+                            // Add PnL data if successful and not already present
+                            if (pnlResponse.status === 'fulfilled' && pnlResponse.value.data && !updatedPosition.pnlBreakdown) {
+                                updatedPosition.pnlBreakdown = pnlResponse.value.data;
+                            } else if (pnlResponse.status === 'rejected') {
+                                console.debug(`PnL load failed for position ${position.nftId}:`, pnlResponse.reason);
+                            }
+
+                            // Add curve data if successful and not already present
+                            if (curveResponse.status === 'fulfilled' && curveResponse.value.data && !updatedPosition.curveData) {
+                                updatedPosition.curveData = curveResponse.value.data;
+                            } else if (curveResponse.status === 'rejected') {
+                                console.debug(`Curve load failed for position ${position.nftId}:`, curveResponse.reason);
+                            }
+
+                            // Only update if we got at least some data or made changes
+                            if (updatedPosition.pnlBreakdown !== existingPosition.pnlBreakdown ||
+                                updatedPosition.curveData !== existingPosition.curveData) {
+                                updatePositionEverywhere(key, updatedPosition);
+                            }
+                        }
+                    }
+                },
+                {
+                    threshold: 0.1,
+                    rootMargin: '100px'
+                }
+            );
+
+            if (cardRef.current) {
+                observer.observe(cardRef.current);
+            }
+
+            return () => observer.disconnect();
+        }
+    }, [pnlData, positionWithDetails?.curveData, pnlLoaded, position.nftId, position.pool?.chain]);
+
     // Check if PnL data failed to load (for debugging)
-    const pnlFailed = Boolean(pnlError && !pnlLoading);
+    // const pnlFailed = false; // Store doesn't track individual errors
 
     // Get PnL color classes - Commented out until PnL data is available
     // const getPnLColorClasses = (pnlPercent: number) => {
@@ -157,7 +224,7 @@ export function PositionCard({
     const positionStatus = getPositionStatus();
 
     return (
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-6 py-4 hover:border-slate-600/50 transition-all duration-200">
+        <div ref={cardRef} className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-6 py-4 hover:border-slate-600/50 transition-all duration-200">
             {/* Header - Always Visible */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">

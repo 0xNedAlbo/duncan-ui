@@ -2,7 +2,7 @@
  * Hook for fetching position curve data
  */
 
-import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
+import { useQuery, type UseQueryOptions, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/app/apiClient';
 import type { ApiError } from '@/lib/app/apiError';
 import type { PositionCurveResponse } from '@/app/api/positions/uniswapv3/nft/[chain]/[nft]/curve/route';
@@ -25,12 +25,31 @@ export function usePositionCurve(
   nftId: string | undefined,
   options?: UsePositionCurveOptions
 ) {
+  const queryClient = useQueryClient();
+  const cacheKey = ['positions', 'curve', chain, nftId];
+
+  // Check if data is already in cache before making query
+  const existingData = queryClient.getQueryData(cacheKey);
+  if (existingData && chain && nftId) {
+    console.debug('[Cache] Found existing curve data in cache:', {
+      cacheKey,
+      pointsCount: (existingData as CurveData).points?.length,
+      willUseCache: true
+    });
+  }
+
   return useQuery({
-    queryKey: ['positions', 'curve', chain, nftId],
+    queryKey: cacheKey,
     queryFn: async () => {
       if (!chain || !nftId) {
         throw new Error('Chain and NFT ID are required');
       }
+
+      console.debug('[Cache] Fetching curve data from API (cache miss):', {
+        cacheKey,
+        chain,
+        nftId
+      });
 
       const response = await apiClient.get<PositionCurveResponse>(
         `/api/positions/uniswapv3/nft/${chain}/${nftId}/curve`
@@ -39,6 +58,12 @@ export function usePositionCurve(
       if (!response.data) {
         throw new Error('No curve data received');
       }
+
+      console.debug('[Cache] Received curve data from API:', {
+        cacheKey,
+        pointsCount: response.data.points?.length,
+        hasData: !!response.data
+      });
 
       return response.data;
     },
@@ -51,6 +76,15 @@ export function usePositionCurve(
     // Additional optimizations for curve data
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+
+    // Track cache hits/misses
+    onSuccess: (data) => {
+      console.debug('[Cache] Successfully got curve data:', {
+        cacheKey,
+        pointsCount: data.points?.length,
+        source: 'cache or fresh API call'
+      });
+    },
 
     ...options,
   });

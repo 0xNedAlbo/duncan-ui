@@ -134,26 +134,27 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
             // Fetch the updated position data
             const refreshedPosition = await positionService.getPosition(position.id);
 
-            // Pre-calculate fresh curve data to warm the cache
-            // This ensures the curve visualization is immediately available after refresh
+            // Calculate fresh curve data and include in response
+            // This eliminates the need for a separate curve data fetch
+            let curveData = undefined;
             try {
                 if (refreshedPosition && curveDataService.validatePosition(refreshedPosition)) {
-                    await curveDataService.getCurveData(refreshedPosition);
+                    curveData = await curveDataService.getCurveData(refreshedPosition);
                     log.debug(
                         { positionId: position.id },
-                        "Successfully pre-calculated fresh curve data"
+                        "Successfully calculated fresh curve data for response"
                     );
                 } else {
                     log.debug(
                         { positionId: position.id },
-                        "Skipped curve data pre-calculation due to invalid position data"
+                        "Skipped curve data calculation due to invalid position data"
                     );
                 }
             } catch (curveError) {
                 // Log curve calculation error but don't fail the refresh
                 log.debug(
                     { positionId: position.id, error: curveError },
-                    "Failed to pre-calculate curve data, but refresh completed successfully"
+                    "Failed to calculate curve data, but refresh completed successfully"
                 );
             }
 
@@ -165,6 +166,7 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                     currentValue: pnlBreakdown.currentValue,
                     totalPnL: pnlBreakdown.totalPnL,
                     calculatedAt: pnlBreakdown.calculatedAt,
+                    includedCurveData: !!curveData,
                 },
                 "Successfully refreshed position data"
             );
@@ -174,6 +176,7 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                 data: {
                     position: refreshedPosition,
                     pnlBreakdown: pnlBreakdown,
+                    ...(curveData && { curveData }),
                 },
                 meta: {
                     requestedAt: new Date().toISOString(),

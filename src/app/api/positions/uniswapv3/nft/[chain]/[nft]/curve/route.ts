@@ -6,11 +6,12 @@ import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
 import type { CurveData } from "@/components/charts/mini-pnl-curve";
 import type { ApiResponse } from "@/types/api";
 
-export interface PositionCurveResponse extends ApiResponse<CurveData> {
+export interface PositionCurveResponse extends ApiResponse<CurveData | null> {
     meta: {
         requestedAt: string;
         positionId: string;
         cached: boolean;
+        reason?: string;
     };
 }
 
@@ -129,21 +130,19 @@ export const GET = withAuthAndLogging<PositionCurveResponse>(
             // Validate position data before curve generation
             if (!curveDataService.validatePosition(position)) {
                 log.debug(
-                    { positionId: position.id, chain, nftId },
-                    "Invalid position data for curve generation"
+                    { positionId: position.id, chain, nftId, status: position.status, liquidity: position.liquidity },
+                    "Position not eligible for curve generation (likely closed or invalid)"
                 );
-                return NextResponse.json(
-                    {
-                        success: false,
-                        error: "Position data invalid for curve generation",
-                        meta: {
-                            requestedAt: new Date().toISOString(),
-                            positionId: position.id,
-                            cached: false
-                        }
-                    },
-                    { status: 422 }
-                );
+                return NextResponse.json({
+                    success: true,
+                    data: null,
+                    meta: {
+                        requestedAt: new Date().toISOString(),
+                        positionId: position.id,
+                        cached: false,
+                        reason: "Position not eligible for curve generation"
+                    }
+                });
             }
 
             // Get curve data using cache-first pattern

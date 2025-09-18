@@ -121,6 +121,7 @@ export function useRefreshNFTPosition(
     onSuccess: (response, { chain, nftId }) => {
       const refreshedPosition = response.data?.position;
       const pnlBreakdown = response.data?.pnlBreakdown;
+      const curveData = response.data?.curveData;
 
       if (refreshedPosition) {
         // Update the specific NFT position in cache
@@ -135,6 +136,19 @@ export function useRefreshNFTPosition(
             ['positions', 'pnl', chain, nftId],
             pnlBreakdown
           );
+        }
+
+        // Update curve cache with fresh data if included in response
+        if (curveData) {
+          const cacheKey = ['positions', 'curve', chain, nftId];
+          queryClient.setQueryData(cacheKey, curveData);
+          console.debug('[Cache] Set curve data in React Query cache:', {
+            cacheKey,
+            pointsCount: curveData.points?.length,
+            hasData: !!curveData
+          });
+        } else {
+          console.debug('[Cache] No curve data in refresh response to cache');
         }
 
         // Invalidate positions list to ensure it's updated
@@ -226,6 +240,7 @@ export function useRefreshPosition(
     onSuccess: (response, position) => {
       const refreshedPosition = response.data?.position;
       const pnlBreakdown = response.data?.pnlBreakdown;
+      const curveData = response.data?.curveData;
 
       if (refreshedPosition) {
         // Update position in all positions list queries
@@ -252,6 +267,19 @@ export function useRefreshPosition(
             ['positions', 'pnl', position.pool.chain, position.nftId],
             pnlBreakdown
           );
+        }
+
+        // Update curve cache with fresh data if included in response
+        if (position.nftId && position.pool.chain && curveData) {
+          const cacheKey = ['positions', 'curve', position.pool.chain, position.nftId];
+          queryClient.setQueryData(cacheKey, curveData);
+          console.debug('[Cache] Set curve data in React Query cache (BasicPosition):', {
+            cacheKey,
+            pointsCount: curveData.points?.length,
+            hasData: !!curveData
+          });
+        } else if (position.nftId && position.pool.chain) {
+          console.debug('[Cache] No curve data in refresh response to cache (BasicPosition)');
         }
       }
     },
