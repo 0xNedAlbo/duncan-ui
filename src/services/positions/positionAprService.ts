@@ -29,6 +29,15 @@ export interface AprBreakdown {
     realizedApr: number;       // APR from collected fees only
     unrealizedApr: number;     // APR from unclaimed fees only
     totalApr: number;          // Combined APR
+
+    // Breakdown metrics for UI display
+    totalFeesCollected: string;      // Realized fees (BigInt as string)
+    timeWeightedCostBasis: string;   // For realized section (BigInt as string)
+    totalActiveDays: number;         // For realized section
+
+    unrealizedCostBasis: string;     // Current period cost basis (BigInt as string)
+    unrealizedActiveDays: number;    // Days since last collect/start
+
     calculatedAt: Date;
 }
 
@@ -574,9 +583,9 @@ export class PositionAprService {
      * (or from the beginning if no collects have occurred yet).
      *
      * @param positionId - The position ID
-     * @param unclaimedFeesValue - Current unclaimed fees value in quote token (from PnL breakdown)
+     * @param unclaimedFeesValue - Current unclaimed fees value in quote token (from PnL breakdown) - optional
      */
-    async getAprBreakdown(positionId: string, unclaimedFeesValue: string): Promise<AprBreakdown> {
+    async getAprBreakdown(positionId: string, unclaimedFeesValue?: string): Promise<AprBreakdown> {
         // Get all APR periods (realized portion)
         const aprData = await this.getPositionApr(positionId, false);
         const realizedApr = aprData.totalApr;
@@ -597,9 +606,17 @@ export class PositionAprService {
                 realizedApr: 0,
                 unrealizedApr: 0,
                 totalApr: 0,
+                totalFeesCollected: '0',
+                timeWeightedCostBasis: '0',
+                totalActiveDays: 0,
+                unrealizedCostBasis: '0',
+                unrealizedActiveDays: 0,
                 calculatedAt: new Date()
             };
         }
+
+        // Use provided unclaimed fees or default to "0" if not available
+        const unclaimedFees = unclaimedFeesValue || "0";
 
         // Find the last COLLECT event and the most recent event
         const lastCollectEvent = events.reverse().find(e => e.eventType === 'COLLECT');
@@ -607,18 +624,28 @@ export class PositionAprService {
 
         // If no collect events, all current position value is unrealized
         if (!lastCollectEvent) {
-            // Calculate unrealized APR for the entire position lifetime
+            const firstEvent = events[events.length - 1]; // First event (when reversed)
             const unrealizedApr = this.calculateUnrealizedApr(
-                events[events.length - 1], // First event (when reversed)
+                firstEvent,
                 mostRecentEvent,
-                unclaimedFeesValue
+                unclaimedFees
             );
+
+            // Calculate unrealized metrics - days from first event to now
+            const now = new Date();
+            const unrealizedDays = Math.floor((now.getTime() - firstEvent.blockTimestamp.getTime()) / (1000 * 60 * 60 * 24));
+            const unrealizedCostBasis = mostRecentEvent.costBasisAfter;
 
             return {
                 positionId,
                 realizedApr: 0,
                 unrealizedApr: unrealizedApr,
                 totalApr: unrealizedApr,
+                totalFeesCollected: '0',
+                timeWeightedCostBasis: '0',
+                totalActiveDays: 0,
+                unrealizedCostBasis,
+                unrealizedActiveDays: Math.max(1, unrealizedDays),
                 calculatedAt: new Date()
             };
         }
@@ -627,16 +654,26 @@ export class PositionAprService {
         const unrealizedApr = this.calculateUnrealizedApr(
             lastCollectEvent,
             mostRecentEvent,
-            unclaimedFeesValue
+            unclaimedFees
         );
 
         const totalApr = realizedApr + unrealizedApr;
+
+        // Calculate unrealized metrics (period since last collect to now)
+        const now = new Date();
+        const unrealizedDays = Math.floor((now.getTime() - lastCollectEvent.blockTimestamp.getTime()) / (1000 * 60 * 60 * 24));
+        const unrealizedCostBasis = mostRecentEvent.costBasisAfter;
 
         return {
             positionId,
             realizedApr,
             unrealizedApr,
             totalApr,
+            totalFeesCollected: aprData.totalFeesCollected,
+            timeWeightedCostBasis: aprData.timeWeightedCostBasis,
+            totalActiveDays: aprData.totalActiveDays,
+            unrealizedCostBasis,
+            unrealizedActiveDays: Math.max(1, unrealizedDays),
             calculatedAt: new Date()
         };
     }
@@ -649,11 +686,23 @@ export class PositionAprService {
         currentEvent: PositionEvent,
         unclaimedFeesValue: string
     ): number {
-        // Calculate days in the unrealized period
-        const periodDays = (currentEvent.blockTimestamp.getTime() - periodStartEvent.blockTimestamp.getTime())
+        // Calculate days from period start to NOW (not just to the current event)
+        // This is important for active positions where we want to measure APR up to the current moment
+        const now = new Date();
+        const periodDays = (now.getTime() - periodStartEvent.blockTimestamp.getTime())
             / (1000 * 60 * 60 * 24);
 
+        this.logger.debug({
+            periodStartTimestamp: periodStartEvent.blockTimestamp.toISOString(),
+            currentEventTimestamp: currentEvent.blockTimestamp.toISOString(),
+            currentTime: now.toISOString(),
+            periodDays,
+            unclaimedFeesValue,
+            currentCostBasis: currentEvent.costBasisAfter
+        }, 'Calculating unrealized APR');
+
         if (periodDays <= 0) {
+            this.logger.debug({ periodDays }, 'Period days <= 0, returning 0 APR');
             return 0;
         }
 
@@ -661,6 +710,10 @@ export class PositionAprService {
         const currentCostBasis = BigInt(currentEvent.costBasisAfter);
 
         if (currentCostBasis === BigInt(0) || unclaimedFeesBigInt === BigInt(0)) {
+            this.logger.debug({
+                currentCostBasis: currentCostBasis.toString(),
+                unclaimedFees: unclaimedFeesBigInt.toString()
+            }, 'Cost basis or unclaimed fees is 0, returning 0 APR');
             return 0;
         }
 
@@ -668,6 +721,15 @@ export class PositionAprService {
         const feeRatio = Number(unclaimedFeesBigInt) / Number(currentCostBasis);
         const annualizedRatio = feeRatio / (periodDays / 365);
         const unrealizedApr = annualizedRatio * 100;
+
+        this.logger.debug({
+            unclaimedFees: unclaimedFeesBigInt.toString(),
+            costBasis: currentCostBasis.toString(),
+            feeRatio,
+            annualizedRatio,
+            unrealizedApr,
+            expectedCalculation: `(${unclaimedFeesBigInt.toString()} / ${currentCostBasis.toString()}) / (${periodDays} / 365) * 100 = ${unrealizedApr}`
+        }, 'Unrealized APR calculation details');
 
         return unrealizedApr;
     }

@@ -129,16 +129,27 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
             // - Position events sync via positionLedgerService.syncPositionEvents()
             // - Fresh PnL calculation with current prices and unclaimed fees
             // - Cache update with new data
-            const pnlBreakdown = await positionPnLService.getPnlBreakdown(
-                position.id
-            );
+            let pnlBreakdown = null;
+            try {
+                pnlBreakdown = await positionPnLService.getPnlBreakdown(position.id);
+                log.debug(
+                    { positionId: position.id },
+                    "Fresh PnL calculation completed"
+                );
+            } catch (error) {
+                log.debug(
+                    { positionId: position.id, error: error instanceof Error ? error.message : String(error) },
+                    "PnL calculation failed during refresh"
+                );
+            }
 
-            // Calculate fresh APR breakdown using unclaimed fees from PnL
+            // Calculate fresh APR breakdown with or without PnL data
             let aprBreakdown = undefined;
             try {
+                const unclaimedFees = pnlBreakdown?.unclaimedFees;
                 aprBreakdown = await positionAprService.getAprBreakdown(
                     position.id,
-                    pnlBreakdown.unclaimedFees
+                    unclaimedFees
                 );
                 log.debug(
                     { positionId: position.id, realizedApr: aprBreakdown.realizedApr, unrealizedApr: aprBreakdown.unrealizedApr },
@@ -184,9 +195,9 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                     positionId: position.id,
                     chain,
                     nftId,
-                    currentValue: pnlBreakdown.currentValue,
-                    totalPnL: pnlBreakdown.totalPnL,
-                    calculatedAt: pnlBreakdown.calculatedAt,
+                    currentValue: pnlBreakdown?.currentValue || "not available",
+                    totalPnL: pnlBreakdown?.totalPnL || "not available",
+                    calculatedAt: pnlBreakdown?.calculatedAt?.toISOString() || "not available",
                     includedAprBreakdown: !!aprBreakdown,
                     aprRealizedApr: aprBreakdown?.realizedApr || 0,
                     aprUnrealizedApr: aprBreakdown?.unrealizedApr || 0,
@@ -206,7 +217,7 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                 meta: {
                     requestedAt: new Date().toISOString(),
                     positionId: position.id,
-                    refreshedAt: pnlBreakdown.calculatedAt.toISOString(),
+                    refreshedAt: pnlBreakdown?.calculatedAt?.toISOString() || new Date().toISOString(),
                 },
             });
         } catch (error) {

@@ -146,6 +146,10 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
             let pnlBreakdown = null;
             try {
                 pnlBreakdown = await positionPnLService.getPnlBreakdown(position.id);
+                log.debug(
+                    { positionId: position.id, pnlBreakdown },
+                    "PnL breakdown loaded for APR calculation"
+                );
             } catch (error) {
                 log.debug(
                     { positionId: position.id, error: error instanceof Error ? error.message : String(error) },
@@ -153,18 +157,18 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
                 );
             }
 
-            // Load APR breakdown and curve data in parallel (APR needs unclaimed fees from PnL)
+            // Load APR breakdown and curve data in parallel
             const [aprResult, curveResult] = await Promise.allSettled([
                 (async () => {
                     try {
-                        if (!pnlBreakdown) {
-                            log.debug(
-                                { positionId: position.id },
-                                "APR breakdown skipped - PnL data not available"
-                            );
-                            return null;
-                        }
-                        return await positionAprService.getAprBreakdown(position.id, pnlBreakdown.unclaimedFees);
+                        // Calculate APR breakdown with or without PnL data
+                        const unclaimedFees = pnlBreakdown?.unclaimedFees;
+                        const aprBreakdownResult = await positionAprService.getAprBreakdown(position.id, unclaimedFees);
+                        log.debug(
+                            { positionId: position.id, aprBreakdownResult, unclaimedFees: unclaimedFees || "not available" },
+                            "APR breakdown calculation completed"
+                        );
+                        return aprBreakdownResult;
                     } catch (error) {
                         log.debug(
                             { positionId: position.id, error: error instanceof Error ? error.message : String(error) },
