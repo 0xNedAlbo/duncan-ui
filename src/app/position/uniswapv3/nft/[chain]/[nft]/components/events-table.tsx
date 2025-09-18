@@ -2,22 +2,27 @@
 
 import { useTranslations } from "@/i18n/client";
 import { PositionEvent } from "@/types/api";
-import { formatFractionHuman, FORMAT_PRESET_EN, FORMAT_PRESET_DE } from "@/lib/utils/fraction-format";
+import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { useSettingsStore } from "@/store/settings-store";
 import { ExternalLink, Clock } from "lucide-react";
+import Image from "next/image";
+import type { TokenData } from "@/services/positions/positionService";
 
 interface EventsTableProps {
     events: PositionEvent[];
     isLoading?: boolean;
     chainSlug?: string;
+    quoteToken?: {
+        symbol: string;
+        decimals: number;
+    };
+    token0?: TokenData;
+    token1?: TokenData;
 }
 
-export function EventsTable({ events, isLoading, chainSlug = 'arbitrum' }: EventsTableProps) {
+export function EventsTable({ events, isLoading, chainSlug = 'arbitrum', quoteToken, token0, token1 }: EventsTableProps) {
     const t = useTranslations();
     const { locale } = useSettingsStore();
-    // Convert settings store locale format to simple string for formatting
-    const localeString = locale === 'de-DE' ? 'de' : 'en';
-    const formatPreset = localeString === 'de' ? FORMAT_PRESET_DE : FORMAT_PRESET_EN;
 
     if (isLoading) {
         return (
@@ -39,7 +44,7 @@ export function EventsTable({ events, isLoading, chainSlug = 'arbitrum' }: Event
             <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8 text-center">
                 <div className="text-slate-400 mb-4">
                     <Clock className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p className="text-lg">{t("positionDetails.events.noEvents")}</p>
+                    <p className="text-lg">{t("positionDetails.ledger.noEvents")}</p>
                     <p className="text-sm mt-2">
                         This position may be new or events may still be syncing.
                     </p>
@@ -48,15 +53,11 @@ export function EventsTable({ events, isLoading, chainSlug = 'arbitrum' }: Event
         );
     }
 
-    const formatTokenAmount = (amount: string, decimals: number = 18): string => {
+    const formatValue = (amount: string, decimals: number = 6): string => {
         if (!amount || amount === '0') return '0';
         try {
             const bigintAmount = BigInt(amount);
-            const fraction = {
-                num: bigintAmount,
-                den: BigInt(10) ** BigInt(decimals)
-            };
-            return formatFractionHuman(fraction, formatPreset);
+            return formatCompactValue(bigintAmount, decimals);
         } catch {
             return amount;
         }
@@ -72,7 +73,94 @@ export function EventsTable({ events, isLoading, chainSlug = 'arbitrum' }: Event
             minute: '2-digit',
             second: '2-digit'
         };
+        const localeString = locale === 'de-DE' ? 'de' : 'en';
         return date.toLocaleDateString(localeString, dateOptions);
+    };
+
+    const renderTokenAmount = (amount: string, token: TokenData | undefined, decimals: number) => {
+        if (!amount || amount === '0' || !token) return null;
+
+        return (
+            <div className="flex items-center gap-2">
+                {token.logoUrl && (
+                    <Image
+                        src={token.logoUrl}
+                        alt={token.symbol}
+                        width={16}
+                        height={16}
+                        className="rounded-full"
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                    />
+                )}
+                <span>{formatValue(amount, decimals)} {token.symbol}</span>
+            </div>
+        );
+    };
+
+    const renderPrincipalAmount = (amount: string, token: TokenData | undefined, decimals: number) => {
+        if (!amount || amount === '0' || !token) return null;
+
+        return (
+            <div className="flex items-center gap-2 text-orange-400">
+                {token.logoUrl && (
+                    <Image
+                        src={token.logoUrl}
+                        alt={token.symbol}
+                        width={16}
+                        height={16}
+                        className="rounded-full"
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                    />
+                )}
+                <span>{t('positionDetails.ledger.valueDisplay.principal')}: {formatValue(amount, decimals)} {token.symbol}</span>
+            </div>
+        );
+    };
+
+    const renderFeeAmount = (amount: string, token: TokenData | undefined, decimals: number) => {
+        if (!amount || amount === '0' || !token) return null;
+
+        return (
+            <div className="flex items-center gap-2 text-purple-400">
+                {token.logoUrl && (
+                    <Image
+                        src={token.logoUrl}
+                        alt={token.symbol}
+                        width={16}
+                        height={16}
+                        className="rounded-full"
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                    />
+                )}
+                <span>{t('positionDetails.ledger.valueDisplay.fees')}: {formatValue(amount, decimals)} {token.symbol}</span>
+            </div>
+        );
+    };
+
+    const calculateCollectedPrincipal = (tokenDelta: string, collectedFee: string | undefined): string => {
+        if (!tokenDelta || tokenDelta === '0' || collectedFee === undefined) return '0';
+
+        try {
+            const total = BigInt(tokenDelta);
+            const fees = BigInt(collectedFee || '0');
+            const principal = total - fees;
+            return principal > 0n ? principal.toString() : '0';
+        } catch {
+            return '0';
+        }
+    };
+
+    const hasPrincipalWithdrawal = (event: PositionEvent): boolean => {
+        if (event.eventType !== 'COLLECT') return false;
+        const principal0 = calculateCollectedPrincipal(event.token0Delta, event.collectedFee0);
+        const principal1 = calculateCollectedPrincipal(event.token1Delta, event.collectedFee1);
+        return principal0 !== '0' || principal1 !== '0';
     };
 
     const getEventTypeColor = (eventType: PositionEvent['eventType']): string => {
@@ -111,13 +199,13 @@ export function EventsTable({ events, isLoading, chainSlug = 'arbitrum' }: Event
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-700/50">
                 <h3 className="text-lg font-semibold text-white">
-                    {t("positionDetails.events.title")}
+                    {t("positionDetails.ledger.title")}
                 </h3>
                 <p className="text-sm text-slate-400 mt-1">
-                    {t("positionDetails.events.description")}
+                    {t("positionDetails.ledger.description")}
                 </p>
                 <div className="text-xs text-slate-500 mt-2">
-                    {t("positionDetails.events.totalEvents")}: {events.length}
+                    {t("positionDetails.ledger.totalEvents")}: {events.length}
                 </div>
             </div>
 
@@ -127,19 +215,19 @@ export function EventsTable({ events, isLoading, chainSlug = 'arbitrum' }: Event
                     <thead className="bg-slate-700/30">
                         <tr>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                {t("positionDetails.events.columns.datetime")}
+                                {t("positionDetails.ledger.columns.datetime")}
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                {t("positionDetails.events.columns.eventType")}
+                                {t("positionDetails.ledger.columns.eventType")}
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                {t("positionDetails.events.columns.value")}
+                                {t("positionDetails.ledger.columns.value")}
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                {t("positionDetails.events.columns.details")}
+                                {t("positionDetails.ledger.columns.details")}
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                {t("positionDetails.events.columns.transaction")}
+                                {t("positionDetails.ledger.columns.transaction")}
                             </th>
                         </tr>
                     </thead>
@@ -150,53 +238,57 @@ export function EventsTable({ events, isLoading, chainSlug = 'arbitrum' }: Event
                                     {formatDateTime(event.timestamp)}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center space-x-2">
-                                        <span className="text-lg">{getEventTypeIcon(event.eventType)}</span>
-                                        <span className={`text-sm font-medium ${getEventTypeColor(event.eventType)}`}>
-                                            {t(`positionDetails.events.eventTypes.${event.eventType}`)}
-                                        </span>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-lg">{getEventTypeIcon(event.eventType)}</span>
+                                            <span className={`text-sm font-medium ${getEventTypeColor(event.eventType)}`}>
+                                                {t(`positionDetails.ledger.eventTypes.${event.eventType}`)}
+                                            </span>
+                                        </div>
+                                        {hasPrincipalWithdrawal(event) && (
+                                            <div className="text-xs text-orange-400 ml-7">
+                                                {t('positionDetails.ledger.valueDisplay.principalWithdrawal')}
+                                            </div>
+                                        )}
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 text-sm text-slate-300">
                                     <div className="space-y-1">
                                         {event.eventType === 'COLLECT' && event.feeValueInQuote ? (
                                             <div className="text-purple-400 font-medium">
-                                                ${formatTokenAmount(event.feeValueInQuote, 6)}
+                                                {formatValue(event.feeValueInQuote, quoteToken?.decimals || 6)} {quoteToken?.symbol || ''}
                                             </div>
                                         ) : (
                                             <div className="font-medium">
-                                                ${formatTokenAmount(event.valueInQuote, 6)}
+                                                {formatValue(event.valueInQuote, quoteToken?.decimals || 6)} {quoteToken?.symbol || ''}
                                             </div>
                                         )}
-                                        <div className="text-xs text-slate-500">
-                                            {t(`positionDetails.events.confidence.${event.confidence}`)} • 
-                                            {t(`positionDetails.events.source.${event.source}`)}
-                                        </div>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 text-sm text-slate-400">
                                     <div className="space-y-1">
-                                        {event.liquidityDelta !== '0' && (
-                                            <div>
-                                                Liquidity: {event.liquidityDelta.startsWith('-') ? '' : '+'}
-                                                {formatTokenAmount(event.liquidityDelta.replace('-', ''), 18)}
-                                            </div>
-                                        )}
-                                        {event.token0Delta !== '0' && (
-                                            <div>Token0: {formatTokenAmount(event.token0Delta, 18)}</div>
-                                        )}
-                                        {event.token1Delta !== '0' && (
-                                            <div>Token1: {formatTokenAmount(event.token1Delta, 6)}</div>
-                                        )}
-                                        {event.eventType === 'COLLECT' && event.collectedFee0 && (
-                                            <div className="text-purple-400">
-                                                Fee0: {formatTokenAmount(event.collectedFee0, 18)}
-                                            </div>
-                                        )}
-                                        {event.eventType === 'COLLECT' && event.collectedFee1 && (
-                                            <div className="text-purple-400">
-                                                Fee1: {formatTokenAmount(event.collectedFee1, 6)}
-                                            </div>
+                                        {event.eventType === 'COLLECT' ? (
+                                            <>
+                                                {/* Show fees first */}
+                                                {event.collectedFee0 && event.collectedFee0 !== '0' && renderFeeAmount(event.collectedFee0, token0, token0?.decimals || 18)}
+                                                {event.collectedFee1 && event.collectedFee1 !== '0' && renderFeeAmount(event.collectedFee1, token1, token1?.decimals || 6)}
+                                                {/* Show principal amounts */}
+                                                {(() => {
+                                                    const principal0 = calculateCollectedPrincipal(event.token0Delta, event.collectedFee0);
+                                                    const principal1 = calculateCollectedPrincipal(event.token1Delta, event.collectedFee1);
+                                                    return (
+                                                        <>
+                                                            {principal0 !== '0' && renderPrincipalAmount(principal0, token0, token0?.decimals || 18)}
+                                                            {principal1 !== '0' && renderPrincipalAmount(principal1, token1, token1?.decimals || 6)}
+                                                        </>
+                                                    );
+                                                })()}
+                                            </>
+                                        ) : (
+                                            <>
+                                                {renderTokenAmount(event.token0Delta, token0, token0?.decimals || 18)}
+                                                {renderTokenAmount(event.token1Delta, token1, token1?.decimals || 6)}
+                                            </>
                                         )}
                                     </div>
                                 </td>
@@ -229,11 +321,18 @@ export function EventsTable({ events, isLoading, chainSlug = 'arbitrum' }: Event
                 {events.map((event) => (
                     <div key={event.id} className="p-4 space-y-3">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                                <span className="text-lg">{getEventTypeIcon(event.eventType)}</span>
-                                <span className={`text-sm font-medium ${getEventTypeColor(event.eventType)}`}>
-                                    {t(`positionDetails.events.eventTypes.${event.eventType}`)}
-                                </span>
+                            <div className="space-y-1">
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-lg">{getEventTypeIcon(event.eventType)}</span>
+                                    <span className={`text-sm font-medium ${getEventTypeColor(event.eventType)}`}>
+                                        {t(`positionDetails.ledger.eventTypes.${event.eventType}`)}
+                                    </span>
+                                </div>
+                                {hasPrincipalWithdrawal(event) && (
+                                    <div className="text-xs text-orange-400 ml-7">
+                                        {t('positionDetails.ledger.valueDisplay.principalWithdrawal')}
+                                    </div>
+                                )}
                             </div>
                             <div className="text-xs text-slate-400">
                                 {formatDateTime(event.timestamp)}
@@ -243,11 +342,7 @@ export function EventsTable({ events, isLoading, chainSlug = 'arbitrum' }: Event
                         <div className="flex justify-between items-start">
                             <div>
                                 <div className="text-white font-medium">
-                                    ${formatTokenAmount(event.valueInQuote, 6)}
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                    {t(`positionDetails.events.confidence.${event.confidence}`)} • 
-                                    {t(`positionDetails.events.source.${event.source}`)}
+                                    {formatValue(event.valueInQuote, quoteToken?.decimals || 6)} {quoteToken?.symbol || ''}
                                 </div>
                             </div>
                             <a
@@ -263,16 +358,30 @@ export function EventsTable({ events, isLoading, chainSlug = 'arbitrum' }: Event
                             </a>
                         </div>
 
-                        {(event.liquidityDelta !== '0' || event.token0Delta !== '0' || event.token1Delta !== '0') && (
+                        {(event.token0Delta !== '0' || event.token1Delta !== '0' || (event.eventType === 'COLLECT' && (event.collectedFee0 || event.collectedFee1))) && (
                             <div className="text-xs text-slate-400 space-y-1">
-                                {event.liquidityDelta !== '0' && (
-                                    <div>Liquidity: {formatTokenAmount(event.liquidityDelta, 18)}</div>
-                                )}
-                                {event.token0Delta !== '0' && (
-                                    <div>Token0: {formatTokenAmount(event.token0Delta, 18)}</div>
-                                )}
-                                {event.token1Delta !== '0' && (
-                                    <div>Token1: {formatTokenAmount(event.token1Delta, 6)}</div>
+                                {event.eventType === 'COLLECT' ? (
+                                    <>
+                                        {/* Show fees first */}
+                                        {event.collectedFee0 && event.collectedFee0 !== '0' && renderFeeAmount(event.collectedFee0, token0, token0?.decimals || 18)}
+                                        {event.collectedFee1 && event.collectedFee1 !== '0' && renderFeeAmount(event.collectedFee1, token1, token1?.decimals || 6)}
+                                        {/* Show principal amounts */}
+                                        {(() => {
+                                            const principal0 = calculateCollectedPrincipal(event.token0Delta, event.collectedFee0);
+                                            const principal1 = calculateCollectedPrincipal(event.token1Delta, event.collectedFee1);
+                                            return (
+                                                <>
+                                                    {principal0 !== '0' && renderPrincipalAmount(principal0, token0, token0?.decimals || 18)}
+                                                    {principal1 !== '0' && renderPrincipalAmount(principal1, token1, token1?.decimals || 6)}
+                                                </>
+                                            );
+                                        })()}
+                                    </>
+                                ) : (
+                                    <>
+                                        {renderTokenAmount(event.token0Delta, token0, token0?.decimals || 18)}
+                                        {renderTokenAmount(event.token1Delta, token1, token1?.decimals || 6)}
+                                    </>
                                 )}
                             </div>
                         )}

@@ -92,8 +92,8 @@ export function usePnLDisplayValues(
     };
   }
 
-  // Use the service-provided totalPnL which includes collected fees
-  // totalPnL = unrealizedPnL + collectedFees (overall position performance)
+  // Use the service-provided totalPnL which includes all fees
+  // totalPnL = unrealizedPnL + collectedFees + unclaimedFees (overall position performance)
   const totalPnL = BigInt(pnlData.totalPnL);
 
   const isPositive = totalPnL > 0n;

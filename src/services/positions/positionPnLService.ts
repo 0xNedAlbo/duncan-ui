@@ -39,7 +39,7 @@ export interface PnlBreakdown {
 
   // Derived metrics
   unrealizedPnL: string;          // currentValue - currentCostBasis
-  totalPnL: string;               // unrealizedPnL + collectedFees
+  totalPnL: string;               // unrealizedPnL + collectedFees + unclaimedFees
 
   // Metadata
   positionId: string;
@@ -485,9 +485,10 @@ export class PositionPnLService {
     const currentValueBigInt = BigInt(currentValue);
     const currentCostBasisBigInt = BigInt(currentCostBasis);
     const collectedFeesBigInt = BigInt(collectedFees);
+    const unclaimedFeesBigInt = BigInt(unclaimedFeesData.valueInQuoteToken);
 
     const unrealizedPnL = (currentValueBigInt - currentCostBasisBigInt).toString();
-    const totalPnL = (BigInt(unrealizedPnL) + collectedFeesBigInt).toString();
+    const totalPnL = (BigInt(unrealizedPnL) + collectedFeesBigInt + unclaimedFeesBigInt).toString();
 
     // Get current pool state for cache metadata
     const poolData = await this.prisma.pool.findUnique({

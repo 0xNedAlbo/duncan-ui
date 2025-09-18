@@ -487,7 +487,8 @@ export class PositionLedgerService {
                         poolPrice,
                         calculatedDeltaCostBasis,
                         calculatedFeeValue,
-                        calculatedDeltaPnL
+                        calculatedDeltaPnL,
+                        currentState // Pass the BEFORE state for fee calculation
                     );
                 } else if (event.dbEvent) {
                     // Update existing manual event with new state
@@ -650,7 +651,11 @@ export class PositionLedgerService {
         poolPrice: bigint,
         deltaCostBasis: string,
         calculatedFeeValue?: string,
-        calculatedDeltaPnL?: string
+        calculatedDeltaPnL?: string,
+        previousState?: {
+            uncollectedPrincipal0: string;
+            uncollectedPrincipal1: string;
+        }
     ): Promise<void> {
         const inputHash = this.generateOnchainInputHash(
             rawEvent.blockNumber,
@@ -688,15 +693,15 @@ export class PositionLedgerService {
                 token1Amount: rawEvent.amount1 || "0",
                 tokenValueInQuote,
 
-                // Fees (for COLLECT events)
+                // Fees (for COLLECT events) - pure fees only, excluding principal
                 feesCollected0:
-                    rawEvent.eventType === "COLLECT"
-                        ? rawEvent.amount0 || "0"
-                        : "0",
+                    rawEvent.eventType === "COLLECT" && previousState
+                        ? this.calculatePureFees(rawEvent, previousState).feeToken0.toString()
+                        : rawEvent.eventType === "COLLECT" ? rawEvent.amount0 || "0" : "0",
                 feesCollected1:
-                    rawEvent.eventType === "COLLECT"
-                        ? rawEvent.amount1 || "0"
-                        : "0",
+                    rawEvent.eventType === "COLLECT" && previousState
+                        ? this.calculatePureFees(rawEvent, previousState).feeToken1.toString()
+                        : rawEvent.eventType === "COLLECT" ? rawEvent.amount1 || "0" : "0",
                 feeValueInQuote:
                     rawEvent.eventType === "COLLECT"
                         ? calculatedFeeValue || "0"
@@ -976,20 +981,15 @@ export class PositionLedgerService {
     }
 
     /**
-     * Calculate the pure fee value for COLLECT events (excluding principal collection)
+     * Calculate pure fee amounts for COLLECT events (excluding principal collection)
      */
-    private calculatePureFeeValue(
+    private calculatePureFees(
         rawEvent: RawPositionEvent,
         currentState: {
-            liquidityAfter: string;
-            costBasisAfter: string;
-            realizedPnLAfter: string;
             uncollectedPrincipal0: string;
             uncollectedPrincipal1: string;
-        },
-        poolPrice: bigint,
-        positionInfo: PositionSyncInfo
-    ): string {
+        }
+    ): { feeToken0: bigint; feeToken1: bigint } {
         // Get token amounts from the COLLECT event
         const collectedToken0 = BigInt(rawEvent.amount0 || "0");
         const collectedToken1 = BigInt(rawEvent.amount1 || "0");
@@ -1011,6 +1011,27 @@ export class PositionLedgerService {
 
         const feeToken0 = collectedToken0 - principalCollectedToken0;
         const feeToken1 = collectedToken1 - principalCollectedToken1;
+
+        return { feeToken0, feeToken1 };
+    }
+
+    /**
+     * Calculate the pure fee value for COLLECT events (excluding principal collection)
+     */
+    private calculatePureFeeValue(
+        rawEvent: RawPositionEvent,
+        currentState: {
+            liquidityAfter: string;
+            costBasisAfter: string;
+            realizedPnLAfter: string;
+            uncollectedPrincipal0: string;
+            uncollectedPrincipal1: string;
+        },
+        poolPrice: bigint,
+        positionInfo: PositionSyncInfo
+    ): string {
+        // Calculate pure fee amounts using the helper method
+        const { feeToken0, feeToken1 } = this.calculatePureFees(rawEvent, currentState);
 
         // Calculate fee value in quote token using current price
         return this.calculateTokenValueInQuote(

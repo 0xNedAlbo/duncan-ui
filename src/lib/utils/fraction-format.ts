@@ -252,9 +252,28 @@ export function formatCompactValue(
     const absValue = value < 0n ? -value : value;
     const isGreaterOrEqualToOne = absValue >= denominator;
     
-    // If less than 1, return full precision
+    // If less than 1, limit to 3 decimal places for compact display
     if (!isGreaterOrEqualToOne) {
-        return fullFormatted;
+        const decimalSep = opts?.decimalSep ?? FORMAT_PRESET_EN.decimalSep;
+        const parts = fullFormatted.split(decimalSep);
+
+        // If no decimal part, return as is
+        if (parts.length === 1) {
+            return fullFormatted;
+        }
+
+        // Limit decimal part to 3 digits (no rounding, just truncation)
+        const truncatedDecimal = parts[1].substring(0, 3);
+
+        // Remove trailing zeros
+        const trimmedDecimal = truncatedDecimal.replace(/0+$/, '');
+
+        // If no significant digits remain, return just the integer part
+        if (!trimmedDecimal) {
+            return parts[0];
+        }
+
+        return parts[0] + decimalSep + trimmedDecimal;
     }
     
     // For values >= 1, truncate to max 2 decimal places

@@ -200,7 +200,7 @@
     },
     "tabs": {
       "overview": "Übersicht",
-      "events": "Ereignisse",
+      "ledger": "Ledger",
       "range": "Range-Analyse",
       "fees": "Gebühren & Erträge",
       "analytics": "Analysen"
@@ -247,8 +247,8 @@
         "unknown": "Unbekannt"
       }
     },
-    "events": {
-      "title": "Positions-Events",
+    "ledger": {
+      "title": "Positions-Ledger",
       "description": "Kompletter Verlauf deiner Liquiditätsänderungen und Fee-Einsammlungen",
       "noEvents": "Keine Events für diese Position gefunden",
       "loadingEvents": "Lade Events...",
@@ -270,7 +270,9 @@
       "valueDisplay": {
         "liquidity": "Liquiditäts-Änderung",
         "fees": "Fees Eingesammelt",
-        "tokens": "Token-Mengen"
+        "tokens": "Token-Mengen",
+        "principal": "Einlagen",
+        "principalWithdrawal": "Einlagen abgeholt"
       },
       "confidence": {
         "exact": "Exakt",

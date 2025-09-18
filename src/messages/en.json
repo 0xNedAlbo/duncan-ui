@@ -200,7 +200,7 @@
     },
     "tabs": {
       "overview": "Overview",
-      "events": "Events",
+      "ledger": "Ledger",
       "range": "Range Analysis",
       "fees": "Fees & Returns",
       "analytics": "Analytics"
@@ -247,8 +247,8 @@
         "unknown": "Unknown"
       }
     },
-    "events": {
-      "title": "Position Events",
+    "ledger": {
+      "title": "Position Ledger",
       "description": "Complete history of your position's liquidity changes and fee collections",
       "noEvents": "No events found for this position",
       "loadingEvents": "Loading events...",
@@ -270,7 +270,9 @@
       "valueDisplay": {
         "liquidity": "Liquidity Change",
         "fees": "Fees Collected",
-        "tokens": "Token Amounts"
+        "tokens": "Token Amounts",
+        "principal": "Principal",
+        "principalWithdrawal": "Principal withdrawal"
       },
       "confidence": {
         "exact": "Exact",
