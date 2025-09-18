@@ -449,6 +449,9 @@ export class PositionPnLService {
 
     await this.calculateAndCachePnL(positionId, position);
 
+    // Update position's updatedAt timestamp to reflect the refresh
+    await this.positionService.touchPosition(positionId);
+
     // Fetch the newly cached data
     const newCachedPnL = await this.prisma.positionPnL.findUniqueOrThrow({
       where: { positionId }

@@ -261,6 +261,18 @@ export class PositionService {
     }
 
     /**
+     * Touch a position to update its updatedAt timestamp
+     */
+    async touchPosition(positionId: string): Promise<void> {
+        await this.prisma.position.update({
+            where: { id: positionId },
+            data: {
+                updatedAt: new Date(),
+            },
+        });
+    }
+
+    /**
      * Delete a position
      */
     async deletePosition(positionId: string): Promise<void> {
