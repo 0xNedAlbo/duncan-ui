@@ -216,26 +216,6 @@ function MiniPnLCurveComponent({
                     />
                 )}
 
-                {/* Range boundary lines */}
-                <line
-                    x1={lowerBoundaryX}
-                    y1={0}
-                    x2={lowerBoundaryX}
-                    y2={height}
-                    stroke="#06b6d4"
-                    strokeWidth={1.5}
-                    opacity={0.7}
-                />
-                <line
-                    x1={upperBoundaryX}
-                    y1={0}
-                    x2={upperBoundaryX}
-                    y2={height}
-                    stroke="#06b6d4"
-                    strokeWidth={1.5}
-                    opacity={0.7}
-                />
-
                 {/* PnL curve */}
                 <path
                     d={pathData}
@@ -244,6 +224,28 @@ function MiniPnLCurveComponent({
                     strokeWidth={2}
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                />
+
+                {/* Range boundary lines - drawn after curve to ensure visibility */}
+                <line
+                    x1={lowerBoundaryX}
+                    y1={0}
+                    x2={lowerBoundaryX}
+                    y2={height}
+                    stroke="#06b6d4"
+                    strokeWidth={1.5}
+                    opacity={0.8}
+                    strokeDasharray="3,3"
+                />
+                <line
+                    x1={upperBoundaryX}
+                    y1={0}
+                    x2={upperBoundaryX}
+                    y2={height}
+                    stroke="#06b6d4"
+                    strokeWidth={1.5}
+                    opacity={0.8}
+                    strokeDasharray="3,3"
                 />
 
                 {/* Current position marker */}

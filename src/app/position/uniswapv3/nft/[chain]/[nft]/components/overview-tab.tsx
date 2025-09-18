@@ -2,7 +2,6 @@
 
 import { useTranslations } from "@/i18n/client";
 import { usePnLDisplayValues } from "@/hooks/api/usePositionPnL";
-import { useActivePosition } from "@/store/position-store";
 import {
     formatCompactValue,
 } from "@/lib/utils/fraction-format";
@@ -13,17 +12,20 @@ import {
     DollarSign,
     Target,
     BarChart3,
-    Loader2,
 } from "lucide-react";
 import type { BasicPosition } from "@/services/positions/positionService";
+import type { PnlBreakdown } from "@/services/positions/positionPnLService";
+import type { CurveData } from "@/components/charts/mini-pnl-curve";
 
 interface OverviewTabProps {
     position: BasicPosition;
+    pnlBreakdown?: PnlBreakdown | null;
+    curveData?: CurveData | null;
     chainSlug: string;
     nftId: string;
 }
 
-export function OverviewTab({ position }: OverviewTabProps) {
+export function OverviewTab({ position, pnlBreakdown, curveData }: OverviewTabProps) {
     const t = useTranslations();
     // Get quote token info for formatting (must be before hook calls)
     const quoteToken = position.token0IsQuote
@@ -31,35 +33,11 @@ export function OverviewTab({ position }: OverviewTabProps) {
         : position.pool.token1;
     const quoteTokenDecimals = quoteToken.decimals;
 
-    // Get position data from store (includes PnL and curve data)
-    const positionWithDetails = useActivePosition();
-
-    // Extract PnL data from store
-    const pnlData = positionWithDetails?.pnlBreakdown;
-    const pnlLoading = !pnlData; // Loading if no PnL data available
+    // Use PnL data from props instead of store
+    const pnlData = pnlBreakdown || undefined;
 
     // Get formatted display values using the same hook as PositionCard
     const pnlDisplayValues = usePnLDisplayValues(pnlData, quoteTokenDecimals);
-
-    // Loading state
-    if (pnlLoading) {
-        return (
-            <div className="space-y-6">
-                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8">
-                    <div className="flex items-center justify-center py-12">
-                        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-                        <span className="ml-3 text-slate-400">
-                            {t("common.loading")}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // Note: MiniPnLCurveLazy will automatically use curve data from store when available
-
-    // Position is provided as prop, no need to check if it exists
 
     // Get position status
     const getPositionStatus = () => {
@@ -253,6 +231,7 @@ export function OverviewTab({ position }: OverviewTabProps) {
                     <div className="flex justify-center">
                         <MiniPnLCurveLazy
                             position={position}
+                            curveData={curveData}
                             width={400}
                             height={200}
                             showTooltip={true}

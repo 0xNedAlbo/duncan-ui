@@ -66,6 +66,7 @@ export interface PositionStore {
     ) => void;
     navigateToPosition: (_chain: string, _nftId: string) => void;
     refreshPosition: (_chain: string, _nftId: string) => Promise<void>;
+    loadPositionDetails: (_chain: string, _nftId: string) => Promise<PositionWithDetails | null>;
     updatePositionEverywhere: (
         _key: string,
         _updatedPosition: PositionWithDetails
@@ -313,6 +314,61 @@ export const usePositionStore = create<PositionStore>()(
                         throw error;
                     } finally {
                         set((state) => ({ ...state, isRefreshing: false }));
+                    }
+                },
+
+                loadPositionDetails: async (chain, nftId) => {
+                    const key = getPositionKey(chain, nftId);
+
+                    try {
+                        // Check if we already have complete data
+                        const existingPosition = get().getPosition(chain, nftId);
+                        if (existingPosition?.pnlBreakdown !== undefined && existingPosition?.curveData !== undefined) {
+                            console.log(`[Store] Complete data already exists for ${key}, setting as active`);
+                            // Set as active and return existing data
+                            get().navigateToPosition(chain, nftId);
+                            return existingPosition;
+                        }
+
+                        const { apiClient } = await import("@/lib/app/apiClient");
+
+                        console.log(`[Store] Loading complete position details via unified endpoint: ${key}`);
+
+                        // Call unified details endpoint
+                        const response = await apiClient.get(`/api/positions/uniswapv3/nft/${chain}/${nftId}/details`);
+
+                        if (response.success && response.data) {
+                            const { basicData, pnlBreakdown, curveData } = response.data;
+
+                            // Create complete position object
+                            const completePosition: PositionWithDetails = {
+                                basicData,
+                                pnlBreakdown,
+                                curveData,
+                                isRefreshing: false,
+                                lastUpdated: new Date().toISOString(),
+                            };
+
+                            // Update position everywhere in store
+                            get().updatePositionEverywhere(key, completePosition);
+
+                            // Set as active position
+                            get().navigateToPosition(chain, nftId);
+
+                            console.log(`[Store] ✓ Loaded complete position details: ${key}`, {
+                                hasPnl: !!pnlBreakdown,
+                                hasCurve: curveData !== undefined,
+                                curvePoints: curveData?.points?.length || 0
+                            });
+
+                            return completePosition;
+                        } else {
+                            console.error(`[Store] Failed to load position details: ${key}`, response.error);
+                            return null;
+                        }
+                    } catch (error) {
+                        console.error(`[Store] Error loading position details: ${key}`, error);
+                        return null;
                     }
                 },
 

@@ -7,6 +7,7 @@ import { usePositionStore } from "@/store/position-store";
 
 interface MiniPnLCurveLazyProps {
     position: BasicPosition;
+    curveData?: CurveData | null;
     width?: number;
     height?: number;
     className?: string;
@@ -40,16 +41,17 @@ function CurveSkeleton({ width = 120, height = 60, className = "" }: { width?: n
 
 export function MiniPnLCurveLazy({
     position,
+    curveData: propCurveData,
     width = 120,
     height = 60,
     className = "",
     showTooltip = false
 }: MiniPnLCurveLazyProps) {
-    // Get curve data from position store
+    // Use curve data from props if provided, otherwise fall back to store
     const getPosition = usePositionStore(state => state.getPosition);
-    const positionWithDetails = position.nftId ?
+    const positionWithDetails = position.nftId && !propCurveData ?
         getPosition(position.pool.chain, position.nftId) : null;
-    const curveData = positionWithDetails?.curveData;
+    const curveData = propCurveData || positionWithDetails?.curveData;
 
     return (
         <div className={className}>

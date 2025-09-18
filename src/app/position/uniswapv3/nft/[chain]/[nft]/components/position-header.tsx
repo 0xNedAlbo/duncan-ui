@@ -8,13 +8,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ChainConfig } from "@/config/chains";
 import type { BasicPosition } from "@/services/positions/positionService";
-import { usePositionRefresh } from "@/store/position-store";
-
 interface PositionHeaderProps {
     position: BasicPosition;
     chainSlug: string;
     nftId: string;
     chainConfig: ChainConfig;
+    onRefresh: () => Promise<void>;
+    isRefreshing: boolean;
 }
 
 // Helper function to get token data from PositionWithPnL structure
@@ -30,21 +30,10 @@ function getTokenData(token: any) {
     };
 }
 
-export function PositionHeader({ position, chainSlug, nftId, chainConfig }: PositionHeaderProps) {
+export function PositionHeader({ position, chainSlug, nftId, chainConfig, onRefresh, isRefreshing }: PositionHeaderProps) {
     const t = useTranslations();
     const router = useRouter();
     const [copied, setCopied] = useState(false);
-
-    const { refreshPosition, isRefreshing } = usePositionRefresh();
-
-    const handleRefresh = async () => {
-        try {
-            await refreshPosition(chainSlug, nftId);
-        } catch (error) {
-            console.error("Failed to refresh position:", error);
-            // TODO: Show error toast/notification
-        }
-    };
 
     const copyNftId = async () => {
         try {
@@ -193,7 +182,7 @@ export function PositionHeader({ position, chainSlug, nftId, chainConfig }: Posi
 
                         {/* Refresh Button */}
                         <button
-                            onClick={handleRefresh}
+                            onClick={onRefresh}
                             disabled={isRefreshing}
                             className="p-3 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                             title={t("positionDetails.header.refresh")}
