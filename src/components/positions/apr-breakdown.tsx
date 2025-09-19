@@ -15,7 +15,7 @@ interface AprBreakdownProps {
     quoteTokenDecimals: number;
 }
 
-export function AprBreakdown({ aprData, pnlData, quoteToken, quoteTokenDecimals }: AprBreakdownProps) {
+export function AprBreakdown({ aprData, quoteToken, quoteTokenDecimals }: AprBreakdownProps) {
     const t = useTranslations();
 
     // APR breakdown data should come from the service
@@ -24,13 +24,13 @@ export function AprBreakdown({ aprData, pnlData, quoteToken, quoteTokenDecimals 
     const totalAprValue = aprData.totalApr;
 
     // All data should come from the service
-    const realizedFees = BigInt(aprData.totalFeesCollected);
-    const timeWeightedCostBasis = BigInt(aprData.timeWeightedCostBasis);
-    const unclaimedFees = pnlData ? BigInt(pnlData.unclaimedFees) : BigInt(0);
+    const realizedFees = BigInt(aprData.realizedFeesCollected);
+    const realizedTWCostBasis = BigInt(aprData.realizedTWCostBasis);
+    const unclaimedFees = BigInt(aprData.unrealizedFeesUnclaimed);
 
     // Unrealized metrics should come from service
-    const unrealizedCostBasis = BigInt(aprData.unrealizedCostBasis || aprData.timeWeightedCostBasis);
-    const unrealizedDays = aprData.unrealizedActiveDays || aprData.totalActiveDays;
+    const unrealizedCostBasis = BigInt(aprData.unrealizedCostBasis);
+    const unrealizedDays = aprData.unrealizedActiveDays;
 
     return (
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
@@ -49,7 +49,7 @@ export function AprBreakdown({ aprData, pnlData, quoteToken, quoteTokenDecimals 
                             {totalAprValue.toFixed(2)}%
                         </span>
                         <span className="text-sm text-slate-400 ml-2">
-                            ({t("positionDetails.overview.overTotal")} {aprData.totalActiveDays + unrealizedDays} {t("positionDetails.overview.days")})
+                            ({t("positionDetails.overview.overTotal")} {aprData.totalActiveDays} {t("positionDetails.overview.days")})
                         </span>
                     </div>
                 </div>
@@ -75,7 +75,7 @@ export function AprBreakdown({ aprData, pnlData, quoteToken, quoteTokenDecimals 
                                     {t("positionDetails.overview.timeWeightedCostBasis")}
                                 </span>
                                 <span className="text-white font-medium">
-                                    {formatCompactValue(timeWeightedCostBasis, quoteTokenDecimals)} {quoteToken.symbol}
+                                    {formatCompactValue(realizedTWCostBasis, quoteTokenDecimals)} {quoteToken.symbol}
                                 </span>
                             </div>
                             <div className="flex justify-between items-center text-sm">
@@ -83,7 +83,7 @@ export function AprBreakdown({ aprData, pnlData, quoteToken, quoteTokenDecimals 
                                     {t("positionDetails.overview.activeDays")}
                                 </span>
                                 <span className="text-white font-medium">
-                                    {aprData.totalActiveDays} {t("positionDetails.overview.days")}
+                                    {aprData.realizedActiveDays} {t("positionDetails.overview.days")}
                                 </span>
                             </div>
                             <div className="border-t border-slate-600/50 pt-2 mt-2">

@@ -17,8 +17,8 @@ export interface AprPeriodData {
 export interface PositionAprSummary {
     positionId: string;
     totalApr: number; // Percentage
-    timeWeightedCostBasis: string; // BigInt as string
-    totalFeesCollected: string; // BigInt as string
+    totalTWCostBasis: string; // BigInt as string
+    realizedFeesCollected: string; // BigInt as string
     totalActiveDays: number;
     calculatedAt: string; // ISO string
     periods: AprPeriodData[];

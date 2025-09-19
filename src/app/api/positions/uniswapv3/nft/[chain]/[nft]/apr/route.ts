@@ -135,8 +135,8 @@ export const GET = withAuthAndLogging<AprApiResponse>(
             const responseData: PositionAprSummary = {
                 positionId: aprBreakdown.positionId,
                 totalApr: aprBreakdown.totalApr,  // Use corrected time-weighted APR
-                timeWeightedCostBasis: aprBreakdown.timeWeightedCostBasis,
-                totalFeesCollected: aprBreakdown.totalFeesCollected,
+                totalTWCostBasis: aprBreakdown.totalTWCostBasis,
+                realizedFeesCollected: aprBreakdown.realizedFeesCollected,
                 totalActiveDays: aprBreakdown.totalActiveDays,
                 calculatedAt: aprBreakdown.calculatedAt.toISOString(),
                 periods: periodsData

@@ -26,17 +26,23 @@ export interface AprCalculationResult {
 
 export interface AprBreakdown {
     positionId: string;
-    realizedApr: number;       // APR from collected fees only
-    unrealizedApr: number;     // APR from unclaimed fees only
-    totalApr: number;          // Combined APR
 
-    // Breakdown metrics for UI display
-    totalFeesCollected: string;      // Realized fees (BigInt as string)
-    timeWeightedCostBasis: string;   // For realized section (BigInt as string)
-    totalActiveDays: number;         // For realized section
+    // Realized metrics
+    realizedApr: number;              // APR from collected fees only
+    realizedFeesCollected: string;    // Collected fees (BigInt as string)
+    realizedTWCostBasis: string;      // Time-weighted cost basis for realized periods (BigInt as string)
+    realizedActiveDays: number;       // Days covered by realized periods
 
-    unrealizedCostBasis: string;     // Current period cost basis (BigInt as string)
-    unrealizedActiveDays: number;    // Days since last collect/start
+    // Unrealized metrics
+    unrealizedApr: number;            // APR from unclaimed fees only
+    unrealizedFeesUnclaimed: string;  // Current unclaimed fees (BigInt as string)
+    unrealizedCostBasis: string;      // Current period cost basis (BigInt as string)
+    unrealizedActiveDays: number;     // Days since last collect/start
+
+    // Total metrics (calculated from realized + unrealized components)
+    totalApr: number;                 // Time-weighted average: (realizedApr * realizedActiveDays + unrealizedApr * unrealizedActiveDays) / totalActiveDays
+    totalActiveDays: number;          // realizedActiveDays + unrealizedActiveDays (0 for closed positions)
+    totalTWCostBasis: string;         // Time-weighted average of realized + unrealized cost basis
 
     calculatedAt: Date;
 }
@@ -604,13 +610,16 @@ export class PositionAprService {
             return {
                 positionId,
                 realizedApr: 0,
+                realizedFeesCollected: '0',
+                realizedTWCostBasis: '0',
+                realizedActiveDays: 0,
                 unrealizedApr: 0,
-                totalApr: 0,
-                totalFeesCollected: '0',
-                timeWeightedCostBasis: '0',
-                totalActiveDays: 0,
+                unrealizedFeesUnclaimed: '0',
                 unrealizedCostBasis: '0',
                 unrealizedActiveDays: 0,
+                totalApr: 0,
+                totalActiveDays: 0,
+                totalTWCostBasis: '0',
                 calculatedAt: new Date()
             };
         }
@@ -635,21 +644,29 @@ export class PositionAprService {
             const now = new Date();
             const unrealizedDays = Math.floor((now.getTime() - firstEvent.blockTimestamp.getTime()) / (1000 * 60 * 60 * 24));
             const unrealizedCostBasis = mostRecentEvent.costBasisAfter;
+            const unrealizedActiveDays = Math.max(1, unrealizedDays);
 
-            // For positions with no collect events, total APR equals unrealized APR
-            // unless the position is closed (cost basis = 0)
-            const totalApr = BigInt(unrealizedCostBasis) === BigInt(0) ? 0 : unrealizedApr;
+            // For closed positions, unrealized days should be 0
+            const finalUnrealizedActiveDays = BigInt(unrealizedCostBasis) === BigInt(0) ? 0 : unrealizedActiveDays;
+            const finalUnrealizedApr = BigInt(unrealizedCostBasis) === BigInt(0) ? 0 : unrealizedApr;
+
+            // Calculate totals using simplified approach
+            const totalActiveDays = 0 + finalUnrealizedActiveDays;
+            const totalApr = totalActiveDays > 0 ? finalUnrealizedApr : 0;
 
             return {
                 positionId,
                 realizedApr: 0,
-                unrealizedApr: unrealizedApr,
-                totalApr,
-                totalFeesCollected: '0',
-                timeWeightedCostBasis: '0',
-                totalActiveDays: 0,
+                realizedFeesCollected: '0',
+                realizedTWCostBasis: '0',
+                realizedActiveDays: 0,
+                unrealizedApr: finalUnrealizedApr,
+                unrealizedFeesUnclaimed: unclaimedFees,
                 unrealizedCostBasis,
-                unrealizedActiveDays: Math.max(1, unrealizedDays),
+                unrealizedActiveDays: finalUnrealizedActiveDays,
+                totalApr,
+                totalActiveDays,
+                totalTWCostBasis: unrealizedCostBasis,
                 calculatedAt: new Date()
             };
         }
@@ -666,30 +683,41 @@ export class PositionAprService {
             unclaimedFees
         );
 
-        // Calculate total APR using time-weighted average
-        // For closed positions (unrealized cost basis = 0), exclude unrealized period
-        const totalApr = (() => {
-            if (BigInt(unrealizedCostBasis) === BigInt(0)) {
-                return realizedApr;
-            }
+        // For closed positions, unrealized days should be 0
+        const finalUnrealizedActiveDays = BigInt(unrealizedCostBasis) === BigInt(0) ? 0 : Math.max(1, unrealizedDays);
+        const finalUnrealizedApr = BigInt(unrealizedCostBasis) === BigInt(0) ? 0 : unrealizedApr;
 
-            // For active positions, use time-weighted average
-            const totalDays = aprData.totalActiveDays + Math.max(1, unrealizedDays);
-            return totalDays > 0
-                ? (realizedApr * aprData.totalActiveDays + unrealizedApr * Math.max(1, unrealizedDays)) / totalDays
-                : 0;
-        })();
+        // Calculate totals using simplified approach
+        const totalActiveDays = aprData.totalActiveDays + finalUnrealizedActiveDays;
+        const totalApr = totalActiveDays > 0
+            ? (realizedApr * aprData.totalActiveDays + finalUnrealizedApr * finalUnrealizedActiveDays) / totalActiveDays
+            : 0;
+
+        // Calculate total time-weighted cost basis
+        const realizedWeight = aprData.totalActiveDays;
+        const unrealizedWeight = finalUnrealizedActiveDays;
+        const totalWeight = realizedWeight + unrealizedWeight;
+
+        const totalTWCostBasis = totalWeight > 0
+            ? BigInt(Math.floor(
+                (Number(BigInt(aprData.timeWeightedCostBasis)) * realizedWeight +
+                 Number(BigInt(unrealizedCostBasis)) * unrealizedWeight) / totalWeight
+              )).toString()
+            : aprData.timeWeightedCostBasis;
 
         return {
             positionId,
             realizedApr,
-            unrealizedApr,
-            totalApr,
-            totalFeesCollected: aprData.totalFeesCollected,
-            timeWeightedCostBasis: aprData.timeWeightedCostBasis,
-            totalActiveDays: aprData.totalActiveDays,
+            realizedFeesCollected: aprData.totalFeesCollected,
+            realizedTWCostBasis: aprData.timeWeightedCostBasis,
+            realizedActiveDays: aprData.totalActiveDays,
+            unrealizedApr: finalUnrealizedApr,
+            unrealizedFeesUnclaimed: unclaimedFees,
             unrealizedCostBasis,
-            unrealizedActiveDays: Math.max(1, unrealizedDays),
+            unrealizedActiveDays: finalUnrealizedActiveDays,
+            totalApr,
+            totalActiveDays,
+            totalTWCostBasis,
             calculatedAt: new Date()
         };
     }
