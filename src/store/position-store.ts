@@ -68,6 +68,7 @@ export interface PositionStore {
         _pagination: PaginationResponse,
         _filters: PositionListParams
     ) => void;
+    addPosition: (_position: BasicPosition) => void;
     navigateToPosition: (_chain: string, _nftId: string) => void;
     refreshPosition: (_chain: string, _nftId: string) => Promise<void>;
     loadPositionDetails: (_chain: string, _nftId: string) => Promise<PositionWithDetails | null>;
@@ -180,6 +181,37 @@ export const usePositionStore = create<PositionStore>()(
                             error: null,
                         },
                     }));
+                },
+
+                addPosition: (position) => {
+                    set((state) => {
+                        // Validate required fields before adding
+                        if (!position.nftId || !position.pool.chain) {
+                            console.error('Cannot add position: missing required nftId or chain', {
+                                nftId: position.nftId,
+                                chain: position.pool.chain
+                            });
+                            return state; // Return unchanged state
+                        }
+
+                        const key = getPositionKey(position.pool.chain, position.nftId);
+                        const newPosition = basicPositionToDetails(position);
+
+                        return {
+                            ...state,
+                            currentList: {
+                                ...state.currentList,
+                                positions: {
+                                    [key]: newPosition,
+                                    ...state.currentList.positions,
+                                },
+                                pagination: {
+                                    ...state.currentList.pagination,
+                                    total: state.currentList.pagination.total + 1,
+                                },
+                            },
+                        };
+                    });
                 },
 
                 navigateToPosition: (chain, nftId) => {

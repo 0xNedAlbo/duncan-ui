@@ -17,7 +17,7 @@ export function CreatePositionDropdown({
     onImportSuccess,
 }: CreatePositionDropdownProps = {}) {
     const t = useTranslations();
-    const { setCurrentList } = usePositionStore();
+    const { addPosition } = usePositionStore();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [showNftForm, setShowNftForm] = useState(false);
     const [nftId, setNftId] = useState("");
@@ -48,22 +48,10 @@ export function CreatePositionDropdown({
             if (response.data?.position) {
                 const importedPosition = response.data.position as unknown as BasicPosition;
 
-                // Update Zustand store - add the imported position to current list
-                const currentState = usePositionStore.getState().currentList;
-                const existingPositions = Object.values(currentState.positions).map(p => p.basicData);
-                const updatedPositions = [importedPosition, ...existingPositions];
+                // Add the imported position to current list
+                addPosition(importedPosition);
 
-                // Update store with new position list
-                setCurrentList(
-                    updatedPositions,
-                    {
-                        ...currentState.pagination,
-                        total: currentState.pagination.total + 1,
-                    },
-                    currentState.filters
-                );
-
-                console.log(`✓ Added imported position to Zustand store: ${importedPosition.pool.chain}/${importedPosition.nftId}`);
+                console.log(`✓ Added imported position to store: ${importedPosition.pool.chain}/${importedPosition.nftId}`);
 
                 // Create simple display data for success message
                 const displayData = {
