@@ -31,11 +31,6 @@ export function usePositionCurve(
   // Check if data is already in cache before making query
   const existingData = queryClient.getQueryData(cacheKey);
   if (existingData && chain && nftId) {
-    console.debug('[Cache] Found existing curve data in cache:', {
-      cacheKey,
-      pointsCount: (existingData as CurveData).points?.length,
-      willUseCache: true
-    });
   }
 
   return useQuery({
@@ -45,11 +40,6 @@ export function usePositionCurve(
         throw new Error('Chain and NFT ID are required');
       }
 
-      console.debug('[Cache] Fetching curve data from API (cache miss):', {
-        cacheKey,
-        chain,
-        nftId
-      });
 
       const response = await apiClient.get<PositionCurveResponse>(
         `/api/positions/uniswapv3/nft/${chain}/${nftId}/curve`
@@ -59,11 +49,6 @@ export function usePositionCurve(
         throw new Error('No curve data received');
       }
 
-      console.debug('[Cache] Received curve data from API:', {
-        cacheKey,
-        pointsCount: response.data.points?.length,
-        hasData: !!response.data
-      });
 
       return response.data;
     },

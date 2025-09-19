@@ -144,13 +144,7 @@ export function useRefreshNFTPosition(
         if (curveData) {
           const cacheKey = ['positions', 'curve', chain, nftId];
           queryClient.setQueryData(cacheKey, curveData);
-          console.debug('[Cache] Set curve data in React Query cache:', {
-            cacheKey,
-            pointsCount: curveData.points?.length,
-            hasData: !!curveData
-          });
         } else {
-          console.debug('[Cache] No curve data in refresh response to cache');
         }
 
         // Invalidate positions list to ensure it's updated
@@ -208,7 +202,6 @@ export function useImportNFT(
           }
         );
 
-        console.log(`✓ Position imported successfully: ${importedPosition.pool.chain}/${importedPosition.nftId}`);
       }
     },
 
@@ -278,13 +271,7 @@ export function useRefreshPosition(
         if (position.nftId && position.pool.chain && curveData) {
           const cacheKey = ['positions', 'curve', position.pool.chain, position.nftId];
           queryClient.setQueryData(cacheKey, curveData);
-          console.debug('[Cache] Set curve data in React Query cache (BasicPosition):', {
-            cacheKey,
-            pointsCount: curveData.points?.length,
-            hasData: !!curveData
-          });
         } else if (position.nftId && position.pool.chain) {
-          console.debug('[Cache] No curve data in refresh response to cache (BasicPosition)');
         }
       }
     },

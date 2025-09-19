@@ -359,20 +359,10 @@ export const usePositionStore = create<PositionStore>()(
                     try {
                         // TEMPORARY: Force fresh data load for debugging
                         // TODO: Remove this once APR calculation is working
-                        console.log(`[Store] Forcing fresh data load for debugging APR calculation`);
 
-                        // Check if we already have complete data with the correct APR format
-                        const existingPosition = get().getPosition(chain, nftId);
-                        console.log(`[Store] Cache validation:`, {
-                            hasPnl: !!existingPosition?.pnlBreakdown,
-                            hasCurve: !!existingPosition?.curveData,
-                            aprKeys: existingPosition?.aprBreakdown ? Object.keys(existingPosition.aprBreakdown) : 'no aprBreakdown',
-                            aprData: existingPosition?.aprBreakdown
-                        });
 
                         const { apiClient } = await import("@/lib/app/apiClient");
 
-                        console.log(`[Store] Loading complete position details via unified endpoint: ${key}`);
 
                         // Call unified details endpoint
                         const response = await apiClient.get(`/api/positions/uniswapv3/nft/${chain}/${nftId}/details`);
@@ -396,14 +386,6 @@ export const usePositionStore = create<PositionStore>()(
                             // Set as active position
                             get().navigateToPosition(chain, nftId);
 
-                            console.log(`[Store] ✓ Loaded complete position details: ${key}`, {
-                                hasPnl: !!pnlBreakdown,
-                                hasApr: !!aprBreakdown,
-                                hasCurve: curveData !== undefined,
-                                curvePoints: curveData?.points?.length || 0,
-                                aprRealizedApr: aprBreakdown?.realizedApr || 0,
-                                aprUnrealizedApr: aprBreakdown?.unrealizedApr || 0
-                            });
 
                             return completePosition;
                         } else {
