@@ -636,11 +636,15 @@ export class PositionAprService {
             const unrealizedDays = Math.floor((now.getTime() - firstEvent.blockTimestamp.getTime()) / (1000 * 60 * 60 * 24));
             const unrealizedCostBasis = mostRecentEvent.costBasisAfter;
 
+            // For positions with no collect events, total APR equals unrealized APR
+            // unless the position is closed (cost basis = 0)
+            const totalApr = BigInt(unrealizedCostBasis) === BigInt(0) ? 0 : unrealizedApr;
+
             return {
                 positionId,
                 realizedApr: 0,
                 unrealizedApr: unrealizedApr,
-                totalApr: unrealizedApr,
+                totalApr,
                 totalFeesCollected: '0',
                 timeWeightedCostBasis: '0',
                 totalActiveDays: 0,
@@ -650,6 +654,11 @@ export class PositionAprService {
             };
         }
 
+        // Calculate unrealized metrics (period since last collect to now)
+        const now = new Date();
+        const unrealizedDays = Math.floor((now.getTime() - lastCollectEvent.blockTimestamp.getTime()) / (1000 * 60 * 60 * 24));
+        const unrealizedCostBasis = mostRecentEvent.costBasisAfter;
+
         // Calculate unrealized APR for period after last collect
         const unrealizedApr = this.calculateUnrealizedApr(
             lastCollectEvent,
@@ -657,12 +666,19 @@ export class PositionAprService {
             unclaimedFees
         );
 
-        const totalApr = realizedApr + unrealizedApr;
+        // Calculate total APR using time-weighted average
+        // For closed positions (unrealized cost basis = 0), exclude unrealized period
+        const totalApr = (() => {
+            if (BigInt(unrealizedCostBasis) === BigInt(0)) {
+                return realizedApr;
+            }
 
-        // Calculate unrealized metrics (period since last collect to now)
-        const now = new Date();
-        const unrealizedDays = Math.floor((now.getTime() - lastCollectEvent.blockTimestamp.getTime()) / (1000 * 60 * 60 * 24));
-        const unrealizedCostBasis = mostRecentEvent.costBasisAfter;
+            // For active positions, use time-weighted average
+            const totalDays = aprData.totalActiveDays + Math.max(1, unrealizedDays);
+            return totalDays > 0
+                ? (realizedApr * aprData.totalActiveDays + unrealizedApr * Math.max(1, unrealizedDays)) / totalDays
+                : 0;
+        })();
 
         return {
             positionId,

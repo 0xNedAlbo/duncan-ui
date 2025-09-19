@@ -41,12 +41,15 @@ export function AprBreakdown({ aprData, pnlData, quoteToken, quoteTokenDecimals 
             <div className="space-y-6">
                 {/* Total APR at top */}
                 <div className="border-b border-slate-600/50 pb-4">
-                    <div className="flex justify-between items-center">
+                    <div className="flex items-center">
                         <span className="text-lg font-semibold text-slate-300">
-                            {t("positionDetails.overview.totalAprBreakdown")}
+                            {t("positionDetails.overview.totalAprBreakdown")}:
                         </span>
-                        <span className="text-xl font-bold text-green-400">
+                        <span className="text-xl font-bold text-green-400 ml-2">
                             {totalAprValue.toFixed(2)}%
+                        </span>
+                        <span className="text-sm text-slate-400 ml-2">
+                            ({t("positionDetails.overview.overTotal")} {aprData.totalActiveDays + unrealizedDays} {t("positionDetails.overview.days")})
                         </span>
                     </div>
                 </div>

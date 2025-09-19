@@ -531,7 +531,7 @@ export function PositionCard({
                         {aprData && aprData.totalApr !== undefined ? (
                             <div className="text-right">
                                 <div className="text-xs text-slate-400 mb-0.5">
-                                    Total APR
+                                    ∅ APR
                                 </div>
                                 <div
                                     className={`text-lg font-semibold ${aprColorClass}`}
@@ -542,7 +542,7 @@ export function PositionCard({
                         ) : aprLoading ? (
                             <div className="text-right">
                                 <div className="text-xs text-slate-400 mb-0.5">
-                                    Total APR
+                                    ∅ APR
                                 </div>
                                 <div className="text-lg font-semibold text-slate-400">
                                     --

@@ -78,6 +78,7 @@ export const GET = withAuthAndLogging<AprApiResponse>(
             const apiFactory = ApiServiceFactory.getInstance();
             const positionService = apiFactory.positionService;
             const positionAprService = apiFactory.positionAprService;
+            const positionPnLService = apiFactory.positionPnLService;
 
             // Find the position by user ID, chain, and NFT ID
             const position = await positionService.getPositionByUserChainAndNft(
@@ -102,14 +103,26 @@ export const GET = withAuthAndLogging<AprApiResponse>(
                 );
             }
 
-            // Calculate APR data (uses cached data if valid)
-            const aprResult = await positionAprService.getPositionApr(
-                position.id,
-                false // Use cached data if available
-            );
+            // Get PnL data first for APR breakdown calculation
+            let unclaimedFees = undefined;
+            try {
+                const pnlBreakdown = await positionPnLService.getPnlBreakdown(position.id);
+                unclaimedFees = pnlBreakdown?.unclaimedFees;
+            } catch (error) {
+                log.debug(
+                    { positionId: position.id, error: error instanceof Error ? error.message : String(error) },
+                    "PnL calculation failed for APR breakdown, proceeding without unclaimed fees"
+                );
+            }
+
+            // Get APR breakdown for corrected time-weighted calculation
+            const aprBreakdown = await positionAprService.getAprBreakdown(position.id, unclaimedFees);
+
+            // Get detailed periods data for API response
+            const aprDetailResult = await positionAprService.getPositionApr(position.id, false);
 
             // Transform periods data for API response
-            const periodsData = aprResult.periods.map(period => ({
+            const periodsData = aprDetailResult.periods.map(period => ({
                 eventId: period.eventId,
                 periodStartDate: period.periodStartDate.toISOString(),
                 periodEndDate: period.periodEndDate?.toISOString() || null,
@@ -120,12 +133,12 @@ export const GET = withAuthAndLogging<AprApiResponse>(
             }));
 
             const responseData: PositionAprSummary = {
-                positionId: aprResult.positionId,
-                totalApr: aprResult.totalApr,
-                timeWeightedCostBasis: aprResult.timeWeightedCostBasis,
-                totalFeesCollected: aprResult.totalFeesCollected,
-                totalActiveDays: aprResult.totalActiveDays,
-                calculatedAt: aprResult.calculatedAt.toISOString(),
+                positionId: aprBreakdown.positionId,
+                totalApr: aprBreakdown.totalApr,  // Use corrected time-weighted APR
+                timeWeightedCostBasis: aprBreakdown.timeWeightedCostBasis,
+                totalFeesCollected: aprBreakdown.totalFeesCollected,
+                totalActiveDays: aprBreakdown.totalActiveDays,
+                calculatedAt: aprBreakdown.calculatedAt.toISOString(),
                 periods: periodsData
             };
 
@@ -135,7 +148,9 @@ export const GET = withAuthAndLogging<AprApiResponse>(
                     nftId,
                     userId: user.userId,
                     positionId: position.id,
-                    totalApr: aprResult.totalApr,
+                    totalApr: aprBreakdown.totalApr,
+                    realizedApr: aprBreakdown.realizedApr,
+                    unrealizedApr: aprBreakdown.unrealizedApr,
                     periodsCount: periodsData.length
                 },
                 "APR calculation completed successfully"
