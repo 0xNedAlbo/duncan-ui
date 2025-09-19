@@ -188,5 +188,5 @@ export const GET = withAuth<ResponseType>(
   - API returns: `{"price": "1500000"}` (1.5 USDC as 1500000 scaled)
 
 **Additional Coding Guidelines for Claude:**
-- use formatFractionHuman() or other functions from fraction-formats.ts when displaying bigint values
+- use formatCompactValue() from fraction-formats.ts when displaying bigint values (not formatFractionHuman which requires Fraction objects)
 - use scripts/api-debug.ts when testing API behaviour because it contains proper authentication

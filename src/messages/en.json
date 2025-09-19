@@ -200,7 +200,7 @@
     },
     "tabs": {
       "overview": "Overview",
-      "ledger": "Ledger",
+      "ledger": "PnL Analysis",
       "apr": "APR Analysis",
       "range": "Range Analysis",
       "analytics": "Analytics"
@@ -260,6 +260,16 @@
       "noAprData": "No APR data available yet",
       "currentCostBasis": "Current Cost Basis",
       "daysSinceStart": "Days Since Start",
+      "positionStates": "Position States",
+      "lowerRange": "Position at Lower Range",
+      "currentState": "Current Position State",
+      "upperRange": "Position at Upper Range",
+      "poolPrice": "Pool Price",
+      "positionValue": "Position Value",
+      "pnlIncludingFees": "PnL (Including Fees)",
+      "pnlExcludingFees": "PnL (Excluding Fees)",
+      "breakEvenPrice": "Break-Even Price",
+      "breakEvenDescription": "Price needed for PnL = 0",
       "status": {
         "in-range": "In Range",
         "out-of-range": "Out of Range",

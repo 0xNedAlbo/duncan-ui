@@ -81,6 +81,55 @@ export function PositionHeader({
         }
     };
 
+    const getRangeStatus = () => {
+        if (position.status !== "active") {
+            return null;
+        }
+
+        // Check if position is in range based on current tick
+        if (
+            position.pool.currentTick !== undefined &&
+            position.pool.currentTick !== null
+        ) {
+            const currentTick = position.pool.currentTick;
+            if (
+                currentTick >= position.tickLower &&
+                currentTick <= position.tickUpper
+            ) {
+                return "in-range";
+            } else {
+                return "out-of-range";
+            }
+        }
+        return "unknown";
+    };
+
+    const getRangeStatusColor = (status: string | null) => {
+        switch (status) {
+            case "in-range":
+                return "text-green-400 bg-green-500/10 border-green-500/20";
+            case "out-of-range":
+                return "text-red-400 bg-red-500/10 border-red-500/20";
+            case "unknown":
+                return "text-slate-400 bg-slate-500/10 border-slate-500/20";
+            default:
+                return "text-slate-400 bg-slate-500/10 border-slate-500/20";
+        }
+    };
+
+    const getRangeStatusText = (status: string | null) => {
+        switch (status) {
+            case "in-range":
+                return t("positionDetails.overview.status.in-range");
+            case "out-of-range":
+                return t("positionDetails.overview.status.out-of-range");
+            case "unknown":
+                return t("positionDetails.overview.status.unknown");
+            default:
+                return "";
+        }
+    };
+
     return (
         <div className="mb-8">
             {/* Back Navigation */}
@@ -175,6 +224,21 @@ export function PositionHeader({
                                         }
                                     })()}
                                 </span>
+                                {(() => {
+                                    const rangeStatus = getRangeStatus();
+                                    if (rangeStatus) {
+                                        return (
+                                            <span
+                                                className={`px-3 py-1 rounded-lg text-sm font-medium border ${getRangeStatusColor(
+                                                    rangeStatus
+                                                )}`}
+                                            >
+                                                {getRangeStatusText(rangeStatus)}
+                                            </span>
+                                        );
+                                    }
+                                    return null;
+                                })()}
                             </div>
 
                             <div className="flex items-center gap-4 text-sm text-slate-400">
