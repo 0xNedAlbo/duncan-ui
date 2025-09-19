@@ -3,7 +3,6 @@
 import { useTranslations } from "@/i18n/client";
 import { usePositionApr } from "@/hooks/api/usePositions";
 import { AprBreakdown } from "@/components/positions/apr-breakdown";
-import { EventsTable } from "./events-table";
 import type { AprBreakdown as AprBreakdownType } from "@/services/positions/positionAprService";
 import type { PnlBreakdown } from "@/services/positions/positionPnLService";
 
@@ -32,15 +31,13 @@ export function AprTab({
     aprBreakdown,
     pnlBreakdown,
     quoteToken,
-    token0,
-    token1
 }: AprTabProps) {
     const t = useTranslations();
 
     const {
         data: aprData,
         isLoading: aprLoading,
-        error: aprError
+        error: aprError,
     } = usePositionApr(chainSlug, nftId, {
         staleTime: 60000, // 1 minute
     });
@@ -64,26 +61,32 @@ export function AprTab({
     }
 
     // Convert APR data periods to events format for the events table
-    const aprEvents = aprData?.periods?.map(period => ({
-        id: period.eventId,
-        type: 'apr_period' as const,
-        transactionHash: null,
-        blockNumber: null,
-        timestamp: new Date(period.periodStartDate),
-        amount0: '0',
-        amount1: '0',
-        tickLower: null,
-        tickUpper: null,
-        liquidity: '0',
-        chainSlug,
-        nftId,
-        // APR-specific data
-        periodDays: period.periodDays,
-        periodCostBasis: period.periodCostBasis,
-        allocatedFees: period.allocatedFees,
-        periodApr: period.periodApr,
-        periodEndDate: period.periodEndDate ? new Date(period.periodEndDate) : null,
-    })).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()) || [];
+    const aprEvents =
+        aprData?.periods
+            ?.map((period) => ({
+                id: period.eventId,
+                type: "apr_period" as const,
+                transactionHash: null,
+                blockNumber: null,
+                timestamp: new Date(period.periodStartDate),
+                amount0: "0",
+                amount1: "0",
+                tickLower: null,
+                tickUpper: null,
+                liquidity: "0",
+                chainSlug,
+                nftId,
+                // APR-specific data
+                periodDays: period.periodDays,
+                periodCostBasis: period.periodCostBasis,
+                allocatedFees: period.allocatedFees,
+                periodApr: period.periodApr,
+                periodEndDate: period.periodEndDate
+                    ? new Date(period.periodEndDate)
+                    : null,
+            }))
+            .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()) ||
+        [];
 
     return (
         <div className="space-y-6">
@@ -105,7 +108,9 @@ export function AprTab({
 
                 {aprLoading ? (
                     <div className="text-center py-8">
-                        <div className="text-slate-400">{t("common.loading")}</div>
+                        <div className="text-slate-400">
+                            {t("common.loading")}
+                        </div>
                     </div>
                 ) : aprEvents.length > 0 ? (
                     <div className="overflow-x-auto">
@@ -119,40 +124,66 @@ export function AprTab({
                                         {t("positionDetails.overview.duration")}
                                     </th>
                                     <th className="text-right py-3 px-2 text-slate-400 font-medium">
-                                        {t("positionDetails.overview.costBasis")}
+                                        {t(
+                                            "positionDetails.overview.costBasis"
+                                        )}
                                     </th>
                                     <th className="text-right py-3 px-2 text-slate-400 font-medium">
-                                        {t("positionDetails.overview.feesAllocated")}
+                                        {t(
+                                            "positionDetails.overview.feesAllocated"
+                                        )}
                                     </th>
                                     <th className="text-right py-3 px-2 text-slate-400 font-medium">
-                                        {t("positionDetails.overview.periodApr")}
+                                        {t(
+                                            "positionDetails.overview.periodApr"
+                                        )}
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {aprEvents.map((event, index) => (
+                                {aprEvents.map((event) => (
                                     <tr
                                         key={event.id}
                                         className="border-b border-slate-700/30 hover:bg-slate-700/20"
                                     >
                                         <td className="py-3 px-2">
                                             <div className="text-white">
-                                                {event.timestamp.toLocaleDateString()} {event.timestamp.toLocaleTimeString()}
+                                                {event.timestamp.toLocaleDateString()}{" "}
+                                                {event.timestamp.toLocaleTimeString()}
                                             </div>
                                         </td>
                                         <td className="py-3 px-2 text-right text-slate-300">
                                             {(() => {
-                                                if (event.periodDays) return event.periodDays.toFixed(2);
+                                                if (event.periodDays)
+                                                    return event.periodDays.toFixed(
+                                                        2
+                                                    );
                                                 // For ongoing periods, calculate days from start to now
                                                 const now = new Date();
-                                                const daysSinceStart = (now.getTime() - event.timestamp.getTime()) / (1000 * 60 * 60 * 24);
-                                                return Math.max(0.01, daysSinceStart).toFixed(2);
-                                            })()} {t("positionDetails.overview.days")}
+                                                const daysSinceStart =
+                                                    (now.getTime() -
+                                                        event.timestamp.getTime()) /
+                                                    (1000 * 60 * 60 * 24);
+                                                return Math.max(
+                                                    0.01,
+                                                    daysSinceStart
+                                                ).toFixed(2);
+                                            })()}{" "}
+                                            {t("positionDetails.overview.days")}
                                         </td>
                                         <td className="py-3 px-2 text-right text-slate-300">
                                             {quoteToken ? (
                                                 <>
-                                                    {(BigInt(event.periodCostBasis) / BigInt(10 ** quoteToken.decimals)).toString()} {quoteToken.symbol}
+                                                    {(
+                                                        BigInt(
+                                                            event.periodCostBasis
+                                                        ) /
+                                                        BigInt(
+                                                            10 **
+                                                                quoteToken.decimals
+                                                        )
+                                                    ).toString()}{" "}
+                                                    {quoteToken.symbol}
                                                 </>
                                             ) : (
                                                 event.periodCostBasis
@@ -161,15 +192,35 @@ export function AprTab({
                                         <td className="py-3 px-2 text-right text-green-400">
                                             {quoteToken ? (
                                                 <>
-                                                    {(BigInt(event.allocatedFees) / BigInt(10 ** quoteToken.decimals)).toString()} {quoteToken.symbol}
+                                                    {(
+                                                        BigInt(
+                                                            event.allocatedFees
+                                                        ) /
+                                                        BigInt(
+                                                            10 **
+                                                                quoteToken.decimals
+                                                        )
+                                                    ).toString()}{" "}
+                                                    {quoteToken.symbol}
                                                 </>
                                             ) : (
                                                 event.allocatedFees
                                             )}
                                         </td>
                                         <td className="py-3 px-2 text-right">
-                                            <span className={event.periodApr && event.periodApr > 0 ? "text-green-400" : "text-slate-400"}>
-                                                {event.periodApr ? `${event.periodApr.toFixed(2)}%` : '-'}
+                                            <span
+                                                className={
+                                                    event.periodApr &&
+                                                    event.periodApr > 0
+                                                        ? "text-green-400"
+                                                        : "text-slate-400"
+                                                }
+                                            >
+                                                {event.periodApr
+                                                    ? `${event.periodApr.toFixed(
+                                                          2
+                                                      )}%`
+                                                    : "-"}
                                             </span>
                                         </td>
                                     </tr>
@@ -179,7 +230,9 @@ export function AprTab({
                     </div>
                 ) : (
                     <div className="text-center py-8">
-                        <div className="text-slate-400">{t("positionDetails.overview.noAprData")}</div>
+                        <div className="text-slate-400">
+                            {t("positionDetails.overview.noAprData")}
+                        </div>
                     </div>
                 )}
             </div>

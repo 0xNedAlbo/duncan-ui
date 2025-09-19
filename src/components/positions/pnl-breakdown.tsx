@@ -2,10 +2,10 @@
 
 import { useTranslations } from "@/i18n/client";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
-import type { PositionPnLData } from "@/services/positions/positionPnLService";
+import type { PnlBreakdown } from "@/services/positions/positionPnLService";
 
 interface PnLBreakdownProps {
-    pnlData: PositionPnLData;
+    pnlData: PnlBreakdown;
     quoteToken: {
         symbol: string;
         decimals: number;

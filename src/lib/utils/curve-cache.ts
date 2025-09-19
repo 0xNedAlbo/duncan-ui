@@ -26,12 +26,12 @@ class CurveCache {
     private static readonly MAX_ENTRIES = 100;
     private static readonly DEFAULT_TTL = 60 * 60 * 1000; // 1 hour in ms
     private static readonly MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB total cache limit
-    
+
     // In-memory stats tracking
     private stats = {
         hits: 0,
         misses: 0,
-        sets: 0
+        sets: 0,
     };
 
     /**
@@ -49,13 +49,13 @@ class CurveCache {
     private hashString(str: string): string {
         let hash = 0;
         if (str.length === 0) return hash.toString();
-        
+
         for (let i = 0; i < str.length; i++) {
             const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
+            hash = (hash << 5) - hash + char;
             hash = hash & hash; // Convert to 32-bit integer
         }
-        
+
         return Math.abs(hash).toString(36).slice(0, 8);
     }
 
@@ -66,7 +66,7 @@ class CurveCache {
         try {
             const key = this.generateCacheKey(positionId, currentPrice);
             const cached = this.getFromStorage(key);
-            
+
             if (!cached) {
                 this.stats.misses++;
                 return null;
@@ -88,9 +88,8 @@ class CurveCache {
 
             this.stats.hits++;
             return cached.data;
-
         } catch (error) {
-            console.warn('Cache get error:', error);
+            console.warn("Cache get error:", error);
             this.stats.misses++;
             return null;
         }
@@ -99,22 +98,27 @@ class CurveCache {
     /**
      * Store curve data in cache with TTL
      */
-    set(positionId: string, currentPrice: string, data: CurveData, ttl: number = CurveCache.DEFAULT_TTL): void {
+    set(
+        positionId: string,
+        currentPrice: string,
+        data: CurveData,
+        ttl: number = CurveCache.DEFAULT_TTL
+    ): void {
         try {
             const key = this.generateCacheKey(positionId, currentPrice);
             const priceHash = this.hashString(currentPrice);
-            
+
             const cachedData: CachedCurveData = {
                 ...data,
                 timestamp: Date.now(),
                 positionId,
                 priceHash,
-                version: CurveCache.CACHE_VERSION
+                version: CurveCache.CACHE_VERSION,
             };
 
             const cacheEntry: CacheEntry = {
                 data: cachedData,
-                expiresAt: Date.now() + ttl
+                expiresAt: Date.now() + ttl,
             };
 
             // Check cache size limits before storing
@@ -122,9 +126,8 @@ class CurveCache {
 
             this.setToStorage(key, cacheEntry);
             this.stats.sets++;
-
         } catch (error) {
-            console.warn('Cache set error:', error);
+            console.warn("Cache set error:", error);
             // Non-fatal - app continues without caching
         }
     }
@@ -135,14 +138,13 @@ class CurveCache {
     invalidate(positionId: string): void {
         try {
             const keys = this.getAllCacheKeys();
-            const keysToRemove = keys.filter(key => 
+            const keysToRemove = keys.filter((key) =>
                 key.startsWith(`${CurveCache.CACHE_PREFIX}${positionId}_`)
             );
 
-            keysToRemove.forEach(key => this.removeFromStorage(key));
-            
+            keysToRemove.forEach((key) => this.removeFromStorage(key));
         } catch (error) {
-            console.warn('Cache invalidate error:', error);
+            console.warn("Cache invalidate error:", error);
         }
     }
 
@@ -152,13 +154,12 @@ class CurveCache {
     clear(): void {
         try {
             const keys = this.getAllCacheKeys();
-            keys.forEach(key => this.removeFromStorage(key));
-            
+            keys.forEach((key) => this.removeFromStorage(key));
+
             // Reset stats
             this.stats = { hits: 0, misses: 0, sets: 0 };
-            
         } catch (error) {
-            console.warn('Cache clear error:', error);
+            console.warn("Cache clear error:", error);
         }
     }
 
@@ -172,7 +173,7 @@ class CurveCache {
             let removedCount = 0;
 
             // Remove expired entries
-            keys.forEach(key => {
+            keys.forEach((key) => {
                 const cached = this.getFromStorage(key);
                 if (!cached || now > cached.expiresAt) {
                     this.removeFromStorage(key);
@@ -182,13 +183,14 @@ class CurveCache {
 
             // Enforce entry count limit
             this.enforceCacheEntryLimit();
-            
-            if (removedCount > 0) {
-                console.debug(`Cache cleanup: removed ${removedCount} expired entries`);
-            }
 
+            if (removedCount > 0) {
+                console.debug(
+                    `Cache cleanup: removed ${removedCount} expired entries`
+                );
+            }
         } catch (error) {
-            console.warn('Cache cleanup error:', error);
+            console.warn("Cache cleanup error:", error);
         }
     }
 
@@ -198,30 +200,36 @@ class CurveCache {
     getStats(): CacheStats {
         try {
             const keys = this.getAllCacheKeys();
-            const entries = keys.map(key => this.getFromStorage(key)).filter(Boolean) as CacheEntry[];
-            
+            const entries = keys
+                .map((key) => this.getFromStorage(key))
+                .filter(Boolean) as CacheEntry[];
+
             const totalSize = this.calculateCacheSize();
-            const timestamps = entries.map(e => e.data.timestamp).filter(Boolean);
-            
+            const timestamps = entries
+                .map((e) => e.data.timestamp)
+                .filter(Boolean);
+
             const totalRequests = this.stats.hits + this.stats.misses;
-            const hitRate = totalRequests > 0 ? this.stats.hits / totalRequests : 0;
+            const hitRate =
+                totalRequests > 0 ? this.stats.hits / totalRequests : 0;
 
             return {
                 totalEntries: entries.length,
                 totalSize,
                 hitRate,
-                oldestEntry: timestamps.length > 0 ? Math.min(...timestamps) : 0,
-                newestEntry: timestamps.length > 0 ? Math.max(...timestamps) : 0
+                oldestEntry:
+                    timestamps.length > 0 ? Math.min(...timestamps) : 0,
+                newestEntry:
+                    timestamps.length > 0 ? Math.max(...timestamps) : 0,
             };
-
         } catch (error) {
-            console.warn('Cache stats error:', error);
+            console.warn("Cache stats error:", error);
             return {
                 totalEntries: 0,
                 totalSize: 0,
                 hitRate: 0,
                 oldestEntry: 0,
-                newestEntry: 0
+                newestEntry: 0,
             };
         }
     }
@@ -231,15 +239,14 @@ class CurveCache {
      */
     isAvailable(): boolean {
         try {
-            if (typeof window === 'undefined') return false;
+            if (typeof window === "undefined") return false;
             if (!window.localStorage) return false;
-            
+
             // Test storage availability
-            const testKey = '__cache_test__';
-            localStorage.setItem(testKey, 'test');
+            const testKey = "__cache_test__";
+            localStorage.setItem(testKey, "test");
             localStorage.removeItem(testKey);
             return true;
-            
         } catch {
             return false;
         }
@@ -259,9 +266,9 @@ class CurveCache {
     private setToStorage(key: string, entry: CacheEntry): void {
         try {
             localStorage.setItem(key, JSON.stringify(entry));
-        } catch (error) {
+        } catch {
             // Handle storage quota exceeded
-            console.warn('Storage quota exceeded, cleaning up cache');
+            console.warn("Storage quota exceeded, cleaning up cache");
             this.cleanup();
             // Try once more after cleanup
             try {
@@ -299,15 +306,15 @@ class CurveCache {
         try {
             const keys = this.getAllCacheKeys();
             let totalSize = 0;
-            
-            keys.forEach(key => {
+
+            keys.forEach((key) => {
                 const value = localStorage.getItem(key);
                 if (value) {
                     // Approximate size: key + value length in UTF-16
                     totalSize += (key.length + value.length) * 2;
                 }
             });
-            
+
             return totalSize;
         } catch {
             return 0;
@@ -319,7 +326,7 @@ class CurveCache {
         const currentSize = this.calculateCacheSize();
         if (currentSize > CurveCache.MAX_SIZE_BYTES) {
             this.cleanup();
-            
+
             // If still over limit, remove oldest entries
             const remainingSize = this.calculateCacheSize();
             if (remainingSize > CurveCache.MAX_SIZE_BYTES) {
@@ -336,10 +343,15 @@ class CurveCache {
         if (keys.length <= CurveCache.MAX_ENTRIES) return;
 
         // Get entries with timestamps
-        const entries = keys.map(key => ({
-            key,
-            entry: this.getFromStorage(key)
-        })).filter(item => item.entry !== null) as Array<{key: string, entry: CacheEntry}>;
+        const entries = keys
+            .map((key) => ({
+                key,
+                entry: this.getFromStorage(key),
+            }))
+            .filter((item) => item.entry !== null) as Array<{
+            key: string;
+            entry: CacheEntry;
+        }>;
 
         // Sort by timestamp (oldest first)
         entries.sort((a, b) => a.entry.data.timestamp - b.entry.data.timestamp);
@@ -353,10 +365,15 @@ class CurveCache {
 
     private removeOldestEntries(count: number): void {
         const keys = this.getAllCacheKeys();
-        const entries = keys.map(key => ({
-            key,
-            entry: this.getFromStorage(key)
-        })).filter(item => item.entry !== null) as Array<{key: string, entry: CacheEntry}>;
+        const entries = keys
+            .map((key) => ({
+                key,
+                entry: this.getFromStorage(key),
+            }))
+            .filter((item) => item.entry !== null) as Array<{
+            key: string;
+            entry: CacheEntry;
+        }>;
 
         // Sort by timestamp (oldest first)
         entries.sort((a, b) => a.entry.data.timestamp - b.entry.data.timestamp);
@@ -373,7 +390,7 @@ class CurveCache {
 export const curveCache = new CurveCache();
 
 // Auto-cleanup on app start (if in browser)
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
     // Cleanup expired entries on startup
     setTimeout(() => {
         curveCache.cleanup();

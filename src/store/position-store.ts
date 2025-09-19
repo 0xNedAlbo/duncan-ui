@@ -325,14 +325,18 @@ export const usePositionStore = create<PositionStore>()(
                     const key = getPositionKey(chain, nftId);
 
                     try {
-                        // Check if we already have complete data
+                        // TEMPORARY: Force fresh data load for debugging
+                        // TODO: Remove this once APR calculation is working
+                        console.log(`[Store] Forcing fresh data load for debugging APR calculation`);
+
+                        // Check if we already have complete data with the correct APR format
                         const existingPosition = get().getPosition(chain, nftId);
-                        if (existingPosition?.pnlBreakdown !== undefined && existingPosition?.curveData !== undefined) {
-                            console.log(`[Store] Complete data already exists for ${key}, setting as active`);
-                            // Set as active and return existing data
-                            get().navigateToPosition(chain, nftId);
-                            return existingPosition;
-                        }
+                        console.log(`[Store] Cache validation:`, {
+                            hasPnl: !!existingPosition?.pnlBreakdown,
+                            hasCurve: !!existingPosition?.curveData,
+                            aprKeys: existingPosition?.aprBreakdown ? Object.keys(existingPosition.aprBreakdown) : 'no aprBreakdown',
+                            aprData: existingPosition?.aprBreakdown
+                        });
 
                         const { apiClient } = await import("@/lib/app/apiClient");
 
@@ -342,12 +346,13 @@ export const usePositionStore = create<PositionStore>()(
                         const response = await apiClient.get(`/api/positions/uniswapv3/nft/${chain}/${nftId}/details`);
 
                         if (response.success && response.data) {
-                            const { basicData, pnlBreakdown, curveData } = response.data;
+                            const { basicData, pnlBreakdown, aprBreakdown, curveData } = response.data;
 
                             // Create complete position object
                             const completePosition: PositionWithDetails = {
                                 basicData,
                                 pnlBreakdown,
+                                aprBreakdown,
                                 curveData,
                                 isRefreshing: false,
                                 lastUpdated: new Date().toISOString(),
@@ -361,8 +366,11 @@ export const usePositionStore = create<PositionStore>()(
 
                             console.log(`[Store] ✓ Loaded complete position details: ${key}`, {
                                 hasPnl: !!pnlBreakdown,
+                                hasApr: !!aprBreakdown,
                                 hasCurve: curveData !== undefined,
-                                curvePoints: curveData?.points?.length || 0
+                                curvePoints: curveData?.points?.length || 0,
+                                aprRealizedApr: aprBreakdown?.realizedApr || 0,
+                                aprUnrealizedApr: aprBreakdown?.unrealizedApr || 0
                             });
 
                             return completePosition;

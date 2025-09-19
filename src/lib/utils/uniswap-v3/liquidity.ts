@@ -1,15 +1,11 @@
 import { TickMath } from "@uniswap/v3-sdk";
 import { Q96 } from "./constants";
+import type { TokenAmounts } from "./types";
 
 /**
  * Liquidity calculations for Uniswap V3 positions
  * Pure functions with simple parameters - no custom data structures
  */
-
-export interface TokenAmounts {
-    token0Amount: bigint;
-    token1Amount: bigint;
-}
 
 /**
  * Calculate token amounts from liquidity for a given price range

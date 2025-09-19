@@ -17,6 +17,7 @@ import type {
   PositionEventsResponse,
   ApiResponse
 } from '@/types/api';
+import type { AprApiResponse } from '@/types/apr';
 import { QUERY_KEYS, MUTATION_KEYS, QUERY_OPTIONS } from '@/types/api';
 import type { BasicPosition } from '@/services/positions/positionService';
 
@@ -195,7 +196,7 @@ export function useImportNFT(
               ...oldData,
               data: {
                 ...oldData.data,
-                positions: [response.data!.position as BasicPosition, ...oldData.data.positions],
+                positions: [response.data!.position as unknown as BasicPosition, ...oldData.data.positions],
                 pagination: {
                   ...oldData.data.pagination,
                   total: oldData.data.pagination.total + 1,
@@ -350,6 +351,33 @@ export function useInvalidatePositions() {
       return queryClient.invalidateQueries({ queryKey: QUERY_KEYS.positions });
     },
   };
+}
+
+/**
+ * Hook to fetch position APR data
+ * Returns APR calculation data for a specific position
+ */
+export function usePositionApr(
+  chain: string,
+  nftId: string,
+  options?: Omit<UseQueryOptions<AprApiResponse, ApiError, AprApiResponse['data']>, 'queryKey' | 'queryFn' | 'select'>
+) {
+  return useQuery({
+    queryKey: ['positions', 'apr', chain, nftId] as const,
+    queryFn: () => apiClient.get<AprApiResponse>(`/api/positions/uniswapv3/nft/${chain}/${nftId}/apr`),
+
+    // Default options
+    staleTime: QUERY_OPTIONS.positionDetails.staleTime,
+    gcTime: QUERY_OPTIONS.positionDetails.cacheTime,
+
+    // Only run query if chain and nftId are provided
+    enabled: !!chain && !!nftId,
+
+    // Transform response to extract just the APR data
+    select: (response: AprApiResponse) => response.data!,
+
+    ...options,
+  });
 }
 
 /**

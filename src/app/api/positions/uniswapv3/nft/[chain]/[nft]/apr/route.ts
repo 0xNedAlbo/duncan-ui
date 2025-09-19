@@ -149,7 +149,7 @@ export const GET = withAuthAndLogging<AprApiResponse>(
             });
 
         } catch (error) {
-            logError(error, {
+            logError(log, error, {
                 chain: params?.chain || 'unknown',
                 nftId: params?.nft || 'unknown',
                 userId: user.userId

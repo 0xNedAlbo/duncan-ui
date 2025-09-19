@@ -11,6 +11,7 @@ import { PositionHeader } from "./components/position-header";
 import { PositionTabs } from "./components/position-tabs";
 import { OverviewTab } from "./components/overview-tab";
 import { EventsTab } from "./components/events-tab";
+import { AprTab } from "./components/apr-tab";
 import type { PositionWithDetails } from "@/store/position-store";
 
 export default function UniswapV3PositionPage() {
@@ -158,10 +159,22 @@ export default function UniswapV3PositionPage() {
                 );
             case "ledger":
                 return <EventsTab chainSlug={chainSlug} nftId={nftId} />;
+            case "apr":
+                return (
+                    <AprTab
+                        chainSlug={chainSlug}
+                        nftId={nftId}
+                        aprBreakdown={position.aprBreakdown}
+                        pnlBreakdown={position.pnlBreakdown}
+                        quoteToken={position.basicData?.token0IsQuote
+                            ? position.basicData.pool.token0
+                            : position.basicData.pool.token1}
+                        token0={position.basicData?.pool.token0}
+                        token1={position.basicData?.pool.token1}
+                    />
+                );
             case "range":
                 return <div className="text-slate-400 text-center py-12">{t("positionDetails.tabs.range")} - {t("common.comingSoon")}</div>;
-            case "fees":
-                return <div className="text-slate-400 text-center py-12">{t("positionDetails.tabs.fees")} - {t("common.comingSoon")}</div>;
             case "analytics":
                 return <div className="text-slate-400 text-center py-12">{t("positionDetails.tabs.analytics")} - {t("common.comingSoon")}</div>;
             default:

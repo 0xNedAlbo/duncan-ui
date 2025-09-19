@@ -193,7 +193,7 @@ export class CurveDataService {
 
         if (cachedCurve) {
             // Return cached data
-            return cachedCurve.curveData as CurveData;
+            return cachedCurve.curveData as unknown as CurveData;
         }
 
         // No valid cache found - generate fresh curve data and cache it

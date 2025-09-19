@@ -21,9 +21,7 @@ export type ApiHandler<T = any> = (
     params?: any
 ) => Promise<NextResponse<T>>;
 
-export type RouteParams = {
-    params?: Promise<any> | any;
-};
+import type { NextRouteContext } from './types';
 
 /**
  * Wrap an API route handler with structured logging
@@ -35,8 +33,8 @@ export type RouteParams = {
 export function withLogging<T = any>(
     handler: ApiHandler<T>,
     authUser?: AuthUser
-): (request: NextRequest, context?: RouteParams) => Promise<NextResponse<T>> {
-    return async (request: NextRequest, context?: RouteParams) => {
+): (request: NextRequest, context: NextRouteContext) => Promise<NextResponse<T>> {
+    return async (request: NextRequest, context: NextRouteContext) => {
         const { reqId, headers, access, log } = beginRequestLog(request, authUser);
 
         try {
@@ -50,11 +48,8 @@ export function withLogging<T = any>(
                 "Incoming API request"
             );
 
-            // Resolve params if they're a promise (Next.js 15 pattern)
-            const resolvedParams =
-                context?.params && typeof context.params.then === "function"
-                    ? await context.params
-                    : context?.params;
+            // Resolve params (Next.js 15 pattern - always a promise)
+            const resolvedParams = await context.params;
 
             // Execute the handler
             const response = await handler(

@@ -33,8 +33,8 @@ export function EventsTab({ chainSlug, nftId }: EventsTabProps) {
 
     // Get quote token info for PnL breakdown
     const quoteToken = position?.token0IsQuote
-        ? position.pool.token0
-        : position.pool.token1;
+        ? position?.pool.token0
+        : position?.pool.token1;
     const quoteTokenDecimals = quoteToken?.decimals;
 
     if (eventsError) {

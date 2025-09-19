@@ -90,7 +90,7 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
           const positions = response.data.positions || [];
           const limitedPositions = positions.slice(0, 5); // Load PnL for first 5 positions
 
-          limitedPositions.forEach(async (position) => {
+          limitedPositions.forEach(async (position: BasicPosition) => {
             if (position.nftId && position.pool?.chain) {
               // Load both PnL and curve data in parallel
               const [pnlResponse, curveResponse] = await Promise.allSettled([

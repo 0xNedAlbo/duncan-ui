@@ -181,7 +181,6 @@ export const GET = withAuthAndLogging<PositionEventsResponse>(
                     collectedFee0: mappedEventType === 'COLLECT' ? dbEvent.feesCollected0 : undefined,
                     collectedFee1: mappedEventType === 'COLLECT' ? dbEvent.feesCollected1 : undefined,
                     poolPrice: dbEvent.poolPrice,
-                    tick: null, // Not stored in current schema
                     valueInQuote: dbEvent.tokenValueInQuote,
                     feeValueInQuote: mappedEventType === 'COLLECT' ? dbEvent.feeValueInQuote : undefined,
                     source: dbEvent.source as 'subgraph' | 'onchain' | 'manual',

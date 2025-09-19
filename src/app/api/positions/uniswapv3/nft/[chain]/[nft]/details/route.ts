@@ -3,14 +3,15 @@ import { withAuthAndLogging } from "@/lib/api/withAuth";
 import { logError } from "@/lib/api/withLogging";
 import { ApiServiceFactory } from "@/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
-import type { BasicPosition, PnLBreakdown } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/services/positions/positionService";
+import type { PnlBreakdown } from "@/services/positions/positionPnLService";
 import type { CurveData } from "@/components/charts/mini-pnl-curve";
 import type { AprBreakdown } from "@/services/positions/positionAprService";
 import type { ApiResponse } from "@/types/api";
 
 export interface PositionDetailsData {
     basicData: BasicPosition;
-    pnlBreakdown: PnLBreakdown | null;
+    pnlBreakdown: PnlBreakdown | null;
     aprBreakdown: AprBreakdown | null;
     curveData: CurveData | null;
 }

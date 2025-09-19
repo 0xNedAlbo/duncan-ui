@@ -10,7 +10,7 @@ import Link from "next/link";
 
 export default function Home() {
     const t = useTranslations();
-    const { data: session, status } = useSession();
+    const { /* data: session,  */ status } = useSession();
     const router = useRouter();
 
     // Redirect authenticated users to dashboard
@@ -60,7 +60,7 @@ export default function Home() {
                         <p className="text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
                             {t("homepage.hero.description")}
                         </p>
-                        
+
                         <div className="flex gap-4 justify-center">
                             <Link
                                 href="/auth/signup"
@@ -85,7 +85,9 @@ export default function Home() {
                                 {t("homepage.features.riskPlanning.title")}
                             </h3>
                             <p className="text-slate-400">
-                                {t("homepage.features.riskPlanning.description")}
+                                {t(
+                                    "homepage.features.riskPlanning.description"
+                                )}
                             </p>
                         </div>
 
@@ -95,7 +97,9 @@ export default function Home() {
                                 {t("homepage.features.interactiveCharts.title")}
                             </h3>
                             <p className="text-slate-400">
-                                {t("homepage.features.interactiveCharts.description")}
+                                {t(
+                                    "homepage.features.interactiveCharts.description"
+                                )}
                             </p>
                         </div>
 

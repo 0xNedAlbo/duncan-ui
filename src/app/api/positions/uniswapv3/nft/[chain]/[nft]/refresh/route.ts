@@ -39,7 +39,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                         error: "Chain and NFT ID are required",
                         meta: {
                             requestedAt: new Date().toISOString(),
-                            positionId: ""
+                            positionId: "",
+                            refreshedAt: new Date().toISOString()
                         }
                     },
                     { status: 400 }
@@ -56,7 +57,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                         )}`,
                         meta: {
                             requestedAt: new Date().toISOString(),
-                            positionId: ""
+                            positionId: "",
+                            refreshedAt: new Date().toISOString()
                         }
                     },
                     { status: 400 }
@@ -71,7 +73,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                         error: "Invalid NFT ID format. Must be a positive integer.",
                         meta: {
                             requestedAt: new Date().toISOString(),
-                            positionId: ""
+                            positionId: "",
+                            refreshedAt: new Date().toISOString()
                         }
                     },
                     { status: 400 }
@@ -108,7 +111,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                         error: "Position not found",
                         meta: {
                             requestedAt: new Date().toISOString(),
-                            positionId: ""
+                            positionId: "",
+                            refreshedAt: new Date().toISOString()
                         }
                     },
                     { status: 404 }
@@ -236,7 +240,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                             error: "Position not found",
                             meta: {
                                 requestedAt: new Date().toISOString(),
-                                positionId: ""
+                                positionId: "",
+                                refreshedAt: new Date().toISOString()
                             }
                         },
                         { status: 404 }
@@ -250,7 +255,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                             error: "Position refresh not available for this position type",
                             meta: {
                                 requestedAt: new Date().toISOString(),
-                                positionId: ""
+                                positionId: "",
+                                refreshedAt: new Date().toISOString()
                             }
                         },
                         { status: 422 }
@@ -264,7 +270,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                             error: "Blockchain data temporarily unavailable",
                             meta: {
                                 requestedAt: new Date().toISOString(),
-                                positionId: ""
+                                positionId: "",
+                                refreshedAt: new Date().toISOString()
                             }
                         },
                         { status: 503 }
@@ -278,7 +285,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                             error: "Pool data temporarily unavailable",
                             meta: {
                                 requestedAt: new Date().toISOString(),
-                                positionId: ""
+                                positionId: "",
+                                refreshedAt: new Date().toISOString()
                             }
                         },
                         { status: 503 }
@@ -292,7 +300,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                     error: "Internal server error",
                     meta: {
                         requestedAt: new Date().toISOString(),
-                        positionId: ""
+                        positionId: "",
+                        refreshedAt: new Date().toISOString()
                     }
                 },
                 { status: 500 }
@@ -301,7 +310,3 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
     }
 );
 
-// Keep the cache clearing function for potential future use
-export function clearRefreshCache() {
-  // Cache clearing logic would go here in the future implementation
-}

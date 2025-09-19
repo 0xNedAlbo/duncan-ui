@@ -1,20 +1,11 @@
 import { priceToTick } from "./price";
 import { calculatePositionValue } from "./liquidity";
+import type { PnLPoint, PositionPhase } from "./types";
 
 /**
  * Position calculations and analysis for Uniswap V3
  * Pure functions with simple parameters - no custom data structures
  */
-
-export type PositionPhase = "below" | "in-range" | "above";
-
-export interface PnLPoint {
-    price: bigint;
-    positionValue: bigint;
-    pnl: bigint;
-    pnlPercent: number;
-    phase: PositionPhase;
-}
 
 
 /**

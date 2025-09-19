@@ -77,17 +77,7 @@ function createQueryClient(): QueryClient {
     queryCache: undefined, // Use default query cache
     mutationCache: undefined, // Use default mutation cache
     
-    // Logger configuration
-    logger: {
-      log: console.log,
-      warn: console.warn,
-      error: (error) => {
-        // Log React Query errors
-        if (process.env.NODE_ENV === 'development') {
-          console.error('[React Query Error]:', error);
-        }
-      },
-    },
+    // Note: logger configuration was removed as it's deprecated in React Query v5
   });
 }
 
@@ -106,16 +96,7 @@ export function QueryProvider({ children }: QueryProviderProps) {
       {children}
       {/* Only show DevTools in development */}
       {process.env.NODE_ENV === 'development' && (
-        <ReactQueryDevtools
-          initialIsOpen={false}
-          position="bottom-right"
-          toggleButtonProps={{
-            style: {
-              marginBottom: '20px',
-              marginRight: '20px',
-            },
-          }}
-        />
+        <ReactQueryDevtools initialIsOpen={false} />
       )}
     </QueryClientProvider>
   );
@@ -183,10 +164,6 @@ export function createTestQueryClient(): QueryClient {
         networkMode: 'offlineFirst',
       },
     },
-    logger: {
-      log: () => {}, // Silent logging in tests
-      warn: () => {},
-      error: () => {},
-    },
+    // Note: logger configuration was removed as it's deprecated in React Query v5
   });
 }

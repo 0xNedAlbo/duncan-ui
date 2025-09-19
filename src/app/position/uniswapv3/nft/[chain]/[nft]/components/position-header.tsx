@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { ArrowLeft, RefreshCw, Copy, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, Copy, ExternalLink } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ChainConfig } from "@/config/chains";
 import type { BasicPosition } from "@/services/positions/positionService";
@@ -20,19 +19,25 @@ interface PositionHeaderProps {
 // Helper function to get token data from PositionWithPnL structure
 function getTokenData(token: any) {
     if (!token) return null;
-    
+
     return {
         symbol: token.symbol,
         name: token.name,
         logoUrl: token.logoUrl,
         address: token.address || token.id,
-        decimals: token.decimals
+        decimals: token.decimals,
     };
 }
 
-export function PositionHeader({ position, chainSlug, nftId, chainConfig, onRefresh, isRefreshing }: PositionHeaderProps) {
+export function PositionHeader({
+    position,
+    chainSlug,
+    nftId,
+    chainConfig,
+    onRefresh,
+    isRefreshing,
+}: PositionHeaderProps) {
     const t = useTranslations();
-    const router = useRouter();
     const [copied, setCopied] = useState(false);
 
     const copyNftId = async () => {
@@ -52,7 +57,10 @@ export function PositionHeader({ position, chainSlug, nftId, chainConfig, onRefr
             base: "0x03a520b32c04bf3beef7beb72e919cf822ed34f1",
         };
 
-        const contractAddress = uniswapV3NFTAddresses[chainSlug as keyof typeof uniswapV3NFTAddresses];
+        const contractAddress =
+            uniswapV3NFTAddresses[
+                chainSlug as keyof typeof uniswapV3NFTAddresses
+            ];
 
         if (contractAddress) {
             return `${chainConfig.explorer}/token/${contractAddress}?a=${nftId}`;
@@ -77,7 +85,7 @@ export function PositionHeader({ position, chainSlug, nftId, chainConfig, onRefr
         <div className="mb-8">
             {/* Back Navigation */}
             <div className="mb-6">
-                <Link 
+                <Link
                     href="/dashboard"
                     className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
                 >
@@ -94,21 +102,31 @@ export function PositionHeader({ position, chainSlug, nftId, chainConfig, onRefr
                         {/* Token Logos */}
                         <div className="flex items-center -space-x-3">
                             {(() => {
-                                const token0 = getTokenData(position.pool?.token0);
-                                const token1 = getTokenData(position.pool?.token1);
-                                
+                                const token0 = getTokenData(
+                                    position.pool?.token0
+                                );
+                                const token1 = getTokenData(
+                                    position.pool?.token1
+                                );
+
                                 return (
                                     <>
                                         <Image
-                                            src={token0?.logoUrl || '/images/tokens/default.png'}
-                                            alt={token0?.symbol || 'Token 0'}
+                                            src={
+                                                token0?.logoUrl ||
+                                                "/images/tokens/default.png"
+                                            }
+                                            alt={token0?.symbol || "Token 0"}
                                             width={48}
                                             height={48}
                                             className="w-12 h-12 rounded-full border-3 border-slate-800 bg-slate-700 z-10"
                                         />
                                         <Image
-                                            src={token1?.logoUrl || '/images/tokens/default.png'}
-                                            alt={token1?.symbol || 'Token 1'}
+                                            src={
+                                                token1?.logoUrl ||
+                                                "/images/tokens/default.png"
+                                            }
+                                            alt={token1?.symbol || "Token 1"}
                                             width={48}
                                             height={48}
                                             className="w-12 h-12 rounded-full border-3 border-slate-800 bg-slate-700"
@@ -122,32 +140,71 @@ export function PositionHeader({ position, chainSlug, nftId, chainConfig, onRefr
                         <div>
                             <div className="flex items-center gap-3 mb-2">
                                 <h1 className="text-2xl font-bold text-white">
-                                    {position.pool?.token0?.symbol || 'Token0'}/{position.pool?.token1?.symbol || 'Token1'}
+                                    {position.pool?.token0?.symbol || "Token0"}/
+                                    {position.pool?.token1?.symbol || "Token1"}
                                 </h1>
-                                <span className={`px-3 py-1 rounded-lg text-sm font-medium border ${getStatusColor(position.status || 'active')}`}>
-                                    {t(`positionDetails.status.${position.status || 'active'}`)}
+                                <span
+                                    className={`px-3 py-1 rounded-lg text-sm font-medium border ${getStatusColor(
+                                        position.status || "active"
+                                    )}`}
+                                >
+                                    {(() => {
+                                        const status =
+                                            position.status || "active";
+                                        switch (status) {
+                                            case "active":
+                                                return t(
+                                                    "positionDetails.status.active"
+                                                );
+                                            case "closed":
+                                                return t(
+                                                    "positionDetails.status.closed"
+                                                );
+                                            case "archived":
+                                                return t(
+                                                    "positionDetails.status.archived"
+                                                );
+                                            case "liquidated":
+                                                return t(
+                                                    "positionDetails.status.liquidated"
+                                                );
+                                            default:
+                                                return t(
+                                                    "positionDetails.status.active"
+                                                );
+                                        }
+                                    })()}
                                 </span>
                             </div>
-                            
+
                             <div className="flex items-center gap-4 text-sm text-slate-400">
                                 {/* Chain */}
                                 <span className="px-2 py-1 rounded bg-slate-500/20 border border-slate-500/30 text-slate-300">
                                     {chainConfig.shortName}
                                 </span>
-                                
+
                                 {/* Fee */}
                                 <span>
-                                    {t("positionDetails.header.fee")}: {position.pool?.fee ? (position.pool.fee / 10000).toFixed(2) : '0.00'}%
+                                    {t("positionDetails.header.fee")}:{" "}
+                                    {position.pool?.fee
+                                        ? (position.pool.fee / 10000).toFixed(2)
+                                        : "0.00"}
+                                    %
                                 </span>
-                                
+
                                 {/* NFT ID */}
                                 <span>•</span>
                                 <div className="flex items-center gap-2">
-                                    <span>{t("positionDetails.header.nftId")}: #{nftId}</span>
+                                    <span>
+                                        {t("positionDetails.header.nftId")}: #
+                                        {nftId}
+                                    </span>
                                     <button
                                         onClick={copyNftId}
                                         className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                                        title={t("positionDetails.header.copyId")}
+                                        title={t(
+                                            "positionDetails.header.copyId"
+                                        )}
                                     >
                                         <Copy className="w-3 h-3" />
                                     </button>
@@ -157,7 +214,9 @@ export function PositionHeader({ position, chainSlug, nftId, chainConfig, onRefr
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                                            title={t("positionDetails.header.viewOnExplorer")}
+                                            title={t(
+                                                "positionDetails.header.viewOnExplorer"
+                                            )}
                                         >
                                             <ExternalLink className="w-3 h-3" />
                                         </a>
@@ -177,7 +236,13 @@ export function PositionHeader({ position, chainSlug, nftId, chainConfig, onRefr
                         {/* Last Updated */}
                         <div className="text-right text-sm text-slate-400">
                             <div>{t("positionDetails.header.lastUpdated")}</div>
-                            <div>{position.updatedAt ? new Date(position.updatedAt).toLocaleString() : '-'}</div>
+                            <div>
+                                {position.updatedAt
+                                    ? new Date(
+                                          position.updatedAt
+                                      ).toLocaleString()
+                                    : "-"}
+                            </div>
                         </div>
 
                         {/* Refresh Button */}
@@ -187,7 +252,11 @@ export function PositionHeader({ position, chainSlug, nftId, chainConfig, onRefr
                             className="p-3 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                             title={t("positionDetails.header.refresh")}
                         >
-                            <RefreshCw className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`} />
+                            <RefreshCw
+                                className={`w-5 h-5 ${
+                                    isRefreshing ? "animate-spin" : ""
+                                }`}
+                            />
                         </button>
                     </div>
                 </div>

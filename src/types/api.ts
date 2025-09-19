@@ -5,7 +5,7 @@
  */
 
 import type { BasicPosition } from '@/services/positions/positionService';
-import type { ParsedNFTPosition } from '@/services/uniswap/nftPosition';
+import type { NFTPosition } from '@/lib/contracts/nonfungiblePositionManager';
 import type { PnlBreakdown } from '@/services/positions/positionPnLService';
 import type { AprBreakdown } from '@/services/positions/positionAprService';
 import type { CurveData } from '@/components/charts/mini-pnl-curve';
@@ -79,7 +79,6 @@ export interface PositionEvent {
   collectedFee0?: string; // BigInt as string, COLLECT events only
   collectedFee1?: string; // BigInt as string, COLLECT events only
   poolPrice: string; // BigInt as string
-  tick: number;
   valueInQuote: string; // BigInt as string
   feeValueInQuote?: string; // BigInt as string, COLLECT events only
   source: 'subgraph' | 'onchain' | 'manual';
@@ -131,7 +130,7 @@ export interface PositionDetailsResponse extends ApiResponse<PositionWithPnL> {
   data?: PositionWithPnL;
 }
 
-export interface PositionRefreshResponse extends ApiResponse<{ position: BasicPosition | null; pnlBreakdown: PnlBreakdown; aprBreakdown?: AprBreakdown; curveData?: CurveData }> {
+export interface PositionRefreshResponse extends ApiResponse<{ position: BasicPosition | null; pnlBreakdown: PnlBreakdown | null; aprBreakdown?: AprBreakdown; curveData?: CurveData }> {
   meta: {
     requestedAt: string;
     positionId: string;
@@ -152,8 +151,8 @@ export interface ImportNFTRequest {
   nftId: string;
 }
 
-export interface ImportNFTResponse extends ApiResponse<{ position: ParsedNFTPosition }> {
-  position?: ParsedNFTPosition; // Legacy field for backward compatibility
+export interface ImportNFTResponse extends ApiResponse<{ position: NFTPosition }> {
+  position?: NFTPosition; // Legacy field for backward compatibility
   meta: {
     requestedAt: string;
     chain: string;

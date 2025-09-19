@@ -29,8 +29,9 @@ export default function SignUpPage() {
                 name,
             };
 
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
             const response = await apiClient.post<RegisterResponse>(
-                "/api/auth/register", 
+                "/api/auth/register",
                 requestData,
                 { skipAuth: true } // Registration doesn't require authentication
             );
@@ -38,7 +39,10 @@ export default function SignUpPage() {
             // Registration successful, redirect to signin
             router.push("/auth/signin?message=registration-success");
         } catch (error) {
-            const errorMessage = handleApiError(error, t("auth.signIn.errorGeneral"));
+            const errorMessage = handleApiError(
+                error,
+                t("auth.signIn.errorGeneral")
+            );
             setError(errorMessage);
         } finally {
             setIsLoading(false);

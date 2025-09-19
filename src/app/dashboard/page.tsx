@@ -17,14 +17,17 @@ export default function Dashboard() {
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     // Handle successful position import
-    const handleImportSuccess = (_position: any) => {
+    const handleImportSuccess = (/* _position: any */) => {
         // Trigger refresh of position list
-        setRefreshTrigger(prev => prev + 1);
+        setRefreshTrigger((prev) => prev + 1);
     };
 
     // Handle authentication redirect
     useEffect(() => {
-        if (status === "unauthenticated" || (!session && status !== "loading")) {
+        if (
+            status === "unauthenticated" ||
+            (!session && status !== "loading")
+        ) {
             router.push("/auth/signin");
         }
     }, [status, session, router]);
@@ -52,9 +55,7 @@ export default function Dashboard() {
                         <h1 className="text-4xl font-bold text-white mb-2">
                             {t("header.title")}
                         </h1>
-                        <p className="text-lg text-slate-300">
-                            Dashboard
-                        </p>
+                        <p className="text-lg text-slate-300">Dashboard</p>
                     </div>
                     <div className="flex items-center gap-3">
                         <SettingsModal />
@@ -74,8 +75,10 @@ export default function Dashboard() {
                                 {t("dashboard.subtitle")}
                             </p>
                         </div>
-                        
-                        <CreatePositionDropdown onImportSuccess={handleImportSuccess} />
+
+                        <CreatePositionDropdown
+                            onImportSuccess={handleImportSuccess}
+                        />
                     </div>
 
                     {/* Position List */}

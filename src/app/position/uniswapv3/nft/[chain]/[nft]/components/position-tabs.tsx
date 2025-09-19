@@ -22,20 +22,19 @@ const tabs = [
         translationKey: "ledger",
     },
     {
+        id: "apr",
+        icon: TrendingUp,
+        translationKey: "apr",
+    },
+    {
         id: "range",
         icon: Target,
         translationKey: "range",
         comingSoon: true,
     },
     {
-        id: "fees",
-        icon: DollarSign,
-        translationKey: "fees",
-        comingSoon: true,
-    },
-    {
         id: "analytics",
-        icon: TrendingUp,
+        icon: DollarSign,
         translationKey: "analytics",
         comingSoon: true,
     },
@@ -83,7 +82,22 @@ export function PositionTabs({ activeTab, chainSlug, nftId }: PositionTabsProps)
                             `}
                         >
                             <Icon className="w-4 h-4" />
-                            <span>{t(`positionDetails.tabs.${tab.translationKey}`)}</span>
+                            <span>{(() => {
+                                switch (tab.translationKey) {
+                                    case "overview":
+                                        return t("positionDetails.tabs.overview");
+                                    case "ledger":
+                                        return t("positionDetails.tabs.ledger");
+                                    case "apr":
+                                        return t("positionDetails.tabs.apr");
+                                    case "range":
+                                        return t("positionDetails.tabs.range");
+                                    case "analytics":
+                                        return t("positionDetails.tabs.analytics");
+                                    default:
+                                        return tab.translationKey;
+                                }
+                            })()}</span>
                             
                             {tab.comingSoon && (
                                 <span className="ml-1 px-1.5 py-0.5 text-xs bg-slate-600 text-slate-300 rounded">

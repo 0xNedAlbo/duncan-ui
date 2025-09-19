@@ -3,7 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { RefreshCw, Copy, Search, TrendingUp, TrendingDown } from "lucide-react";
+import {
+    RefreshCw,
+    Copy,
+    Search,
+    TrendingUp,
+    TrendingDown,
+} from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import type { BasicPosition } from "@/services/positions/positionService";
@@ -14,6 +20,7 @@ import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy";
 
 interface PositionCardProps {
     position: BasicPosition;
+    // eslint-disable-next-line no-unused-vars
     onRefresh?: (position: BasicPosition) => void;
     isRefreshing?: boolean;
 }
@@ -36,14 +43,15 @@ export function PositionCard({
         : position.pool.token1.decimals;
 
     // Get PnL and APR data from position store
-    const getPosition = usePositionStore(state => state.getPosition);
-    const positionWithDetails = position.nftId ?
-        getPosition(position.pool.chain, position.nftId) : null;
+    const getPosition = usePositionStore((state) => state.getPosition);
+    const positionWithDetails = position.nftId
+        ? getPosition(position.pool.chain, position.nftId)
+        : null;
     const pnlData = positionWithDetails?.pnlBreakdown;
     const aprData = positionWithDetails?.aprBreakdown;
     const pnlLoading = !pnlData && Boolean(position.nftId); // Loading if no PnL data and position has NFT ID
     const aprLoading = !aprData && Boolean(position.nftId); // Loading if no APR data and position has NFT ID
-    // const pnlError = null; // Store doesn't track individual PnL errors
+    const pnlFailed = false; // Store doesn't track individual PnL errors currently
 
     // Get formatted display values
     const pnlDisplayValues = usePnLDisplayValues(pnlData, quoteTokenDecimals);
@@ -62,7 +70,11 @@ export function PositionCard({
     useEffect(() => {
         const curveData = positionWithDetails?.curveData;
         const aprData = positionWithDetails?.aprBreakdown;
-        const needsData = (!pnlData || !curveData || !aprData) && !pnlLoaded && position.nftId && position.pool?.chain;
+        const needsData =
+            (!pnlData || !curveData || !aprData) &&
+            !pnlLoaded &&
+            position.nftId &&
+            position.pool?.chain;
 
         if (needsData) {
             const observer = new IntersectionObserver(
@@ -72,45 +84,89 @@ export function PositionCard({
                         observer.disconnect();
 
                         // Load PnL, APR, and curve data in parallel
-                        const [pnlResponse, aprResponse, curveResponse] = await Promise.allSettled([
-                            apiClient.get(`/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/pnl`),
-                            apiClient.get(`/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/apr`),
-                            apiClient.get(`/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/curve`)
-                        ]);
+                        const [pnlResponse, aprResponse, curveResponse] =
+                            await Promise.allSettled([
+                                apiClient.get(
+                                    `/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/pnl`
+                                ),
+                                apiClient.get(
+                                    `/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/apr`
+                                ),
+                                apiClient.get(
+                                    `/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/curve`
+                                ),
+                            ]);
 
                         // Update position with loaded data in store
-                        const key = `${position.pool.chain}-${position.nftId}`;
-                        const { getPosition, updatePositionEverywhere } = usePositionStore.getState();
+                        if (!position.nftId) {
+                            return; // Skip if no NFT ID
+                        }
 
-                        const existingPosition = getPosition(position.pool.chain, position.nftId);
+                        const key = `${position.pool.chain}-${position.nftId}`;
+                        const { getPosition, updatePositionEverywhere } =
+                            usePositionStore.getState();
+
+                        const existingPosition = getPosition(
+                            position.pool.chain,
+                            position.nftId
+                        );
                         if (existingPosition) {
                             const updatedPosition = { ...existingPosition };
 
                             // Add PnL data if successful and not already present
-                            if (pnlResponse.status === 'fulfilled' && pnlResponse.value.data && !updatedPosition.pnlBreakdown) {
-                                updatedPosition.pnlBreakdown = pnlResponse.value.data;
-                            } else if (pnlResponse.status === 'rejected') {
-                                console.debug(`PnL load failed for position ${position.nftId}:`, pnlResponse.reason);
+                            if (
+                                pnlResponse.status === "fulfilled" &&
+                                pnlResponse.value.data &&
+                                !updatedPosition.pnlBreakdown
+                            ) {
+                                updatedPosition.pnlBreakdown =
+                                    pnlResponse.value.data;
+                            } else if (pnlResponse.status === "rejected") {
+                                console.debug(
+                                    `PnL load failed for position ${position.nftId}:`,
+                                    pnlResponse.reason
+                                );
                             }
 
                             // Add APR data if successful and not already present
-                            if (aprResponse.status === 'fulfilled' && aprResponse.value.data && !updatedPosition.aprBreakdown) {
-                                updatedPosition.aprBreakdown = aprResponse.value.data;
-                            } else if (aprResponse.status === 'rejected') {
-                                console.debug(`APR load failed for position ${position.nftId}:`, aprResponse.reason);
+                            if (
+                                aprResponse.status === "fulfilled" &&
+                                aprResponse.value.data &&
+                                !updatedPosition.aprBreakdown
+                            ) {
+                                updatedPosition.aprBreakdown =
+                                    aprResponse.value.data;
+                            } else if (aprResponse.status === "rejected") {
+                                console.debug(
+                                    `APR load failed for position ${position.nftId}:`,
+                                    aprResponse.reason
+                                );
                             }
 
                             // Add curve data if successful and not already present
-                            if (curveResponse.status === 'fulfilled' && curveResponse.value.data && !updatedPosition.curveData) {
-                                updatedPosition.curveData = curveResponse.value.data;
-                            } else if (curveResponse.status === 'rejected') {
-                                console.debug(`Curve load failed for position ${position.nftId}:`, curveResponse.reason);
+                            if (
+                                curveResponse.status === "fulfilled" &&
+                                curveResponse.value.data &&
+                                !updatedPosition.curveData
+                            ) {
+                                updatedPosition.curveData =
+                                    curveResponse.value.data;
+                            } else if (curveResponse.status === "rejected") {
+                                console.debug(
+                                    `Curve load failed for position ${position.nftId}:`,
+                                    curveResponse.reason
+                                );
                             }
 
                             // Only update if we got at least some data or made changes
-                            if (updatedPosition.pnlBreakdown !== existingPosition.pnlBreakdown ||
-                                updatedPosition.aprBreakdown !== existingPosition.aprBreakdown ||
-                                updatedPosition.curveData !== existingPosition.curveData) {
+                            if (
+                                updatedPosition.pnlBreakdown !==
+                                    existingPosition.pnlBreakdown ||
+                                updatedPosition.aprBreakdown !==
+                                    existingPosition.aprBreakdown ||
+                                updatedPosition.curveData !==
+                                    existingPosition.curveData
+                            ) {
                                 updatePositionEverywhere(key, updatedPosition);
                             }
                         }
@@ -118,7 +174,7 @@ export function PositionCard({
                 },
                 {
                     threshold: 0.1,
-                    rootMargin: '100px'
+                    rootMargin: "100px",
                 }
             );
 
@@ -128,7 +184,14 @@ export function PositionCard({
 
             return () => observer.disconnect();
         }
-    }, [pnlData, positionWithDetails?.curveData, positionWithDetails?.aprBreakdown, pnlLoaded, position.nftId, position.pool?.chain]);
+    }, [
+        pnlData,
+        positionWithDetails?.curveData,
+        positionWithDetails?.aprBreakdown,
+        pnlLoaded,
+        position.nftId,
+        position.pool?.chain,
+    ]);
 
     // Check if PnL data failed to load (for debugging)
     // const pnlFailed = false; // Store doesn't track individual errors
@@ -202,9 +265,15 @@ export function PositionCard({
         }
 
         // Check if position is in range based on current tick
-        if (position.pool.currentTick !== undefined && position.pool.currentTick !== null) {
+        if (
+            position.pool.currentTick !== undefined &&
+            position.pool.currentTick !== null
+        ) {
             const currentTick = position.pool.currentTick;
-            if (currentTick >= position.tickLower && currentTick <= position.tickUpper) {
+            if (
+                currentTick >= position.tickLower &&
+                currentTick <= position.tickUpper
+            ) {
                 return "in-range";
             } else {
                 return "out-of-range";
@@ -246,7 +315,10 @@ export function PositionCard({
     const positionStatus = getPositionStatus();
 
     return (
-        <div ref={cardRef} className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-6 py-4 hover:border-slate-600/50 transition-all duration-200">
+        <div
+            ref={cardRef}
+            className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 px-6 py-4 hover:border-slate-600/50 transition-all duration-200"
+        >
             {/* Header - Always Visible */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -278,10 +350,13 @@ export function PositionCard({
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <h3 className="text-lg font-semibold text-white">
-                                {position.pool.token0.symbol}/{position.pool.token1.symbol}
+                                {position.pool.token0.symbol}/
+                                {position.pool.token1.symbol}
                             </h3>
                             <span
-                                className={`px-1 py-0.5 rounded-sm text-xs font-medium border ${getStatusBadgeStyle(positionStatus)}`}
+                                className={`px-1 py-0.5 rounded-sm text-xs font-medium border ${getStatusBadgeStyle(
+                                    positionStatus
+                                )}`}
                             >
                                 {getStatusText(positionStatus)}
                             </span>
@@ -348,17 +423,19 @@ export function PositionCard({
                         {/* Current Value */}
                         <div className="text-right">
                             <div className="text-xs text-slate-400 mb-0.5">
-                                {t("dashboard.positions.currentValue")} ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
+                                {t("dashboard.positions.currentValue")} (
+                                {position.token0IsQuote
+                                    ? position.pool.token0.symbol
+                                    : position.pool.token1.symbol}
+                                )
                             </div>
                             <div className="text-lg font-semibold text-white">
-                                {pnlDisplayValues.currentValue ? (
-                                    formatCompactValue(
-                                        pnlDisplayValues.currentValue,
-                                        quoteTokenDecimals
-                                    )
-                                ) : (
-                                    "0"
-                                )}
+                                {pnlDisplayValues.currentValue
+                                    ? formatCompactValue(
+                                          pnlDisplayValues.currentValue,
+                                          quoteTokenDecimals
+                                      )
+                                    : "0"}
                             </div>
                         </div>
 
@@ -381,9 +458,15 @@ export function PositionCard({
                         {pnlDisplayValues.totalPnL !== null ? (
                             <div className="text-right">
                                 <div className="text-xs text-slate-400 mb-0.5">
-                                    {t("dashboard.positions.totalPnl")} ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
+                                    {t("dashboard.positions.totalPnl")} (
+                                    {position.token0IsQuote
+                                        ? position.pool.token0.symbol
+                                        : position.pool.token1.symbol}
+                                    )
                                 </div>
-                                <div className={`text-lg font-semibold ${pnlDisplayValues.pnlColor}`}>
+                                <div
+                                    className={`text-lg font-semibold ${pnlDisplayValues.pnlColor}`}
+                                >
                                     <div className="flex items-center justify-end gap-1">
                                         {pnlDisplayValues.isPositive ? (
                                             <TrendingUp className="w-4 h-4" />
@@ -422,17 +505,25 @@ export function PositionCard({
                         {/* Unclaimed Fees */}
                         <div className="text-right">
                             <div className="text-xs text-slate-400 mb-0.5">
-                                {t("dashboard.positions.claimableFees")} ({position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol})
+                                {t("dashboard.positions.claimableFees")} (
+                                {position.token0IsQuote
+                                    ? position.pool.token0.symbol
+                                    : position.pool.token1.symbol}
+                                )
                             </div>
-                            <div className={`text-lg font-semibold ${pnlDisplayValues.unclaimedFees ? 'text-amber-400' : 'text-white'}`}>
-                                {pnlDisplayValues.unclaimedFees ? (
-                                    formatCompactValue(
-                                        pnlDisplayValues.unclaimedFees,
-                                        quoteTokenDecimals
-                                    )
-                                ) : (
-                                    "0"
-                                )}
+                            <div
+                                className={`text-lg font-semibold ${
+                                    pnlDisplayValues.unclaimedFees
+                                        ? "text-amber-400"
+                                        : "text-white"
+                                }`}
+                            >
+                                {pnlDisplayValues.unclaimedFees
+                                    ? formatCompactValue(
+                                          pnlDisplayValues.unclaimedFees,
+                                          quoteTokenDecimals
+                                      )
+                                    : "0"}
                             </div>
                         </div>
 
@@ -442,7 +533,9 @@ export function PositionCard({
                                 <div className="text-xs text-slate-400 mb-0.5">
                                     Total APR
                                 </div>
-                                <div className={`text-lg font-semibold ${aprColorClass}`}>
+                                <div
+                                    className={`text-lg font-semibold ${aprColorClass}`}
+                                >
                                     {formatApr(aprData.totalApr)}
                                 </div>
                             </div>
@@ -479,7 +572,7 @@ export function PositionCard({
                             <Search className="w-5 h-5" />
                         </button>
                     )}
-                    
+
                     {/* Refresh Button */}
                     <div className="relative">
                         <button
@@ -489,7 +582,9 @@ export function PositionCard({
                             title={t("dashboard.positions.refresh")}
                         >
                             <RefreshCw
-                                className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`}
+                                className={`w-5 h-5 ${
+                                    isRefreshing ? "animate-spin" : ""
+                                }`}
                             />
                         </button>
                         {/* Stale Position Indicator - Commented out until lastUpdated field is available */}

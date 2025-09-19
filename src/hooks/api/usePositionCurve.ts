@@ -77,14 +77,7 @@ export function usePositionCurve(
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
 
-    // Track cache hits/misses
-    onSuccess: (data) => {
-      console.debug('[Cache] Successfully got curve data:', {
-        cacheKey,
-        pointsCount: data.points?.length,
-        source: 'cache or fresh API call'
-      });
-    },
+    // Note: onSuccess callback was removed as it's deprecated in React Query v5
 
     ...options,
   });
