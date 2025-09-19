@@ -503,12 +503,28 @@ apiClient.addResponseInterceptor((response, url, options) => {
 
 // Add error logging interceptor
 apiClient.addErrorInterceptor((error, url, options) => {
-    // Log errors
+    // Safely parse request body for logging
+    let requestBody;
+    try {
+        requestBody = options.body ? JSON.parse(options.body as string) : undefined;
+    } catch {
+        requestBody = options.body ? String(options.body) : undefined;
+    }
+
+    // Log errors with full error information
     console.error(`[API Error] ${options.method || "GET"} ${url}:`, {
-        code: error.code,
-        message: error.message,
-        statusCode: error.statusCode,
-        details: error.details,
+        // Use toJSON if available, otherwise fallback to individual properties
+        ...(error.toJSON ? error.toJSON() : {
+            code: error.code,
+            message: error.message,
+            statusCode: error.statusCode,
+            details: error.details,
+            name: error.name,
+            stack: error.stack,
+        }),
+        // Also include request details for debugging
+        requestBody,
+        requestHeaders: options.headers,
     });
     return error;
 });

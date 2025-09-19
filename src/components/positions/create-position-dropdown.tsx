@@ -5,6 +5,8 @@ import { useState } from "react";
 import { useTranslations } from "@/i18n/client";
 import { useImportNFT } from "@/hooks/api/usePositions";
 import { handleApiError } from "@/lib/app/apiError";
+import { usePositionStore } from "@/store/position-store";
+import type { BasicPosition } from "@/services/positions/positionService";
 
 interface CreatePositionDropdownProps {
     // eslint-disable-next-line no-unused-vars
@@ -15,6 +17,7 @@ export function CreatePositionDropdown({
     onImportSuccess,
 }: CreatePositionDropdownProps = {}) {
     const t = useTranslations();
+    const { setCurrentList } = usePositionStore();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [showNftForm, setShowNftForm] = useState(false);
     const [nftId, setNftId] = useState("");
@@ -43,6 +46,25 @@ export function CreatePositionDropdown({
     const importNFT = useImportNFT({
         onSuccess: (response) => {
             if (response.data?.position) {
+                const importedPosition = response.data.position as unknown as BasicPosition;
+
+                // Update Zustand store - add the imported position to current list
+                const currentState = usePositionStore.getState().currentList;
+                const existingPositions = Object.values(currentState.positions).map(p => p.basicData);
+                const updatedPositions = [importedPosition, ...existingPositions];
+
+                // Update store with new position list
+                setCurrentList(
+                    updatedPositions,
+                    {
+                        ...currentState.pagination,
+                        total: currentState.pagination.total + 1,
+                    },
+                    currentState.filters
+                );
+
+                console.log(`✓ Added imported position to Zustand store: ${importedPosition.pool.chain}/${importedPosition.nftId}`);
+
                 // Create simple display data for success message
                 const displayData = {
                     chainName: formatChainName(selectedChain),

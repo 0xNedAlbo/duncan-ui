@@ -150,23 +150,47 @@ export const POST = withAuthAndLogging<{ success: boolean; data?: any; error?: s
         'NFT position import completed successfully'
       );
 
-      // Map the service result to the expected response format
+      // Get the full position data with all relationships (pool, tokens, etc.)
+      // This ensures the frontend gets the same format as the position list endpoint
+      const fullPosition = await apiFactory.positionService.getPosition(importResult.positionId!);
+
+      if (!fullPosition) {
+        log.error(
+          { positionId: importResult.positionId, chain, nftId },
+          'Failed to retrieve full position data after import'
+        );
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Import succeeded but failed to retrieve complete position data',
+            meta: {
+              requestedAt: new Date().toISOString(),
+              chain,
+              nftId,
+              dataSource: 'onchain'
+            }
+          },
+          { status: 500 }
+        );
+      }
+
+      log.debug(
+        {
+          positionId: fullPosition.id,
+          chain: fullPosition.pool.chain,
+          nftId: fullPosition.nftId,
+          poolAddress: fullPosition.pool.poolAddress,
+          token0Symbol: fullPosition.pool.token0.symbol,
+          token1Symbol: fullPosition.pool.token1.symbol,
+        },
+        'Successfully retrieved full position data after import'
+      );
+
+      // Return the full BasicPosition data format (same as position list endpoint)
       return NextResponse.json({
         success: true,
         data: {
-          position: {
-            id: importResult.positionId!,
-            nftId: importResult.data!.nftId,
-            poolAddress: importResult.data!.poolAddress,
-            tickLower: importResult.data!.tickLower,
-            tickUpper: importResult.data!.tickUpper,
-            liquidity: importResult.data!.liquidity,
-            token0Address: importResult.data!.token0Address,
-            token1Address: importResult.data!.token1Address,
-            fee: importResult.data!.fee,
-            chain: importResult.data!.chain,
-            owner: importResult.data!.owner
-          }
+          position: fullPosition
         },
         meta: {
           requestedAt: new Date().toISOString(),

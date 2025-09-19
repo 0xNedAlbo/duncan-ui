@@ -172,19 +172,20 @@ export function useImportNFT(
   options?: UseMutationOptions<ImportNFTResponse, ApiError, ImportNFTRequest>
 ) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationKey: MUTATION_KEYS.importNFT,
-    mutationFn: (data: ImportNFTRequest) => 
+    mutationFn: (data: ImportNFTRequest) =>
       apiClient.post<ImportNFTResponse>('/api/positions/uniswapv3/import-nft', data),
-    
+
     onSuccess: (response) => {
       // Invalidate positions list to refetch with new position
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.positions });
-      
+
       // Note: Position details are now accessed via chain/NFT, not database ID
       // Individual position cache invalidation handled by NFT-specific hooks
       if (response.data?.position) {
+        const importedPosition = response.data.position as unknown as BasicPosition;
 
         // Update positions list cache if it exists
         queryClient.setQueriesData<PositionListResponse>(
@@ -196,7 +197,7 @@ export function useImportNFT(
               ...oldData,
               data: {
                 ...oldData.data,
-                positions: [response.data!.position as unknown as BasicPosition, ...oldData.data.positions],
+                positions: [importedPosition, ...oldData.data.positions],
                 pagination: {
                   ...oldData.data.pagination,
                   total: oldData.data.pagination.total + 1,
@@ -205,14 +206,16 @@ export function useImportNFT(
             };
           }
         );
+
+        console.log(`✓ Position imported successfully: ${importedPosition.pool.chain}/${importedPosition.nftId}`);
       }
     },
-    
+
     onError: (error, variables) => {
       // Log import error for debugging
       console.error(`Failed to import NFT ${variables.nftId} on ${variables.chain}:`, error);
     },
-    
+
     ...options,
   });
 }

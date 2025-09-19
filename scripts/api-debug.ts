@@ -219,23 +219,6 @@ class ApiDebugger {
     console.log('🏁 Example runs completed!');
   }
 
-  /**
-   * Interactive mode for manual testing
-   */
-  async interactive() {
-    console.log('🎮 Interactive mode - you can now call methods manually');
-    console.log('Available methods:');
-    console.log('  - debugger.get(endpoint)');
-    console.log('  - debugger.post(endpoint, data)');
-    console.log('  - debugger.put(endpoint, data)');
-    console.log('  - debugger.delete(endpoint)');
-    console.log('  - debugger.apiRequest(endpoint, options)');
-    console.log('');
-    console.log('Examples:');
-    console.log('  await debugger.get("/api/tokens")');
-    console.log('  await debugger.get("/api/positions/uniswapv3/list")');
-    console.log('');
-  }
 }
 
 /**
@@ -332,8 +315,6 @@ Examples:
   # Run examples
   npx tsx scripts/debug/api-debug.ts --examples
 
-  # Interactive mode (default)
-  npx tsx scripts/debug/api-debug.ts
 `);
 }
 
@@ -363,7 +344,7 @@ async function main() {
   if (parsed.examples) {
     await apiDebugger.runExamples();
   } else if (parsed.method && parsed.endpoint) {
-    // Non-interactive mode with command line args
+    // Command line mode with method and endpoint
     let result;
 
     switch (parsed.method) {
@@ -394,14 +375,10 @@ async function main() {
       process.exit(1);
     }
   } else {
-    // Interactive mode
-    await apiDebugger.interactive();
-
-    // Make debugger available globally for interactive use
-    (global as any).debugger = apiDebugger;
-
-    // Keep process alive for interactive use
-    process.stdin.resume();
+    // Default: show help and exit
+    console.log('❌ Please specify either --examples or provide --method and --endpoint');
+    console.log('Use --help for usage information.');
+    process.exit(1);
   }
 }
 
