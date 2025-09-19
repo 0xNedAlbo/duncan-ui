@@ -26,7 +26,8 @@ const eslintConfig = [
                     caughtErrors: "none"
                 }
             ],
-          "@typescript-eslint/no-explicit-any": "off"
+          "@typescript-eslint/no-explicit-any": "off",
+          "@next/next/no-img-element": "off"
         }
   },
 ];

@@ -89,49 +89,11 @@ export function OverviewTab({ position, pnlBreakdown, curveData }: OverviewTabPr
     };
 
     const lowerRangeCurveData = createCurveDataForTick(position.tickLower);
-    const currentCurveData = curveData; // Use existing curve data with current price
+    const currentCurveData = curveData ?? null; // Use existing curve data with current price
     const upperRangeCurveData = createCurveDataForTick(position.tickUpper);
 
     // Calculate break-even price
     const breakEvenPrice = calculateBreakEvenPrice(position, pnlBreakdown);
-
-    // Get position status
-    const getPositionStatus = () => {
-        if (position.status === "closed" || position.status === "archived") {
-            return {
-                status: "closed",
-                color: "text-slate-400 bg-slate-500/20 border-slate-500/30",
-            };
-        }
-
-        if (
-            position.pool.currentTick !== undefined &&
-            position.pool.currentTick !== null
-        ) {
-            const currentTick = position.pool.currentTick;
-            if (
-                currentTick >= position.tickLower &&
-                currentTick <= position.tickUpper
-            ) {
-                return {
-                    status: "in-range",
-                    color: "text-green-400 bg-green-500/20 border-green-500/30",
-                };
-            } else {
-                return {
-                    status: "out-of-range",
-                    color: "text-red-400 bg-red-500/20 border-red-500/30",
-                };
-            }
-        }
-
-        return {
-            status: "unknown",
-            color: "text-slate-400 bg-slate-500/20 border-slate-500/30",
-        };
-    };
-
-    const positionStatus = getPositionStatus();
 
     return (
         <div className="space-y-6">

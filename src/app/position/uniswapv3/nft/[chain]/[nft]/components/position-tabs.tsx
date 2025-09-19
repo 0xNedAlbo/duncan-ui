@@ -57,20 +57,16 @@ export function PositionTabs({ activeTab, chainSlug, nftId }: PositionTabsProps)
                 {tabs.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
-                    const isDisabled = tab.comingSoon;
 
                     return (
                         <button
                             key={tab.id}
-                            onClick={() => !isDisabled && handleTabChange(tab.id)}
-                            disabled={isDisabled}
+                            onClick={() => handleTabChange(tab.id)}
                             className={`
-                                relative flex items-center gap-2 py-4 px-1 text-sm font-medium transition-colors
+                                relative flex items-center gap-2 py-4 px-1 text-sm font-medium transition-colors cursor-pointer
                                 ${isActive
-                                    ? "text-white border-b-2 border-blue-500 cursor-pointer"
-                                    : isDisabled
-                                    ? "text-slate-500 cursor-not-allowed"
-                                    : "text-slate-400 hover:text-slate-300 cursor-pointer"
+                                    ? "text-white border-b-2 border-blue-500"
+                                    : "text-slate-400 hover:text-slate-300"
                                 }
                             `}
                         >
@@ -89,12 +85,6 @@ export function PositionTabs({ activeTab, chainSlug, nftId }: PositionTabsProps)
                                         return tab.translationKey;
                                 }
                             })()}</span>
-                            
-                            {tab.comingSoon && (
-                                <span className="ml-1 px-1.5 py-0.5 text-xs bg-slate-600 text-slate-300 rounded">
-                                    {t("common.comingSoon")}
-                                </span>
-                            )}
 
                             {/* Active tab indicator */}
                             {isActive && (

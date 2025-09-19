@@ -19,6 +19,8 @@
 
 import { Fraction } from "./math";
 
+export type { Fraction };
+
 export type FormatOpts = {
     /** Thousands separator, e.g. "." for de-DE, "," for en-US */
     groupSep?: string;
