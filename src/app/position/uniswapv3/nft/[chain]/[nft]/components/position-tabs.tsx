@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "@/i18n/client";
-import { BarChart3, Clock, Target, DollarSign, TrendingUp } from "lucide-react";
+import { BarChart3, Clock, TrendingUp, Settings } from "lucide-react";
 
 interface PositionTabsProps {
     activeTab: string;
@@ -27,16 +27,9 @@ const tabs = [
         translationKey: "apr",
     },
     {
-        id: "range",
-        icon: Target,
-        translationKey: "range",
-        comingSoon: true,
-    },
-    {
-        id: "analytics",
-        icon: DollarSign,
-        translationKey: "analytics",
-        comingSoon: true,
+        id: "technical",
+        icon: Settings,
+        translationKey: "technical",
     },
 ];
 
@@ -90,10 +83,8 @@ export function PositionTabs({ activeTab, chainSlug, nftId }: PositionTabsProps)
                                         return t("positionDetails.tabs.ledger");
                                     case "apr":
                                         return t("positionDetails.tabs.apr");
-                                    case "range":
-                                        return t("positionDetails.tabs.range");
-                                    case "analytics":
-                                        return t("positionDetails.tabs.analytics");
+                                    case "technical":
+                                        return t("positionDetails.tabs.technical");
                                     default:
                                         return tab.translationKey;
                                 }

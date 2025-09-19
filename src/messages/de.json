@@ -6,7 +6,9 @@
     "done": "Fertig",
     "save": "Speichern",
     "copied": "Kopiert!",
-    "comingSoon": "Kommt bald"
+    "comingSoon": "Kommt bald",
+    "days": "Tage",
+    "unknown": "Unbekannt"
   },
   "header": {
     "title": "DUNCAN",
@@ -203,7 +205,8 @@
       "ledger": "PnL-Analyse",
       "apr": "APR-Analyse",
       "range": "Range-Analyse",
-      "analytics": "Analysen"
+      "analytics": "Analysen",
+      "technical": "Technisches"
     },
     "status": {
       "active": "Aktiv",
@@ -313,6 +316,30 @@
         "onchain": "On-Chain",
         "manual": "Manuell"
       }
+    },
+    "technical": {
+      "basicInfo": "Pooldaten",
+      "positionData": "Positionsdaten",
+      "nftId": "NFT ID",
+      "nfPositionManager": "NFPositionManager Vertrag",
+      "poolContract": "Pool Vertrag",
+      "owner": "Besitzer",
+      "liquidity": "Liquidität L",
+      "tickLower": "Tick Untergrenze",
+      "tickUpper": "Tick Obergrenze",
+      "creationDate": "Erstellungsdatum",
+      "closingDate": "Schließungsdatum",
+      "positionAge": "Positionsalter",
+      "daysActive": "Aktive Tage",
+      "token0": "Token0 Adresse",
+      "token1": "Token1 Adresse",
+      "fee": "Pool Gebühr",
+      "sqrtRatioX96": "SqrtRatioX96",
+      "currentPrice": "Aktueller Preis",
+      "currentTick": "Aktueller Tick",
+      "tickSpacing": "Tick Spacing",
+      "token0Role": "Token 0",
+      "token1Role": "Token 1"
     }
   },
   "homepage": {

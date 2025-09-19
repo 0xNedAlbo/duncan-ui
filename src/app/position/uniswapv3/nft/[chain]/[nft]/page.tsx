@@ -12,6 +12,7 @@ import { PositionTabs } from "./components/position-tabs";
 import { OverviewTab } from "./components/overview-tab";
 import { EventsTab } from "./components/events-tab";
 import { AprTab } from "./components/apr-tab";
+import { TechnicalDetails } from "./components/technical-details";
 import type { PositionWithDetails } from "@/store/position-store";
 
 export default function UniswapV3PositionPage() {
@@ -173,10 +174,13 @@ export default function UniswapV3PositionPage() {
                         token1={position.basicData?.pool.token1}
                     />
                 );
-            case "range":
-                return <div className="text-slate-400 text-center py-12">{t("positionDetails.tabs.range")} - {t("common.comingSoon")}</div>;
-            case "analytics":
-                return <div className="text-slate-400 text-center py-12">{t("positionDetails.tabs.analytics")} - {t("common.comingSoon")}</div>;
+            case "technical":
+                return (
+                    <TechnicalDetails
+                        position={position.basicData}
+                        chainSlug={chainSlug}
+                    />
+                );
             default:
                 return (
                     <OverviewTab
