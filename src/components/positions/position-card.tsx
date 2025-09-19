@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -15,7 +15,7 @@ import { formatCompactValue } from "@/lib/utils/fraction-format";
 import type { BasicPosition } from "@/services/positions/positionService";
 import { usePnLDisplayValues } from "@/hooks/api/usePositionPnL";
 import { usePositionStore } from "@/store/position-store";
-import { apiClient } from "@/lib/app/apiClient";
+import { usePositionDetails } from "@/hooks/api/usePositions";
 import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy";
 
 interface PositionCardProps {
@@ -35,26 +35,36 @@ export function PositionCard({
     const [token0ImageError, setToken0ImageError] = useState(false);
     const [token1ImageError, setToken1ImageError] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
-    const [pnlLoaded, setPnlLoaded] = useState(false);
 
     // Get quote token decimals for proper formatting
     const quoteTokenDecimals = position.token0IsQuote
         ? position.pool.token0.decimals
         : position.pool.token1.decimals;
 
-    // Get PnL and APR data from position store
-    const getPosition = usePositionStore((state) => state.getPosition);
-    const positionWithDetails = position.nftId
-        ? getPosition(position.pool.chain, position.nftId)
-        : null;
-    const pnlData = positionWithDetails?.pnlBreakdown;
-    const aprData = positionWithDetails?.aprBreakdown;
-    const pnlLoading = !pnlData && Boolean(position.nftId); // Loading if no PnL data and position has NFT ID
-    const aprLoading = !aprData && Boolean(position.nftId); // Loading if no APR data and position has NFT ID
-    const pnlFailed = false; // Store doesn't track individual PnL errors currently
+    // Use the unified details hook for positions with NFT ID
+    const {
+        data: positionDetails,
+        isLoading: detailsLoading,
+        error: detailsError,
+    } = usePositionDetails(position.pool.chain, position.nftId || "", {
+        enabled: Boolean(position.nftId && position.pool.chain),
+    });
+
+    // Extract data from unified response
+    const pnlData = positionDetails?.pnlBreakdown;
+    const aprData = positionDetails?.aprBreakdown;
+    const curveData = positionDetails?.curveData || null;
+
+    // Loading states
+    const pnlLoading = detailsLoading && Boolean(position.nftId);
+    const aprLoading = detailsLoading && Boolean(position.nftId);
+    const pnlFailed = Boolean(detailsError);
 
     // Get formatted display values
-    const pnlDisplayValues = usePnLDisplayValues(pnlData, quoteTokenDecimals);
+    const pnlDisplayValues = usePnLDisplayValues(
+        pnlData || undefined,
+        quoteTokenDecimals
+    );
 
     // Format APR for display
     const formatApr = (apr: number): string => {
@@ -66,132 +76,22 @@ export function PositionCard({
     // APR is always non-negative (no negative fees) so we use white text
     const aprColorClass = "text-white";
 
-    // Load PnL, APR, and curve data when position card becomes visible
+    // Update position store when unified data is received
+    const updatePositionEverywhere = usePositionStore(
+        (state) => state.updatePositionEverywhere
+    );
     useEffect(() => {
-        const curveData = positionWithDetails?.curveData;
-        const aprData = positionWithDetails?.aprBreakdown;
-        const needsData =
-            (!pnlData || !curveData || !aprData) &&
-            !pnlLoaded &&
-            position.nftId &&
-            position.pool?.chain;
-
-        if (needsData) {
-            const observer = new IntersectionObserver(
-                async ([entry]) => {
-                    if (entry.isIntersecting) {
-                        setPnlLoaded(true);
-                        observer.disconnect();
-
-                        // Load PnL, APR, and curve data in parallel
-                        const [pnlResponse, aprResponse, curveResponse] =
-                            await Promise.allSettled([
-                                apiClient.get(
-                                    `/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/pnl`
-                                ),
-                                apiClient.get(
-                                    `/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/apr`
-                                ),
-                                apiClient.get(
-                                    `/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/curve`
-                                ),
-                            ]);
-
-                        // Update position with loaded data in store
-                        if (!position.nftId) {
-                            return; // Skip if no NFT ID
-                        }
-
-                        const key = `${position.pool.chain}-${position.nftId}`;
-                        const { getPosition, updatePositionEverywhere } =
-                            usePositionStore.getState();
-
-                        const existingPosition = getPosition(
-                            position.pool.chain,
-                            position.nftId
-                        );
-                        if (existingPosition) {
-                            const updatedPosition = { ...existingPosition };
-
-                            // Add PnL data if successful and not already present
-                            if (
-                                pnlResponse.status === "fulfilled" &&
-                                pnlResponse.value.data &&
-                                !updatedPosition.pnlBreakdown
-                            ) {
-                                updatedPosition.pnlBreakdown =
-                                    pnlResponse.value.data;
-                            } else if (pnlResponse.status === "rejected") {
-                                console.debug(
-                                    `PnL load failed for position ${position.nftId}:`,
-                                    pnlResponse.reason
-                                );
-                            }
-
-                            // Add APR data if successful and not already present
-                            if (
-                                aprResponse.status === "fulfilled" &&
-                                aprResponse.value.data &&
-                                !updatedPosition.aprBreakdown
-                            ) {
-                                updatedPosition.aprBreakdown =
-                                    aprResponse.value.data;
-                            } else if (aprResponse.status === "rejected") {
-                                console.debug(
-                                    `APR load failed for position ${position.nftId}:`,
-                                    aprResponse.reason
-                                );
-                            }
-
-                            // Add curve data if successful and not already present
-                            if (
-                                curveResponse.status === "fulfilled" &&
-                                curveResponse.value.data &&
-                                !updatedPosition.curveData
-                            ) {
-                                updatedPosition.curveData =
-                                    curveResponse.value.data;
-                            } else if (curveResponse.status === "rejected") {
-                                console.debug(
-                                    `Curve load failed for position ${position.nftId}:`,
-                                    curveResponse.reason
-                                );
-                            }
-
-                            // Only update if we got at least some data or made changes
-                            if (
-                                updatedPosition.pnlBreakdown !==
-                                    existingPosition.pnlBreakdown ||
-                                updatedPosition.aprBreakdown !==
-                                    existingPosition.aprBreakdown ||
-                                updatedPosition.curveData !==
-                                    existingPosition.curveData
-                            ) {
-                                updatePositionEverywhere(key, updatedPosition);
-                            }
-                        }
-                    }
-                },
-                {
-                    threshold: 0.1,
-                    rootMargin: "100px",
-                }
-            );
-
-            if (cardRef.current) {
-                observer.observe(cardRef.current);
-            }
-
-            return () => observer.disconnect();
+        if (positionDetails && position.nftId && position.pool.chain) {
+            const key = `${position.pool.chain}-${position.nftId}`;
+            updatePositionEverywhere(key, {
+                basicData: position,
+                pnlBreakdown: positionDetails.pnlBreakdown || undefined,
+                aprBreakdown: positionDetails.aprBreakdown || undefined,
+                curveData: positionDetails.curveData || undefined,
+                lastUpdated: new Date().toISOString(),
+            });
         }
-    }, [
-        pnlData,
-        positionWithDetails?.curveData,
-        positionWithDetails?.aprBreakdown,
-        pnlLoaded,
-        position.nftId,
-        position.pool?.chain,
-    ]);
+    }, [positionDetails, position, updatePositionEverywhere]);
 
     // Check if PnL data failed to load (for debugging)
     // const pnlFailed = false; // Store doesn't track individual errors
@@ -447,6 +347,7 @@ export function PositionCard({
                             <div className="flex justify-end">
                                 <MiniPnLCurveLazy
                                     position={position}
+                                    curveData={curveData}
                                     width={120}
                                     height={60}
                                     showTooltip={true}

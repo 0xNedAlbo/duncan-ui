@@ -6,7 +6,7 @@ import { useTranslations } from "@/i18n/client";
 
 interface MiniPnLCurveProps {
     position: BasicPosition;
-    curveData?: CurveData | null;
+    curveData: CurveData | null;
     width?: number;
     height?: number;
     className?: string;

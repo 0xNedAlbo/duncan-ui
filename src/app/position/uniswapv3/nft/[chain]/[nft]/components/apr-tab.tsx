@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "@/i18n/client";
-import { usePositionApr } from "@/hooks/api/usePositions";
+import { usePositionAprPeriods } from "@/hooks/api/usePositions";
 import { AprBreakdown } from "@/components/positions/apr-breakdown";
 import type { AprBreakdown as AprBreakdownType } from "@/services/positions/positionAprService";
 import type { PnlBreakdown } from "@/services/positions/positionPnLService";
@@ -38,7 +38,7 @@ export function AprTab({
         data: aprData,
         isLoading: aprLoading,
         error: aprError,
-    } = usePositionApr(chainSlug, nftId, {
+    } = usePositionAprPeriods(chainSlug, nftId, {
         staleTime: 60000, // 1 minute
     });
 

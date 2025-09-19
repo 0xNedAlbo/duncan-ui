@@ -17,6 +17,7 @@ import type {
   PositionEventsResponse,
   ApiResponse
 } from '@/types/api';
+import type { PositionDetailsResponse } from '@/app/api/positions/uniswapv3/nft/[chain]/[nft]/details/route';
 import type { AprApiResponse } from '@/types/apr';
 import { QUERY_KEYS, MUTATION_KEYS, QUERY_OPTIONS } from '@/types/api';
 import type { BasicPosition } from '@/services/positions/positionService';
@@ -357,16 +358,43 @@ export function useInvalidatePositions() {
 }
 
 /**
- * Hook to fetch position APR data
- * Returns APR calculation data for a specific position
+ * Hook to fetch complete position details including PnL, APR breakdown, and curve data
+ * Returns unified position data from the details endpoint
  */
-export function usePositionApr(
+export function usePositionDetails(
+  chain: string,
+  nftId: string,
+  options?: Omit<UseQueryOptions<PositionDetailsResponse, ApiError, PositionDetailsResponse['data']>, 'queryKey' | 'queryFn' | 'select'>
+) {
+  return useQuery({
+    queryKey: ['positions', 'details', chain, nftId] as const,
+    queryFn: () => apiClient.get<PositionDetailsResponse>(`/api/positions/uniswapv3/nft/${chain}/${nftId}/details`),
+
+    // Default options
+    staleTime: QUERY_OPTIONS.positionDetails.staleTime,
+    gcTime: QUERY_OPTIONS.positionDetails.cacheTime,
+
+    // Only run query if chain and nftId are provided
+    enabled: !!chain && !!nftId,
+
+    // Transform response to extract just the details data
+    select: (response: PositionDetailsResponse) => response.data!,
+
+    ...options,
+  });
+}
+
+/**
+ * Hook to fetch position APR periods data (for detailed APR analysis)
+ * Returns APR calculation data with historical periods for a specific position
+ */
+export function usePositionAprPeriods(
   chain: string,
   nftId: string,
   options?: Omit<UseQueryOptions<AprApiResponse, ApiError, AprApiResponse['data']>, 'queryKey' | 'queryFn' | 'select'>
 ) {
   return useQuery({
-    queryKey: ['positions', 'apr', chain, nftId] as const,
+    queryKey: ['positions', 'apr-periods', chain, nftId] as const,
     queryFn: () => apiClient.get<AprApiResponse>(`/api/positions/uniswapv3/nft/${chain}/${nftId}/apr`),
 
     // Default options

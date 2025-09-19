@@ -231,7 +231,7 @@ export function OverviewTab({ position, pnlBreakdown, curveData }: OverviewTabPr
                     <div className="flex justify-center">
                         <MiniPnLCurveLazy
                             position={position}
-                            curveData={curveData}
+                            curveData={curveData || null}
                             width={400}
                             height={200}
                             showTooltip={true}
