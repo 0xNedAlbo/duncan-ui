@@ -113,6 +113,7 @@
         "alreadyImported": "Already Imported",
         "newPositions": "New Positions",
         "selectPositions": "Select Positions to Import",
+        "selectPosition": "Select Position to Import",
         "selectAll": "Select All",
         "selectNone": "Select None",
         "currentValue": "Current Value",

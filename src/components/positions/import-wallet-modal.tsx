@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Wallet, Search, CheckSquare, Square, Loader2, ExternalLink } from "lucide-react";
+import { X, Wallet, Search, Circle, CheckCircle, Loader2, ExternalLink } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import { useDiscoverPositions, useImportDiscoveredPositions } from "@/hooks/api/useDiscoverPositions";
 import { handleApiError } from "@/lib/app/apiError";
@@ -29,7 +29,7 @@ export function ImportWalletModal({
   const [address, setAddress] = useState("");
   const [selectedChain, setSelectedChain] = useState<SupportedChainsType>("ethereum");
   const [limit, setLimit] = useState(10);
-  const [selectedPositions, setSelectedPositions] = useState<Set<string>>(new Set());
+  const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
   const [discoveredPositions, setDiscoveredPositions] = useState<BasicPosition[]>([]);
   const [discoveryStats, setDiscoveryStats] = useState<{
     totalNFTs: number;
@@ -47,7 +47,7 @@ export function ImportWalletModal({
           existingPositions: response.data.existingPositions,
           newPositionsFound: response.data.newPositionsFound,
         });
-        setSelectedPositions(new Set()); // Clear previous selections
+        setSelectedPosition(null); // Clear previous selection
       }
     },
     onError: (error) => {
@@ -71,7 +71,7 @@ export function ImportWalletModal({
           setAddress("");
           setDiscoveredPositions([]);
           setDiscoveryStats(null);
-          setSelectedPositions(new Set());
+          setSelectedPosition(null);
         }, 2000);
       }
 
@@ -91,7 +91,7 @@ export function ImportWalletModal({
       setAddress("");
       setDiscoveredPositions([]);
       setDiscoveryStats(null);
-      setSelectedPositions(new Set());
+      setSelectedPosition(null);
     }
   }, [isOpen]);
 
@@ -101,23 +101,12 @@ export function ImportWalletModal({
   const canDiscover = isAddressValid && address.length > 0;
 
   // Handle position selection
-  const togglePositionSelection = (nftId: string) => {
-    const newSelection = new Set(selectedPositions);
-    if (newSelection.has(nftId)) {
-      newSelection.delete(nftId);
+  const selectPosition = (nftId: string) => {
+    if (selectedPosition === nftId) {
+      setSelectedPosition(null); // Deselect if already selected
     } else {
-      newSelection.add(nftId);
+      setSelectedPosition(nftId); // Select new position
     }
-    setSelectedPositions(newSelection);
-  };
-
-  const selectAllPositions = () => {
-    const allNftIds = discoveredPositions.map(p => p.nftId).filter(Boolean) as string[];
-    setSelectedPositions(new Set(allNftIds));
-  };
-
-  const deselectAllPositions = () => {
-    setSelectedPositions(new Set());
   };
 
   // Handle form submission
@@ -132,32 +121,18 @@ export function ImportWalletModal({
   };
 
   const handleImport = () => {
-    const positionsToImport = discoveredPositions.filter(
-      p => p.nftId && selectedPositions.has(p.nftId)
+    const positionToImport = discoveredPositions.find(
+      p => p.nftId && p.nftId === selectedPosition
     );
 
-    if (positionsToImport.length === 0) return;
+    if (!positionToImport) return;
 
     importPositions.mutate({
-      positions: positionsToImport,
+      positions: [positionToImport],
       chain: selectedChain,
     });
   };
 
-  // Format chain name for display
-  const formatChainName = (chain: string): string => {
-    switch (chain.toLowerCase()) {
-      case "ethereum":
-        return "Ethereum";
-      case "arbitrum":
-        return "Arbitrum";
-      case "base":
-        return "Base";
-      default:
-        return chain.charAt(0).toUpperCase() + chain.slice(1);
-    }
-  };
-  // Used for displaying chain names in UI
 
   // Calculate current position value
   const calculateCurrentValue = (position: BasicPosition): bigint => {
@@ -302,65 +277,14 @@ export function ImportWalletModal({
             {/* Discovery Results */}
             {discoveryStats && (
               <div className="space-y-4">
-                {/* Results Summary or Hint */}
-                {discoveryStats.totalNFTs > 10 ? (
-                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                    <h3 className="text-lg font-medium text-white mb-2">
-                      {t("dashboard.addPosition.wallet.discoveryResults")}
-                    </h3>
-                    <p className="text-sm text-blue-300 mb-2">
-                      {t("dashboard.addPosition.wallet.limitedResults")
-                        .replace('%d', discoveryStats.totalNFTs.toString())
-                        .replace('%d', discoveredPositions.length.toString())}
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      {t("dashboard.addPosition.wallet.useNftImport")}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="bg-slate-700/30 rounded-lg p-4">
-                    <h3 className="text-lg font-medium text-white mb-3">
-                      {t("dashboard.addPosition.wallet.discoveryResults")}
-                    </h3>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-400">{discoveryStats.totalNFTs}</div>
-                        <div className="text-slate-400">{t("dashboard.addPosition.wallet.totalNFTs")}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-yellow-400">{discoveryStats.existingPositions}</div>
-                        <div className="text-slate-400">{t("dashboard.addPosition.wallet.alreadyImported")}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-400">{discoveryStats.newPositionsFound}</div>
-                        <div className="text-slate-400">{t("dashboard.addPosition.wallet.newPositions")}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Position Selection */}
                 {discoveredPositions.length > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <h4 className="text-md font-medium text-white">
-                        {t("dashboard.addPosition.wallet.selectPositions")}
+                        {t("dashboard.addPosition.wallet.selectPosition")}
                       </h4>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={selectAllPositions}
-                          className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
-                        >
-                          {t("dashboard.addPosition.wallet.selectAll")}
-                        </button>
-                        <span className="text-slate-500">|</span>
-                        <button
-                          onClick={deselectAllPositions}
-                          className="text-sm text-slate-400 hover:text-slate-300 transition-colors"
-                        >
-                          {t("dashboard.addPosition.wallet.selectNone")}
-                        </button>
-                      </div>
                     </div>
 
                     {/* Position List */}
@@ -368,7 +292,7 @@ export function ImportWalletModal({
                       {discoveredPositions.map((position) => {
                         if (!position.nftId) return null;
 
-                        const isSelected = selectedPositions.has(position.nftId);
+                        const isSelected = selectedPosition === position.nftId;
 
                         return (
                           <div
@@ -378,13 +302,13 @@ export function ImportWalletModal({
                                 ? "bg-blue-500/10 border-blue-500/30"
                                 : "bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50"
                             }`}
-                            onClick={() => togglePositionSelection(position.nftId!)}
+                            onClick={() => selectPosition(position.nftId!)}
                           >
                             <div className="flex items-center gap-3">
                               {isSelected ? (
-                                <CheckSquare className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                                <CheckCircle className="w-5 h-5 text-blue-400 flex-shrink-0" />
                               ) : (
-                                <Square className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                                <Circle className="w-5 h-5 text-slate-400 flex-shrink-0" />
                               )}
 
                               <div className="flex-1 min-w-0">
@@ -414,7 +338,7 @@ export function ImportWalletModal({
                     {/* Import Button */}
                     <button
                       onClick={handleImport}
-                      disabled={selectedPositions.size === 0 || importPositions.isPending}
+                      disabled={!selectedPosition || importPositions.isPending}
                       className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-slate-600 disabled:text-slate-400 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
                     >
                       {importPositions.isPending ? (
@@ -424,7 +348,7 @@ export function ImportWalletModal({
                         </>
                       ) : (
                         <>
-                          {t("dashboard.addPosition.wallet.importSelected")} ({selectedPositions.size})
+                          {t("dashboard.addPosition.wallet.importSelected")}
                         </>
                       )}
                     </button>

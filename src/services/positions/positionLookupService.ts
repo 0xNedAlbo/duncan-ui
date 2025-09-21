@@ -114,7 +114,8 @@ export class PositionLookupService {
         // Add buffer to account for existing positions we'll skip
         const maxIterations = Math.min(totalNFTs, limit + existingNftIds.length);
 
-        for (let i = 0; i < maxIterations && foundPositions.length < limit; i++) {
+        // Start from the highest index (latest positions) and iterate in descending order
+        for (let i = totalNFTs - 1; i >= 0 && foundPositions.length < limit && (totalNFTs - i) <= maxIterations; i--) {
             try {
                 // Get NFT ID at index
                 const nftId = await client.readContract({
