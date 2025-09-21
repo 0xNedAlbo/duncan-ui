@@ -25,21 +25,19 @@ interface DeletePositionResponse {
 export function useDeletePosition(
   options?: UseMutationOptions<DeletePositionResponse, ApiError, DeletePositionRequest>
 ) {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationKey: ['positions', 'delete'] as const,
     mutationFn: ({ chain, nftId }: DeletePositionRequest) =>
       apiClient.delete<DeletePositionResponse>(`/api/positions/uniswapv3/${chain}/${nftId}`),
 
-    onSuccess: (_, { chain, nftId }) => {
+    onSuccess: () => {
       // Note: Store update is now handled by parent component callback
       // This prevents race conditions and keeps the hook focused on API calls only
     },
 
-    onError: (error, { chain, nftId }) => {
+    onError: (error, variables) => {
       // Log deletion error for debugging
-      console.error(`Failed to delete position ${chain}/${nftId}:`, error);
+      console.error(`Failed to delete position ${variables.chain}/${variables.nftId}:`, error);
     },
 
     ...options,

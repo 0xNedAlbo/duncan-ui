@@ -230,10 +230,12 @@ export const usePositionStore = create<PositionStore>()(
                         const key = getPositionKey(chain, nftId);
 
                         // Create new currentList.positions without the deleted position
+                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
                         const { [key]: _, ...remainingPositions } =
                             state.currentList.positions;
 
                         // Create new recentlyViewed without the deleted position
+                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
                         const { [key]: _removed, ...remainingRecentlyViewed } =
                             state.recentlyViewed;
 
@@ -246,7 +248,6 @@ export const usePositionStore = create<PositionStore>()(
                             state.activePositionKey === key
                                 ? null
                                 : state.activePositionKey;
-
 
                         return {
                             ...state,
