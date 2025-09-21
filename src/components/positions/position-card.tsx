@@ -17,24 +17,34 @@ import { usePnLDisplayValues } from "@/hooks/api/usePositionPnL";
 import { usePositionStore } from "@/store/position-store";
 import { usePositionDetails } from "@/hooks/api/usePositions";
 import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy";
+import { PositionActionsMenu } from "./position-actions-menu";
+import { DeletePositionModal } from "./delete-position-modal";
+import { useIsDeletingPosition } from "@/hooks/api/useDeletePosition";
 
 interface PositionCardProps {
     position: BasicPosition;
     // eslint-disable-next-line no-unused-vars
     onRefresh?: (position: BasicPosition) => void;
     isRefreshing?: boolean;
+    // eslint-disable-next-line no-unused-vars
+    onDelete?: (position: BasicPosition) => void;
 }
 
 export function PositionCard({
     position,
     onRefresh,
     isRefreshing,
+    onDelete,
 }: PositionCardProps) {
     const t = useTranslations();
     const [copied, setCopied] = useState(false);
     const [token0ImageError, setToken0ImageError] = useState(false);
     const [token1ImageError, setToken1ImageError] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
+
+    // Check if this position is being deleted
+    const isDeleting = useIsDeletingPosition(position.chain, position.nftId || "");
 
     // Get quote token decimals for proper formatting
     const quoteTokenDecimals = position.token0IsQuote
@@ -495,8 +505,26 @@ export function PositionCard({
                             </div>
                         )} */}
                     </div>
+
+                    {/* Position Actions Menu */}
+                    <PositionActionsMenu
+                        position={position}
+                        onDelete={() => setShowDeleteModal(true)}
+                        isDeleting={isDeleting}
+                    />
                 </div>
             </div>
+
+            {/* Delete Confirmation Modal */}
+            <DeletePositionModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                position={position}
+                onDeleteSuccess={() => {
+                    // Call the parent callback to handle store update
+                    onDelete?.(position);
+                }}
+            />
         </div>
     );
 }

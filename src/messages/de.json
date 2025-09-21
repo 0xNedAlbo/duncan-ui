@@ -100,7 +100,33 @@
       },
       "wallet": {
         "title": "Aus Wallet importieren",
-        "description": "Bestehende Positionen laden"
+        "description": "Bestehende Positionen laden",
+        "addressLabel": "Wallet-Adresse",
+        "addressPlaceholder": "0x742d35cc6666cf8c8dd2...",
+        "useConnectedWallet": "Verbundene Wallet verwenden",
+        "invalidAddress": "Ungültiges Ethereum-Adressformat",
+        "chain": "Blockchain",
+        "limit": "Max. Positionen",
+        "discover": "Positionen entdecken",
+        "discovering": "Entdecke...",
+        "discoveryError": "Positionsentdeckung fehlgeschlagen",
+        "discoveryResults": "Entdeckungsergebnisse",
+        "totalNFTs": "Gesamt NFTs",
+        "alreadyImported": "Bereits importiert",
+        "newPositions": "Neue Positionen",
+        "selectPositions": "Positionen zum Import auswählen",
+        "selectAll": "Alle auswählen",
+        "selectNone": "Keine auswählen",
+        "currentValue": "Aktueller Wert",
+        "importSelected": "Ausgewählte importieren",
+        "importing": "Importiere...",
+        "importError": "Import der Positionen fehlgeschlagen",
+        "importSuccess": "{count} Position(en) erfolgreich importiert",
+        "partialSuccess": "{failed} Position(en) konnten nicht importiert werden",
+        "noNewPositions": "Keine neuen Positionen gefunden",
+        "noNewPositionsDesc": "Alle entdeckten Positionen sind bereits in deinem Portfolio",
+        "limitedResults": "Diese Adresse hat %d Positionen, aber wir zeigen nur %d davon.",
+        "useNftImport": "Wenn du eine bestimmte Position importieren möchtest, die hier nicht gezeigt wird, verwende stattdessen die 'NFT Position importieren' Funktion."
       },
       "nft": {
         "title": "NFT Position importieren",
@@ -163,7 +189,24 @@
       "unclaimedFees": "Nicht abgeholte Gebühren",
       "pnlCurve": "PnL Curve",
       "totalPnl": "Total PnL",
-      "claimableFees": "Claimable Fees"
+      "claimableFees": "Claimable Fees",
+      "nftId": "NFT ID",
+      "tokenPair": "Token-Paar",
+      "chain": "Chain",
+      "feeTier": "Gebühren-Stufe",
+      "actions": {
+        "menu": "Positions-Aktionen",
+        "delete": "Position löschen"
+      },
+      "delete": {
+        "confirmTitle": "Position löschen",
+        "confirmMessage": "Bist du sicher, dass du diese Position löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden und entfernt die Position dauerhaft aus deinem Portfolio.",
+        "confirmButton": "Position löschen",
+        "cancelButton": "Abbrechen",
+        "deleting": "Lösche...",
+        "success": "Position erfolgreich gelöscht",
+        "error": "Position konnte nicht gelöscht werden"
+      }
     }
   },
   "auth": {

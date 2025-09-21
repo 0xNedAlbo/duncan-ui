@@ -9,7 +9,7 @@ import type { NFTPosition } from '@/lib/contracts/nonfungiblePositionManager';
 import type { PnlBreakdown } from '@/services/positions/positionPnLService';
 import type { AprBreakdown } from '@/services/positions/positionAprService';
 import type { CurveData } from '@/components/charts/mini-pnl-curve';
-import type { DiscoveredPositionSummary, PositionLookupResult } from '@/services/positions/positionLookupService';
+import type { DiscoveredPositionSummary } from '@/services/positions/positionLookupService';
 
 // Enhanced position interface for API responses (includes PnL data)
 export interface PositionWithPnL extends BasicPosition {

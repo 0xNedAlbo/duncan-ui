@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Loader2, Filter, SortAsc, SortDesc, AlertCircle } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import { PositionCard } from "./position-card";
@@ -37,8 +37,11 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
     offset,
   }), [status, chain, sortBy, sortOrder, limit, offset]);
 
-  // Use position store
-  const { setCurrentList, setListLoading, setListError } = usePositionStore();
+  // Use position store with memoized actions to prevent useEffect reruns
+  const setCurrentList = usePositionStore(useCallback((state) => state.setCurrentList, []));
+  const setListLoading = usePositionStore(useCallback((state) => state.setListLoading, []));
+  const setListError = usePositionStore(useCallback((state) => state.setListError, []));
+  const removePosition = usePositionStore(useCallback((state) => state.removePosition, []));
   const currentListState = useCurrentListState();
   const { refreshPosition } = usePositionRefresh();
 
@@ -63,85 +66,81 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
   }, [status, chain, sortBy, sortOrder]);
 
   // Load positions when component mounts or filters change
-  useEffect(() => {
-    const loadPositions = async () => {
-      try {
-        setListLoading(true);
-        setListError(null);
+  const loadPositions = useCallback(async () => {
+    try {
+      setListLoading(true);
+      setListError(null);
 
-        const response = await apiClient.get('/api/positions/uniswapv3/list', {
-          params: queryParams
-        });
+      const response = await apiClient.get('/api/positions/uniswapv3/list', {
+        params: queryParams
+      });
 
-        if (response.data) {
-          setCurrentList(
-            response.data.positions || [],
-            response.data.pagination || {
-              total: 0,
-              limit: 20,
-              offset: 0,
-              hasMore: false,
-              nextOffset: null
-            },
-            queryParams
-          );
+      if (response.data) {
+        setCurrentList(
+          response.data.positions || [],
+          response.data.pagination || {
+            total: 0,
+            limit: 20,
+            offset: 0,
+            hasMore: false,
+            nextOffset: null
+          },
+          queryParams
+        );
 
-          // Load PnL data for the first few positions in the background
-          const positions = response.data.positions || [];
-          const limitedPositions = positions.slice(0, 5); // Load PnL for first 5 positions
+        // Load PnL data for the first few positions in the background
+        const positions = response.data.positions || [];
+        const limitedPositions = positions.slice(0, 5); // Load PnL for first 5 positions
 
-          limitedPositions.forEach(async (position: BasicPosition) => {
-            if (position.nftId && position.pool?.chain) {
-              // Load both PnL and curve data in parallel
-              const [pnlResponse, curveResponse] = await Promise.allSettled([
-                apiClient.get(`/api/positions/uniswapv3/${position.pool.chain}/${position.nftId}/pnl`),
-                apiClient.get(`/api/positions/uniswapv3/${position.pool.chain}/${position.nftId}/curve`)
-              ]);
+        limitedPositions.forEach(async (position: BasicPosition) => {
+          if (position.nftId && position.pool?.chain) {
+            // Load both PnL and curve data in parallel
+            const [pnlResponse, curveResponse] = await Promise.allSettled([
+              apiClient.get(`/api/positions/uniswapv3/${position.pool.chain}/${position.nftId}/pnl`),
+              apiClient.get(`/api/positions/uniswapv3/${position.pool.chain}/${position.nftId}/curve`)
+            ]);
 
-              // Update position with loaded data in store
-              const key = `${position.pool.chain}-${position.nftId}`;
-              const getPosition = usePositionStore.getState().getPosition;
-              const updatePositionEverywhere = usePositionStore.getState().updatePositionEverywhere;
+            // Update position with loaded data in store
+            const key = `${position.pool.chain}-${position.nftId}`;
+            const getPosition = usePositionStore.getState().getPosition;
+            const updatePositionEverywhere = usePositionStore.getState().updatePositionEverywhere;
 
-              const existingPosition = getPosition(position.pool.chain, position.nftId);
-              if (existingPosition) {
-                const updatedPosition = { ...existingPosition };
+            const existingPosition = getPosition(position.pool.chain, position.nftId);
+            if (existingPosition) {
+              const updatedPosition = { ...existingPosition };
 
-                // Add PnL data if successful
-                if (pnlResponse.status === 'fulfilled' && pnlResponse.value.data) {
-                  updatedPosition.pnlBreakdown = pnlResponse.value.data;
-                } else if (pnlResponse.status === 'rejected') {
-                  console.debug(`PnL load failed for position ${position.nftId}:`, pnlResponse.reason);
-                }
+              // Add PnL data if successful
+              if (pnlResponse.status === 'fulfilled' && pnlResponse.value.data) {
+                updatedPosition.pnlBreakdown = pnlResponse.value.data;
+              }
 
-                // Add curve data if successful (including null data for closed positions)
-                if (curveResponse.status === 'fulfilled' && curveResponse.value.success) {
-                  updatedPosition.curveData = curveResponse.value.data; // Can be null for closed positions
-                } else if (curveResponse.status === 'rejected') {
-                  console.debug(`Curve load failed for position ${position.nftId}:`, curveResponse.reason);
-                }
+              // Add curve data if successful (including null data for closed positions)
+              if (curveResponse.status === 'fulfilled' && curveResponse.value.success) {
+                updatedPosition.curveData = curveResponse.value.data; // Can be null for closed positions
+              }
 
-                // Update if we got any response (PnL data or curve response)
-                const hasPnlData = pnlResponse.status === 'fulfilled' && pnlResponse.value.data;
-                const hasCurveResponse = curveResponse.status === 'fulfilled' && curveResponse.value.success;
+              // Update if we got any response (PnL data or curve response)
+              const hasPnlData = pnlResponse.status === 'fulfilled' && pnlResponse.value.data;
+              const hasCurveResponse = curveResponse.status === 'fulfilled' && curveResponse.value.success;
 
-                if (hasPnlData || hasCurveResponse) {
-                  updatePositionEverywhere(key, updatedPosition);
-                }
+              if (hasPnlData || hasCurveResponse) {
+                updatePositionEverywhere(key, updatedPosition);
               }
             }
-          });
-        }
-      } catch (error) {
-        console.error('Failed to load positions:', error);
-        setListError('Failed to load positions');
-      } finally {
-        setListLoading(false);
+          }
+        });
       }
-    };
-
-    loadPositions();
+    } catch (error) {
+      console.error('Failed to load positions:', error);
+      setListError('Failed to load positions');
+    } finally {
+      setListLoading(false);
+    }
   }, [queryParams, setCurrentList, setListLoading, setListError]);
+
+  useEffect(() => {
+    loadPositions();
+  }, [loadPositions]);
 
   // Handle external refresh trigger
   useEffect(() => {
@@ -167,6 +166,11 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
       // TODO: Show error toast
     }
   };
+
+  // Handle position deletion - called after successful API deletion
+  const handleDeletePosition = useCallback((position: BasicPosition) => {
+    removePosition(position.pool.chain, position.nftId || '');
+  }, [removePosition]);
 
   // Check if a specific position is being refreshed
   const isPositionRefreshing = (position: BasicPosition) => {
@@ -295,6 +299,7 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
               key={`${position.chain}-${position.protocol}-${position.nftId}`}
               position={position}
               onRefresh={handleRefreshPosition}
+              onDelete={handleDeletePosition}
               isRefreshing={isPositionRefreshing(position)}
             />
           ))}

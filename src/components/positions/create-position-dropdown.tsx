@@ -6,15 +6,24 @@ import { useTranslations } from "@/i18n/client";
 import { useImportNFT } from "@/hooks/api/usePositions";
 import { handleApiError } from "@/lib/app/apiError";
 import { usePositionStore } from "@/store/position-store";
+import { ImportWalletModal } from "@/components/positions/import-wallet-modal";
 import type { BasicPosition } from "@/services/positions/positionService";
 
 interface CreatePositionDropdownProps {
     // eslint-disable-next-line no-unused-vars
     onImportSuccess?: (position: any) => void;
+    showImportModal?: boolean;
+    onImportModalOpen?: () => void;
+    onImportModalClose?: () => void;
+    connectedAddress?: string;
 }
 
 export function CreatePositionDropdown({
     onImportSuccess,
+    showImportModal = false,
+    onImportModalOpen,
+    onImportModalClose,
+    connectedAddress,
 }: CreatePositionDropdownProps = {}) {
     const t = useTranslations();
     const { addPosition } = usePositionStore();
@@ -124,7 +133,7 @@ export function CreatePositionDropdown({
                         <button
                             onClick={() => {
                                 setIsDropdownOpen(false);
-                                // TODO: Open wallet import modal
+                                onImportModalOpen?.();
                             }}
                             className="w-full px-4 py-3 text-sm text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors"
                         >
@@ -257,6 +266,19 @@ export function CreatePositionDropdown({
                     </div>
                 </div>
             )}
+
+            {/* Import Wallet Modal */}
+            <ImportWalletModal
+                isOpen={showImportModal}
+                onClose={onImportModalClose || (() => {})}
+                onImportSuccess={(positions) => {
+                    // Add positions to store
+                    positions.forEach(position => addPosition(position));
+                    // Notify parent
+                    onImportSuccess?.(positions);
+                }}
+                connectedAddress={connectedAddress}
+            />
         </div>
     );
 }

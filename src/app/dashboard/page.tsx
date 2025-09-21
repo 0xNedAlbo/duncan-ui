@@ -1,20 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { UserDropdown } from "@/components/auth/user-dropdown";
 import { SettingsModal } from "@/components/settings-modal";
 import { CreatePositionDropdown } from "@/components/positions/create-position-dropdown";
 import { PositionList } from "@/components/positions/position-list";
 import { useTranslations } from "@/i18n/client";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 
-export default function Dashboard() {
+function DashboardContent() {
     const t = useTranslations();
-    const { data: session, status } = useSession();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    // Check if import modal should be open based on URL parameter
+    const showImportModal = searchParams.get('import') === 'wallet';
 
     // Handle successful position import
     const handleImportSuccess = (/* _position: any */) => {
@@ -22,29 +25,19 @@ export default function Dashboard() {
         setRefreshTrigger((prev) => prev + 1);
     };
 
-    // Handle authentication redirect
-    useEffect(() => {
-        if (
-            status === "unauthenticated" ||
-            (!session && status !== "loading")
-        ) {
-            router.push("/auth/signin");
-        }
-    }, [status, session, router]);
+    // Handle modal state changes and URL updates
+    const handleImportModalClose = () => {
+        const params = new URLSearchParams(searchParams);
+        params.delete('import');
+        const newUrl = params.toString() ? `?${params.toString()}` : '/dashboard';
+        router.push(newUrl);
+    };
 
-    // Show loading state
-    if (status === "loading") {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
-                <div className="text-white">{t("common.loading")}</div>
-            </div>
-        );
-    }
-
-    // Don't render anything while redirecting
-    if (status === "unauthenticated" || !session) {
-        return null;
-    }
+    const handleImportModalOpen = () => {
+        const params = new URLSearchParams(searchParams);
+        params.set('import', 'wallet');
+        router.push(`?${params.toString()}`);
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
@@ -78,6 +71,9 @@ export default function Dashboard() {
 
                         <CreatePositionDropdown
                             onImportSuccess={handleImportSuccess}
+                            showImportModal={showImportModal}
+                            onImportModalOpen={handleImportModalOpen}
+                            onImportModalClose={handleImportModalClose}
                         />
                     </div>
 
@@ -86,5 +82,45 @@ export default function Dashboard() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function Dashboard() {
+    const t = useTranslations();
+    const { data: session, status } = useSession();
+    const router = useRouter();
+
+    // Handle authentication redirect
+    useEffect(() => {
+        if (
+            status === "unauthenticated" ||
+            (!session && status !== "loading")
+        ) {
+            router.push("/auth/signin");
+        }
+    }, [status, session, router]);
+
+    // Show loading state
+    if (status === "loading") {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+                <div className="text-white">{t("common.loading")}</div>
+            </div>
+        );
+    }
+
+    // Don't render anything while redirecting
+    if (status === "unauthenticated" || !session) {
+        return null;
+    }
+
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+                <div className="text-white">{t("common.loading")}</div>
+            </div>
+        }>
+            <DashboardContent />
+        </Suspense>
     );
 }

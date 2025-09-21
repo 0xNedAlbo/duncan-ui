@@ -1,0 +1,16 @@
+{
+  "restart-dev": {
+    "description": "Restart the development server",
+    "steps": [
+      {
+        "type": "bash",
+        "command": "pkill -f 'npm run dev' || pkill -f 'next dev' || true"
+      },
+      {
+        "type": "bash",
+        "command": "npm run dev",
+        "background": true
+      }
+    ]
+  }
+}

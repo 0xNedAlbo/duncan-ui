@@ -146,11 +146,23 @@ export const POST = withAuthAndLogging<{ success: boolean; data?: any; error?: s
       }
 
       // Import the position
-      const importResult = await positionImportService.importPositionForUserByNftId(
-        user.userId,
-        nftId,
-        chain as SupportedChainsType
-      );
+      let importResult;
+      try {
+        importResult = await positionImportService.importPositionForUserByNftId(
+          user.userId,
+          nftId,
+          chain as SupportedChainsType
+        );
+      } catch (error) {
+        log.error({
+          chain,
+          nftId,
+          userId: user.userId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }, 'Position import service call failed');
+
+        importResult = { success: false, message: 'Position import failed' };
+      }
 
       if (!importResult.success) {
         log.debug(
@@ -263,37 +275,14 @@ export const POST = withAuthAndLogging<{ success: boolean; data?: any; error?: s
         userId: user?.userId
       });
 
-      // Clean up any partially created position data on unexpected errors
-      if (chain && nftId) {
-        try {
-          const cleanupPositionId = {
-            userId: user.userId,
-            chain: chain as SupportedChainsType,
-            protocol: "uniswapv3",
-            nftId
-          };
-          await ApiServiceFactory.getInstance().positionService.deletePosition(cleanupPositionId);
-          log.debug(
-            { chain, nftId, userId: user.userId },
-            'Cleaned up partially created position after unexpected error'
-          );
-        } catch (cleanupError) {
-          log.error(
-            { chain, nftId, userId: user.userId, cleanupError },
-            'Failed to clean up position after unexpected error'
-          );
-          // Don't fail the response due to cleanup errors
-        }
-      }
-
       return NextResponse.json(
         {
           success: false,
           error: 'Internal server error',
           meta: {
             requestedAt: new Date().toISOString(),
-            chain: chain || '',
-            nftId: nftId || '',
+            chain: '',
+            nftId: '',
             dataSource: 'onchain'
           }
         },

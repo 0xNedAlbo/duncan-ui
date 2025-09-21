@@ -98,7 +98,33 @@
       },
       "wallet": {
         "title": "Import from Wallet",
-        "description": "Load existing positions"
+        "description": "Load existing positions",
+        "addressLabel": "Wallet Address",
+        "addressPlaceholder": "0x742d35cc6666cf8c8dd2...",
+        "useConnectedWallet": "Use Connected Wallet",
+        "invalidAddress": "Invalid Ethereum address format",
+        "chain": "Blockchain",
+        "limit": "Max Positions",
+        "discover": "Discover Positions",
+        "discovering": "Discovering...",
+        "discoveryError": "Failed to discover positions",
+        "discoveryResults": "Discovery Results",
+        "totalNFTs": "Total NFTs",
+        "alreadyImported": "Already Imported",
+        "newPositions": "New Positions",
+        "selectPositions": "Select Positions to Import",
+        "selectAll": "Select All",
+        "selectNone": "Select None",
+        "currentValue": "Current Value",
+        "importSelected": "Import Selected",
+        "importing": "Importing...",
+        "importError": "Failed to import positions",
+        "importSuccess": "Successfully imported {count} position(s)",
+        "partialSuccess": "{failed} position(s) failed to import",
+        "noNewPositions": "No new positions found",
+        "noNewPositionsDesc": "All discovered positions are already in your portfolio",
+        "limitedResults": "This address has %d positions, but we're showing only %d of them.",
+        "useNftImport": "If you want to import a specific position not shown here, use the 'Import NFT Position' feature instead."
       },
       "nft": {
         "title": "Import NFT Position",
@@ -161,7 +187,24 @@
       "unclaimedFees": "Unclaimed Fees",
       "pnlCurve": "PnL Curve",
       "totalPnl": "Total PnL",
-      "claimableFees": "Claimable Fees"
+      "claimableFees": "Claimable Fees",
+      "nftId": "NFT ID",
+      "tokenPair": "Token Pair",
+      "chain": "Chain",
+      "feeTier": "Fee Tier",
+      "actions": {
+        "menu": "Position actions",
+        "delete": "Delete Position"
+      },
+      "delete": {
+        "confirmTitle": "Delete Position",
+        "confirmMessage": "Are you sure you want to delete this position? This action cannot be undone and will permanently remove the position from your portfolio.",
+        "confirmButton": "Delete Position",
+        "cancelButton": "Cancel",
+        "deleting": "Deleting...",
+        "success": "Position deleted successfully",
+        "error": "Failed to delete position"
+      }
     }
   },
   "auth": {
@@ -203,7 +246,8 @@
       "ledger": "PnL Analysis",
       "apr": "APR Analysis",
       "range": "Range Analysis",
-      "analytics": "Analytics"
+      "analytics": "Analytics",
+      "technical": "Technical Details"
     },
     "status": {
       "active": "Active",

@@ -69,9 +69,13 @@ export interface PositionStore {
         _filters: PositionListParams
     ) => void;
     addPosition: (_position: BasicPosition) => void;
+    removePosition: (_chain: string, _nftId: string) => void;
     navigateToPosition: (_chain: string, _nftId: string) => void;
     refreshPosition: (_chain: string, _nftId: string) => Promise<void>;
-    loadPositionDetails: (_chain: string, _nftId: string) => Promise<PositionWithDetails | null>;
+    loadPositionDetails: (
+        _chain: string,
+        _nftId: string
+    ) => Promise<PositionWithDetails | null>;
     updatePositionEverywhere: (
         _key: string,
         _updatedPosition: PositionWithDetails
@@ -187,14 +191,20 @@ export const usePositionStore = create<PositionStore>()(
                     set((state) => {
                         // Validate required fields before adding
                         if (!position.nftId || !position.pool.chain) {
-                            console.error('Cannot add position: missing required nftId or chain', {
-                                nftId: position.nftId,
-                                chain: position.pool.chain
-                            });
+                            console.error(
+                                "Cannot add position: missing required nftId or chain",
+                                {
+                                    nftId: position.nftId,
+                                    chain: position.pool.chain,
+                                }
+                            );
                             return state; // Return unchanged state
                         }
 
-                        const key = getPositionKey(position.pool.chain, position.nftId);
+                        const key = getPositionKey(
+                            position.pool.chain,
+                            position.nftId
+                        );
                         const newPosition = basicPositionToDetails(position);
 
                         return {
@@ -207,9 +217,53 @@ export const usePositionStore = create<PositionStore>()(
                                 },
                                 pagination: {
                                     ...state.currentList.pagination,
-                                    total: state.currentList.pagination.total + 1,
+                                    total:
+                                        state.currentList.pagination.total + 1,
                                 },
                             },
+                        };
+                    });
+                },
+
+                removePosition: (chain, nftId) => {
+                    set((state) => {
+                        const key = getPositionKey(chain, nftId);
+
+                        // Create new currentList.positions without the deleted position
+                        const { [key]: _, ...remainingPositions } =
+                            state.currentList.positions;
+
+                        // Create new recentlyViewed without the deleted position
+                        const { [key]: _removed, ...remainingRecentlyViewed } =
+                            state.recentlyViewed;
+
+                        // Update recently viewed order to remove the deleted position
+                        const newRecentlyViewedOrder =
+                            state.recentlyViewedOrder.filter((k) => k !== key);
+
+                        // Reset active position if it was the deleted one
+                        const newActivePositionKey =
+                            state.activePositionKey === key
+                                ? null
+                                : state.activePositionKey;
+
+
+                        return {
+                            ...state,
+                            currentList: {
+                                ...state.currentList,
+                                positions: remainingPositions,
+                                pagination: {
+                                    ...state.currentList.pagination,
+                                    total: Math.max(
+                                        0,
+                                        state.currentList.pagination.total - 1
+                                    ),
+                                },
+                            },
+                            recentlyViewed: remainingRecentlyViewed,
+                            recentlyViewedOrder: newRecentlyViewedOrder,
+                            activePositionKey: newActivePositionKey,
                         };
                     });
                 },
@@ -360,15 +414,22 @@ export const usePositionStore = create<PositionStore>()(
                         // TEMPORARY: Force fresh data load for debugging
                         // TODO: Remove this once APR calculation is working
 
-
-                        const { apiClient } = await import("@/lib/app/apiClient");
-
+                        const { apiClient } = await import(
+                            "@/lib/app/apiClient"
+                        );
 
                         // Call unified details endpoint
-                        const response = await apiClient.get(`/api/positions/uniswapv3/${chain}/${nftId}/details`);
+                        const response = await apiClient.get(
+                            `/api/positions/uniswapv3/${chain}/${nftId}/details`
+                        );
 
                         if (response.success && response.data) {
-                            const { basicData, pnlBreakdown, aprBreakdown, curveData } = response.data;
+                            const {
+                                basicData,
+                                pnlBreakdown,
+                                aprBreakdown,
+                                curveData,
+                            } = response.data;
 
                             // Create complete position object
                             const completePosition: PositionWithDetails = {
@@ -381,19 +442,27 @@ export const usePositionStore = create<PositionStore>()(
                             };
 
                             // Update position everywhere in store
-                            get().updatePositionEverywhere(key, completePosition);
+                            get().updatePositionEverywhere(
+                                key,
+                                completePosition
+                            );
 
                             // Set as active position
                             get().navigateToPosition(chain, nftId);
 
-
                             return completePosition;
                         } else {
-                            console.error(`[Store] Failed to load position details: ${key}`, response.error);
+                            console.error(
+                                `[Store] Failed to load position details: ${key}`,
+                                response.error
+                            );
                             return null;
                         }
                     } catch (error) {
-                        console.error(`[Store] Error loading position details: ${key}`, error);
+                        console.error(
+                            `[Store] Error loading position details: ${key}`,
+                            error
+                        );
                         return null;
                     }
                 },
