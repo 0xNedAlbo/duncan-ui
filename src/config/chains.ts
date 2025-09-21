@@ -1,5 +1,8 @@
 // Blockchain Configuration mit Wrapped Native Token Adressen
 
+import { mainnet, arbitrum, base, type Chain } from "viem/chains";
+import { normalizeAddress } from "@/lib/utils/evm";
+
 export type FinalityConfig =
     | { type: "blockTag" }
     | { type: "blockHeight"; minBlockHeight: number };
@@ -10,6 +13,7 @@ export interface ChainConfig {
     shortName: string;
     slug: string;
     rpcUrl?: string;
+    viemChain: Chain;
     wrappedNativeToken: {
         address: string;
         symbol: string;
@@ -27,8 +31,9 @@ const CHAIN_CONFIG: Record<string, ChainConfig> = {
         name: "Ethereum Mainnet",
         shortName: "Ethereum",
         slug: "ethereum",
+        viemChain: mainnet,
         wrappedNativeToken: {
-            address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            address: normalizeAddress("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"),
             symbol: "WETH",
             name: "Wrapped Ether",
             decimals: 18,
@@ -41,8 +46,9 @@ const CHAIN_CONFIG: Record<string, ChainConfig> = {
         name: "Arbitrum One",
         shortName: "Arbitrum",
         slug: "arbitrum",
+        viemChain: arbitrum,
         wrappedNativeToken: {
-            address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBAb1",
+            address: normalizeAddress("0x82aF49447D8a07e3bd95BD0d56f35241523fBAb1"),
             symbol: "WETH",
             name: "Wrapped Ether",
             decimals: 18,
@@ -55,8 +61,9 @@ const CHAIN_CONFIG: Record<string, ChainConfig> = {
         name: "Base",
         shortName: "Base",
         slug: "base",
+        viemChain: base,
         wrappedNativeToken: {
-            address: "0x4200000000000000000000000000000000000006",
+            address: normalizeAddress("0x4200000000000000000000000000000000000006"),
             symbol: "WETH",
             name: "Wrapped Ether",
             decimals: 18,

@@ -7,25 +7,22 @@
 
 import { type PublicClient } from "viem";
 
-import { type SupportedChainsType } from "@/config/chains";
-import { NONFUNGIBLE_POSITION_MANAGER_ABI } from "@/lib/contracts/nonfungiblePositionManager";
+import { type SupportedChainsType, getChainId } from "@/config/chains";
+import {
+    NONFUNGIBLE_POSITION_MANAGER_ABI,
+    NONFUNGIBLE_POSITION_MANAGER_ADDRESSES
+} from "@/lib/contracts/nonfungiblePositionManager";
 import { PrismaClient } from "@prisma/client";
 import { PoolService } from "../pools/poolService";
 import { PositionService } from "./positionService";
-import { PositionPnLService } from "./positionPnLService";
-import { PositionLedgerService } from "./positionLedgerService";
+// import { PositionPnLService } from "./positionPnLService";
+// import { PositionLedgerService } from "./positionLedgerService";
 import { EtherscanEventService } from "../etherscan/etherscanEventService";
 import { QuoteTokenService } from "./quoteTokenService";
 import type { Services } from "../ServiceFactory";
 import type { Clients } from "../ClientsFactory";
 import { createServiceLogger, type ServiceLogger } from "@/lib/logging/loggerFactory";
 
-// Contract addresses for Uniswap V3 NFT Position Manager
-const NFT_MANAGER_ADDRESSES = {
-    ethereum: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
-    arbitrum: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
-    base: "0x03a520b32C04BF3bEEf7BF5d4f1D4b32E76a7d2f",
-} as const;
 
 // Imported position data structure
 export interface ImportedPositionData {
@@ -44,7 +41,11 @@ export interface ImportedPositionData {
 // Import result
 export interface PositionImportResult {
     success: boolean;
-    positionId?: string;
+    position?: {
+        chain: string;
+        protocol: string;
+        nftId: string;
+    };
     message: string;
     data?: ImportedPositionData;
 }
@@ -54,8 +55,8 @@ export class PositionImportService {
     private rpcClients: Map<SupportedChainsType, PublicClient>;
     private pools: PoolService;
     private positions: PositionService;
-    private positionPnLService: PositionPnLService;
-    private positionLedgerService: PositionLedgerService;
+    // private positionPnLService: PositionPnLService;
+    // private positionLedgerService: PositionLedgerService;
     private etherscanEventService: EtherscanEventService;
     private quoteTokenService: QuoteTokenService;
     private logger: ServiceLogger;
@@ -65,14 +66,15 @@ export class PositionImportService {
             Clients,
             "prisma" | "rpcClients" | "etherscanClient"
         >,
-        requiredServices: Pick<Services, "positionService" | "poolService" | "positionPnLService" | "positionLedgerService">
+        requiredServices: Pick<Services, "positionService" | "poolService">
+        // requiredServices: Pick<Services, "positionService" | "poolService" | "positionPnLService" | "positionLedgerService">
     ) {
         this.prisma = requiredClients.prisma;
         this.rpcClients = requiredClients.rpcClients;
         this.positions = requiredServices.positionService;
         this.pools = requiredServices.poolService;
-        this.positionPnLService = requiredServices.positionPnLService;
-        this.positionLedgerService = requiredServices.positionLedgerService;
+        // this.positionPnLService = requiredServices.positionPnLService;
+        // this.positionLedgerService = requiredServices.positionLedgerService;
         this.etherscanEventService = new EtherscanEventService({
             etherscanClient: requiredClients.etherscanClient,
         });
@@ -101,10 +103,11 @@ export class PositionImportService {
                 throw new Error(`No RPC client available for chain: ${chain}`);
             }
 
-            const nftManagerAddress = NFT_MANAGER_ADDRESSES[chain];
+            const chainId = getChainId(chain);
+            const nftManagerAddress = NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[chainId];
             if (!nftManagerAddress) {
                 throw new Error(
-                    `NFT Manager address not configured for chain: ${chain}`
+                    `NFT Manager address not configured for chain: ${chain} (chainId: ${chainId})`
                 );
             }
 
@@ -133,28 +136,18 @@ export class PositionImportService {
                 queryBlock
             );
 
-            // Step 4: Get pool information
-            const poolData = await this.pools.findOrCreatePool(
+            // Step 4: Get pool address from factory contract
+            const poolAddress = await this.positions.getPoolAddress(
                 chain,
                 positionData.token0,
                 positionData.token1,
-                positionData.fee,
-                userId
+                positionData.fee
             );
 
-            // Step 5: Verify user exists
-            const user = await this.prisma.user.findUnique({
-                where: { id: userId },
-            });
-
-            if (!user) {
-                throw new Error(`User with ID ${userId} not found`);
-            }
-
-            // Step 6: Create imported position data structure
+            // Step 5: Create imported position data structure
             const importedData: ImportedPositionData = {
                 nftId: nftId,
-                poolAddress: poolData.poolAddress.toLowerCase(),
+                poolAddress: poolAddress.toLowerCase(),
                 tickLower: positionData.tickLower,
                 tickUpper: positionData.tickUpper,
                 // Use current liquidity (0 for closed positions) instead of historical liquidity
@@ -166,79 +159,71 @@ export class PositionImportService {
                 owner: positionData.owner.toLowerCase(),
             };
 
-            // Step 7: Determine quote token configuration
+            // Step 6: Create/get pool information
+            const poolData = await this.pools.createPool(
+                chain,
+                poolAddress
+            );
+
+            // Step 7: Verify user exists
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+            });
+
+            if (!user) {
+                throw new Error(`User with ID ${userId} not found`);
+            }
+
+            // Step 8: Determine quote token configuration
             const { token0IsQuote } =
                 this.quoteTokenService.determineQuoteToken(
-                    poolData.token0Data.symbol,
-                    poolData.token0Data.address,
-                    poolData.token1Data.symbol,
-                    poolData.token1Data.address,
+                    poolData.token0.symbol,
+                    poolData.token0.address,
+                    poolData.token1.symbol,
+                    poolData.token1.address,
                     chain
                 );
 
-            // Step 8: Save position to database
+            // Step 9: Save position to database
             const savedPosition = await this.positions.createPosition({
+                chain: chain,
+                protocol: "uniswapv3",
+                nftId: importedData.nftId,
                 userId: userId,
-                poolId: poolData.id,
+                poolChain: chain,
+                poolAddress: poolData.poolAddress,
                 tickLower: importedData.tickLower,
                 tickUpper: importedData.tickUpper,
                 liquidity: importedData.liquidity,
                 token0IsQuote: token0IsQuote,
                 owner: importedData.owner,
                 importType: "nft",
-                nftId: importedData.nftId,
                 status: positionStatus.status === "closed" ? "closed" : "active",
             });
 
-            // Step 9: Sync position events (critical for position functionality)
-            if (savedPosition.nftId) {
-                try {
-                    this.logger.debug({ positionId: savedPosition.id, nftId: savedPosition.nftId, chain }, 'Starting event sync for position');
+            // Step 10: Sync position events (temporarily disabled - requires PositionLedgerService updates)
+            // TODO: Re-enable after PositionLedgerService is updated for composite keys
+            this.logger.debug({
+                chain: savedPosition.chain,
+                protocol: savedPosition.protocol,
+                nftId: savedPosition.nftId
+            }, 'Event sync temporarily disabled during schema migration');
 
-                    // Get the imported position data for sync info
-                    const fullPosition = await this.positions.getPosition(savedPosition.id);
-                    if (fullPosition) {
-                        this.logger.debug({
-                            id: fullPosition.id,
-                            nftId: fullPosition.nftId,
-                            poolAddress: fullPosition.pool.poolAddress,
-                            chain: fullPosition.pool.chain
-                        }, 'Retrieved full position data');
-
-                        const positionSyncInfo = PositionLedgerService.createSyncInfo(fullPosition);
-                        this.logger.debug({
-                            id: positionSyncInfo.id,
-                            poolChain: positionSyncInfo.pool.chain,
-                            poolAddress: positionSyncInfo.pool.poolAddress
-                        }, 'Created position sync info');
-
-                        const syncResult = await this.positionLedgerService.syncPositionEvents(positionSyncInfo, savedPosition.nftId);
-                        this.logger.debug({ eventCount: syncResult.length }, 'Event sync completed');
-                    } else {
-                        this.logger.warn({ positionId: savedPosition.id }, 'Failed to retrieve full position data');
-                    }
-                } catch (error) {
-                    // Log detailed event sync failure but continue - some positions might work without events
-                    this.logger.error({
-                        positionId: savedPosition.id,
-                        nftId: savedPosition.nftId,
-                        error: error instanceof Error ? error.message : error,
-                        stack: error instanceof Error ? error.stack : undefined
-                    }, 'Event syncing failed for position');
-                }
-            }
-
-            // Step 10: Calculate PnL breakdown (best effort - can fail without breaking import)
-            try {
-                await this.positionPnLService.getPnlBreakdown(savedPosition.id);
-            } catch (error) {
-                // Don't fail the import if PnL calculation fails, but log for monitoring
-                this.logger.warn({ positionId: savedPosition.id, error: error instanceof Error ? error.message : error }, 'PnL calculation failed for imported position');
-            }
+            // Step 11: Calculate PnL breakdown (temporarily disabled - requires PositionPnLService updates)
+            // TODO: Re-enable after PositionPnLService is updated for composite keys
+            this.logger.debug({
+                chain: savedPosition.chain,
+                protocol: savedPosition.protocol,
+                nftId: savedPosition.nftId
+            }, 'PnL calculation temporarily disabled during schema migration');
 
             return {
                 success: true,
-                positionId: savedPosition.id,
+                position: {
+                    chain: savedPosition.chain,
+                    protocol: savedPosition.protocol,
+                    nftId: savedPosition.nftId,
+                },
                 message: `Successfully imported position NFT ${nftId} for user ${userId}`,
                 data: importedData,
             };

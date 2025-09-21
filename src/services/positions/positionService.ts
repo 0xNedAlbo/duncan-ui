@@ -7,6 +7,9 @@
 
 import { SupportedChainsType } from "@/config/chains";
 import { PrismaClient } from "@prisma/client";
+import { type PublicClient } from "viem";
+import { UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_FACTORY_ADDRESSES } from "@/lib/contracts/uniswapV3Factory";
+import { normalizeAddress, compareAddresses } from "@/lib/utils/evm";
 
 // Token data interface
 export interface TokenData {
@@ -19,9 +22,9 @@ export interface TokenData {
 
 // Pool data interface
 export interface PoolData {
-    id: string;
     chain: string;
     poolAddress: string;
+    protocol: string;
     fee: number;
     tickSpacing: number;
     token0: TokenData;
@@ -32,9 +35,9 @@ export interface PoolData {
 
 // Basic position interface (no PnL data)
 export interface BasicPosition {
-    id: string;
     chain: string;
-    nftId?: string;
+    protocol: string;
+    nftId: string;
     liquidity: string;
     tickLower: number;
     tickUpper: number;
@@ -49,16 +52,18 @@ export interface BasicPosition {
 
 // Position creation data
 export interface CreatePositionData {
-    id?: string;
+    chain: string;
+    protocol: string;
+    nftId: string;
     userId: string;
-    poolId: string;
+    poolChain: string;
+    poolAddress: string;
     tickLower: number;
     tickUpper: number;
     liquidity: string;
     token0IsQuote: boolean;
     owner?: string;
     importType: "manual" | "wallet" | "nft";
-    nftId?: string;
     status?: string;
 }
 
@@ -85,31 +90,30 @@ export interface PositionListOptions {
 
 export class PositionService {
     private prisma: PrismaClient;
-    constructor(prisma: PrismaClient) {
+    private rpcClients: Map<SupportedChainsType, PublicClient>;
+
+    constructor(prisma: PrismaClient, rpcClients: Map<SupportedChainsType, PublicClient>) {
         this.prisma = prisma;
+        this.rpcClients = rpcClients;
     }
 
     /**
-     * Get a single position by ID
+     * Get a single position by composite key
      */
-    async getPosition(positionId: string): Promise<BasicPosition | null> {
+    async getPosition(chain: string, protocol: string, nftId: string): Promise<BasicPosition | null> {
         const position = await this.prisma.position.findUnique({
-            where: { id: positionId },
+            where: {
+                chain_protocol_nftId: {
+                    chain,
+                    protocol,
+                    nftId,
+                },
+            },
             include: {
                 pool: {
                     include: {
-                        token0Ref: {
-                            include: {
-                                globalToken: true,
-                                userToken: true,
-                            },
-                        },
-                        token1Ref: {
-                            include: {
-                                globalToken: true,
-                                userToken: true,
-                            },
-                        },
+                        token0: true,
+                        token1: true,
                     },
                 },
             },
@@ -149,9 +153,7 @@ export class PositionService {
         }
 
         if (chain) {
-            whereClause.pool = {
-                chain,
-            };
+            whereClause.chain = chain;
         }
 
         const positions = await this.prisma.position.findMany({
@@ -159,18 +161,8 @@ export class PositionService {
             include: {
                 pool: {
                     include: {
-                        token0Ref: {
-                            include: {
-                                globalToken: true,
-                                userToken: true,
-                            },
-                        },
-                        token1Ref: {
-                            include: {
-                                globalToken: true,
-                                userToken: true,
-                            },
-                        },
+                        token0: true,
+                        token1: true,
                     },
                 },
             },
@@ -189,16 +181,17 @@ export class PositionService {
      */
     async createPosition(data: CreatePositionData): Promise<BasicPosition> {
         const positionData = {
-            id: data.id,
+            chain: data.chain,
+            protocol: data.protocol,
+            nftId: data.nftId,
             userId: data.userId,
-            poolId: data.poolId,
+            poolAddress: data.poolAddress,
             tickLower: data.tickLower,
             tickUpper: data.tickUpper,
             liquidity: data.liquidity,
             token0IsQuote: data.token0IsQuote,
             owner: data.owner,
             importType: data.importType,
-            nftId: data.nftId,
             status: data.status || "active",
         };
 
@@ -207,18 +200,8 @@ export class PositionService {
             include: {
                 pool: {
                     include: {
-                        token0Ref: {
-                            include: {
-                                globalToken: true,
-                                userToken: true,
-                            },
-                        },
-                        token1Ref: {
-                            include: {
-                                globalToken: true,
-                                userToken: true,
-                            },
-                        },
+                        token0: true,
+                        token1: true,
                     },
                 },
             },
@@ -231,27 +214,59 @@ export class PositionService {
      * Update an existing position
      */
     async updatePosition(
-        positionId: string,
+        chain: string,
+        protocol: string,
+        nftId: string,
         data: UpdatePositionData
     ): Promise<BasicPosition> {
         const position = await this.prisma.position.update({
-            where: { id: positionId },
+            where: {
+                chain_protocol_nftId: {
+                    chain,
+                    protocol,
+                    nftId,
+                },
+            },
             data,
             include: {
                 pool: {
                     include: {
-                        token0Ref: {
-                            include: {
-                                globalToken: true,
-                                userToken: true,
-                            },
-                        },
-                        token1Ref: {
-                            include: {
-                                globalToken: true,
-                                userToken: true,
-                            },
-                        },
+                        token0: true,
+                        token1: true,
+                    },
+                },
+            },
+        });
+
+        return this.mapToBasicPosition(position);
+    }
+
+    /**
+     * Update mutable on-chain fields of a position (liquidity)
+     */
+    async updatePositionOnChainData(
+        chain: string,
+        protocol: string,
+        nftId: string,
+        liquidity: string
+    ): Promise<BasicPosition> {
+        const position = await this.prisma.position.update({
+            where: {
+                chain_protocol_nftId: {
+                    chain,
+                    protocol,
+                    nftId,
+                },
+            },
+            data: {
+                liquidity,
+                updatedAt: new Date(),
+            },
+            include: {
+                pool: {
+                    include: {
+                        token0: true,
+                        token1: true,
                     },
                 },
             },
@@ -263,9 +278,15 @@ export class PositionService {
     /**
      * Touch a position to update its updatedAt timestamp
      */
-    async touchPosition(positionId: string): Promise<void> {
+    async touchPosition(chain: string, protocol: string, nftId: string): Promise<void> {
         await this.prisma.position.update({
-            where: { id: positionId },
+            where: {
+                chain_protocol_nftId: {
+                    chain,
+                    protocol,
+                    nftId,
+                },
+            },
             data: {
                 updatedAt: new Date(),
             },
@@ -275,9 +296,15 @@ export class PositionService {
     /**
      * Delete a position
      */
-    async deletePosition(positionId: string): Promise<void> {
+    async deletePosition(chain: string, protocol: string, nftId: string): Promise<void> {
         await this.prisma.position.delete({
-            where: { id: positionId },
+            where: {
+                chain_protocol_nftId: {
+                    chain,
+                    protocol,
+                    nftId,
+                },
+            },
         });
     }
 
@@ -300,9 +327,7 @@ export class PositionService {
         }
 
         if (chain) {
-            whereClause.pool = {
-                chain,
-            };
+            whereClause.chain = chain;
         }
 
         return await this.prisma.position.count({
@@ -310,52 +335,6 @@ export class PositionService {
         });
     }
 
-    /**
-     * Get positions by NFT ID
-     */
-    async getPositionsByNftId(
-        nftId: string,
-        chain?: SupportedChainsType,
-        status?: string
-    ): Promise<BasicPosition[]> {
-        const whereClause: any = {
-            nftId,
-        };
-
-        if (status) {
-            whereClause.status = status;
-        }
-
-        if (chain) {
-            whereClause.pool = {
-                chain,
-            };
-        }
-
-        const positions = await this.prisma.position.findMany({
-            where: whereClause,
-            include: {
-                pool: {
-                    include: {
-                        token0Ref: {
-                            include: {
-                                globalToken: true,
-                                userToken: true,
-                            },
-                        },
-                        token1Ref: {
-                            include: {
-                                globalToken: true,
-                                userToken: true,
-                            },
-                        },
-                    },
-                },
-            },
-        });
-
-        return positions.map((position) => this.mapToBasicPosition(position));
-    }
 
     /**
      * Get a single position by user ID, chain, and NFT ID
@@ -369,25 +348,13 @@ export class PositionService {
             where: {
                 userId,
                 nftId,
-                pool: {
-                    chain,
-                },
+                chain,
             },
             include: {
                 pool: {
                     include: {
-                        token0Ref: {
-                            include: {
-                                globalToken: true,
-                                userToken: true,
-                            },
-                        },
-                        token1Ref: {
-                            include: {
-                                globalToken: true,
-                                userToken: true,
-                            },
-                        },
+                        token0: true,
+                        token1: true,
                     },
                 },
             },
@@ -403,10 +370,16 @@ export class PositionService {
     /**
      * Check if position exists
      */
-    async positionExists(positionId: string): Promise<boolean> {
+    async positionExists(chain: string, protocol: string, nftId: string): Promise<boolean> {
         const position = await this.prisma.position.findUnique({
-            where: { id: positionId },
-            select: { id: true },
+            where: {
+                chain_protocol_nftId: {
+                    chain,
+                    protocol,
+                    nftId,
+                },
+            },
+            select: { chain: true },
         });
 
         return position !== null;
@@ -416,13 +389,9 @@ export class PositionService {
      * Map database result to BasicPosition interface
      */
     private mapToBasicPosition(position: any): BasicPosition {
-        // Extract token data from polymorphic references
-        const token0Data = this.extractTokenData(position.pool.token0Ref);
-        const token1Data = this.extractTokenData(position.pool.token1Ref);
-
         return {
-            id: position.id,
-            chain: position.pool.chain,
+            chain: position.chain,
+            protocol: position.protocol,
             nftId: position.nftId,
             liquidity: position.liquidity,
             tickLower: position.tickLower,
@@ -432,13 +401,25 @@ export class PositionService {
             importType: position.importType,
             status: position.status,
             pool: {
-                id: position.pool.id,
                 chain: position.pool.chain,
                 poolAddress: position.pool.poolAddress,
+                protocol: position.pool.protocol,
                 fee: position.pool.fee,
                 tickSpacing: position.pool.tickSpacing,
-                token0: token0Data,
-                token1: token1Data,
+                token0: {
+                    address: position.pool.token0.address,
+                    symbol: position.pool.token0.symbol,
+                    name: position.pool.token0.name,
+                    decimals: position.pool.token0.decimals,
+                    logoUrl: position.pool.token0.logoUrl,
+                },
+                token1: {
+                    address: position.pool.token1.address,
+                    symbol: position.pool.token1.symbol,
+                    name: position.pool.token1.name,
+                    decimals: position.pool.token1.decimals,
+                    logoUrl: position.pool.token1.logoUrl,
+                },
                 currentTick: position.pool.currentTick,
                 currentPrice: position.pool.currentPrice,
             },
@@ -448,22 +429,49 @@ export class PositionService {
     }
 
     /**
-     * Extract token data from polymorphic token reference
+     * Get pool address from Uniswap V3 Factory contract (used for position import)
      */
-    private extractTokenData(tokenRef: any): TokenData {
-        const token = tokenRef.globalToken || tokenRef.userToken;
-
-        if (!token) {
-            throw new Error("Token data not found in reference");
+    async getPoolAddress(
+        chain: string,
+        token0: string,
+        token1: string,
+        fee: number
+    ): Promise<string> {
+        const publicClient = this.rpcClients.get(chain as SupportedChainsType);
+        if (!publicClient) {
+            throw new Error(`No RPC client available for chain: ${chain}`);
         }
 
-        return {
-            address: token.address,
-            symbol: token.symbol,
-            name: token.name,
-            decimals: token.decimals,
-            logoUrl: token.logoUrl,
-        };
+        const factoryAddress = UNISWAP_V3_FACTORY_ADDRESSES[chain];
+        if (!factoryAddress) {
+            throw new Error(`Uniswap V3 Factory not deployed on chain: ${chain}`);
+        }
+
+        // Normalize and sort token addresses (Uniswap V3 requires token0 < token1)
+        const normalizedToken0 = normalizeAddress(token0);
+        const normalizedToken1 = normalizeAddress(token1);
+
+        // Sort tokens to ensure token0 < token1
+        const [sortedToken0, sortedToken1] = compareAddresses(normalizedToken0, normalizedToken1) < 0
+            ? [normalizedToken0, normalizedToken1]
+            : [normalizedToken1, normalizedToken0];
+
+        try {
+            const poolAddress = await publicClient.readContract({
+                address: factoryAddress,
+                abi: UNISWAP_V3_FACTORY_ABI,
+                functionName: "getPool",
+                args: [sortedToken0 as `0x${string}`, sortedToken1 as `0x${string}`, fee],
+            });
+
+            if (!poolAddress || poolAddress === "0x0000000000000000000000000000000000000000") {
+                throw new Error(`Pool does not exist for tokens ${sortedToken0}/${sortedToken1} with fee ${fee}`);
+            }
+
+            return normalizeAddress(poolAddress);
+        } catch (error) {
+            throw new Error(`Failed to get pool address: ${error instanceof Error ? error.message : "Unknown error"}`);
+        }
     }
 
     /**

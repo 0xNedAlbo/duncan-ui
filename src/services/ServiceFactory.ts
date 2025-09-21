@@ -12,8 +12,6 @@ import { PositionPnLService } from "./positions/positionPnLService";
 import { PositionAprService } from "./positions/positionAprService";
 import { CurveDataService } from "./positions/curveDataService";
 import { TokenService } from "./tokens/tokenService";
-import { TokenReferenceService } from "./tokens/tokenReferenceService";
-import { TokenResolutionService } from "./tokens/tokenResolutionService";
 import { ApiKeyService } from "./auth/apiKeyService";
 import { DefaultClientsFactory } from "./ClientsFactory";
 
@@ -32,8 +30,6 @@ export interface Services {
     positionAprService: PositionAprService;
     curveDataService: CurveDataService;
     tokenService: TokenService;
-    tokenReferenceService: TokenReferenceService;
-    tokenResolutionService: TokenResolutionService;
     apiKeyService: ApiKeyService;
 }
 
@@ -59,26 +55,16 @@ export class DefaultServiceFactory implements ServiceFactory {
         const evmBlockInfoService = new EvmBlockInfoService(rpcClients);
         const poolPriceService = new PoolPriceService({ rpcClients, prisma });
         const quoteTokenService = new QuoteTokenService();
-        const positionService = new PositionService(prisma);
+        const positionService = new PositionService(prisma, rpcClients);
 
         const tokenService = new TokenService(
             { prisma },
             { alchemyTokenService }
         );
 
-        const tokenResolutionService = new TokenResolutionService(
-            { prisma },
-            { tokenService, alchemyTokenService }
-        );
-
-        const tokenReferenceService = new TokenReferenceService(
-            { prisma },
-            { tokenResolutionService }
-        );
-
         const poolService = new PoolService(
-            { prisma },
-            { tokenResolutionService, tokenReferenceService }
+            { prisma, rpcClients },
+            { tokenService }
         );
 
         const positionAprService = new PositionAprService(prisma);
@@ -95,7 +81,7 @@ export class DefaultServiceFactory implements ServiceFactory {
 
         const positionImportService = new PositionImportService(
             { prisma, rpcClients, etherscanClient },
-            { positionService, poolService, positionPnLService, positionLedgerService }
+            { positionService, poolService }
         );
 
         const curveDataService = new CurveDataService(
@@ -120,8 +106,6 @@ export class DefaultServiceFactory implements ServiceFactory {
             positionAprService,
             curveDataService,
             tokenService,
-            tokenReferenceService,
-            tokenResolutionService,
             apiKeyService,
         };
     }

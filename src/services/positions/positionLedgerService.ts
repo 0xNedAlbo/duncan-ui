@@ -47,7 +47,7 @@ interface ProcessableEvent {
 }
 
 // Position sync information interface - picks necessary fields from BasicPosition
-export type PositionSyncInfo = Pick<BasicPosition, "id" | "token0IsQuote"> & {
+export type PositionSyncInfo = Pick<BasicPosition, "chain" | "protocol" | "nftId" | "token0IsQuote"> & {
     pool: Pick<BasicPosition["pool"], "poolAddress" | "chain"> & {
         token0: Pick<BasicPosition["pool"]["token0"], "decimals">;
         token1: Pick<BasicPosition["pool"]["token1"], "decimals">;
@@ -68,7 +68,9 @@ export class PositionLedgerService {
      */
     static createSyncInfo(position: BasicPosition): PositionSyncInfo {
         return {
-            id: position.id,
+            chain: position.chain,
+            protocol: position.protocol,
+            nftId: position.nftId,
             token0IsQuote: position.token0IsQuote,
             pool: {
                 poolAddress: position.pool.poolAddress,
@@ -412,7 +414,9 @@ export class PositionLedgerService {
             {
                 nftId,
                 chain: positionInfo.pool.chain,
-                positionId: positionInfo.id,
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
             },
             "Starting syncPositionEvents"
         );

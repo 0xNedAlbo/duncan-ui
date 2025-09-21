@@ -12,8 +12,6 @@ import { PositionPnLService } from "@/services/positions/positionPnLService";
 import { PositionAprService } from "@/services/positions/positionAprService";
 import { CurveDataService } from "@/services/positions/curveDataService";
 import { TokenService } from "@/services/tokens/tokenService";
-import { TokenReferenceService } from "@/services/tokens/tokenReferenceService";
-import { TokenResolutionService } from "@/services/tokens/tokenResolutionService";
 import { ApiKeyService } from "@/services/auth/apiKeyService";
 import { DefaultClientsFactory, type Clients } from "@/services/ClientsFactory";
 import type { Services } from "@/services/ServiceFactory";
@@ -86,8 +84,8 @@ export class ApiServiceFactory {
 
     public get positionService(): PositionService {
         if (!this.serviceInstances.positionService) {
-            const { prisma } = this.clients;
-            this.serviceInstances.positionService = new PositionService(prisma);
+            const { prisma, rpcClients } = this.clients;
+            this.serviceInstances.positionService = new PositionService(prisma, rpcClients);
         }
         return this.serviceInstances.positionService;
     }
@@ -103,34 +101,13 @@ export class ApiServiceFactory {
         return this.serviceInstances.tokenService;
     }
 
-    public get tokenResolutionService(): TokenResolutionService {
-        if (!this.serviceInstances.tokenResolutionService) {
-            const { prisma } = this.clients;
-            this.serviceInstances.tokenResolutionService = new TokenResolutionService(
-                { prisma },
-                { tokenService: this.tokenService, alchemyTokenService: this.alchemyTokenService }
-            );
-        }
-        return this.serviceInstances.tokenResolutionService;
-    }
-
-    public get tokenReferenceService(): TokenReferenceService {
-        if (!this.serviceInstances.tokenReferenceService) {
-            const { prisma } = this.clients;
-            this.serviceInstances.tokenReferenceService = new TokenReferenceService(
-                { prisma },
-                { tokenResolutionService: this.tokenResolutionService }
-            );
-        }
-        return this.serviceInstances.tokenReferenceService;
-    }
 
     public get poolService(): PoolService {
         if (!this.serviceInstances.poolService) {
-            const { prisma } = this.clients;
+            const { prisma, rpcClients } = this.clients;
             this.serviceInstances.poolService = new PoolService(
-                { prisma },
-                { tokenResolutionService: this.tokenResolutionService, tokenReferenceService: this.tokenReferenceService }
+                { prisma, rpcClients },
+                { tokenService: this.tokenService }
             );
         }
         return this.serviceInstances.poolService;
@@ -158,7 +135,7 @@ export class ApiServiceFactory {
             const { prisma, rpcClients, etherscanClient } = this.clients;
             this.serviceInstances.positionImportService = new PositionImportService(
                 { prisma, rpcClients, etherscanClient },
-                { positionService: this.positionService, poolService: this.poolService, positionPnLService: this.positionPnLService, positionLedgerService: this.positionLedgerService }
+                { positionService: this.positionService, poolService: this.poolService }
             );
         }
         return this.serviceInstances.positionImportService;

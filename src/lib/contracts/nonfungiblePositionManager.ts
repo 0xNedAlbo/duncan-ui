@@ -1,13 +1,14 @@
 import { Address } from 'viem';
+import { normalizeAddress } from '@/lib/utils/evm';
 
-// Contract addresses for Uniswap V3 NonfungiblePositionManager
+// Contract addresses for Uniswap V3 NonfungiblePositionManager (EIP-55 checksummed)
 export const NONFUNGIBLE_POSITION_MANAGER_ADDRESSES: Record<number, Address> = {
   // Ethereum Mainnet
-  1: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
+  1: normalizeAddress('0xC36442b4a4522E871399CD717aBDD847Ab11FE88') as Address,
   // Arbitrum One
-  42161: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
+  42161: normalizeAddress('0xC36442b4a4522E871399CD717aBDD847Ab11FE88') as Address,
   // Base
-  8453: '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1',
+  8453: normalizeAddress('0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1') as Address,
 };
 
 // ABI for the positions() and ownerOf() functions

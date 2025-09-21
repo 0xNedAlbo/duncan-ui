@@ -85,33 +85,6 @@ export class QuoteTokenService {
     }
 }
 
-// Legacy function exports for backward compatibility
-export function determineQuoteToken(
-    token0Symbol: string,
-    token0Address: string,
-    token1Symbol: string,
-    token1Address: string,
-    chain: string
-): QuoteTokenResult {
-    const service = new QuoteTokenService();
-    return service.determineQuoteToken(
-        token0Symbol,
-        token0Address,
-        token1Symbol,
-        token1Address,
-        chain
-    );
-}
-
-export function formatTokenPair(
-    token0Symbol: string,
-    token1Symbol: string,
-    token0IsQuote: boolean
-): string {
-    const service = new QuoteTokenService();
-    return service.formatTokenPair(token0Symbol, token1Symbol, token0IsQuote);
-}
-
 /**
  * Beispiele für Quote Token Bestimmung
  */
