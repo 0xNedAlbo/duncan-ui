@@ -9,6 +9,7 @@ import type { NFTPosition } from '@/lib/contracts/nonfungiblePositionManager';
 import type { PnlBreakdown } from '@/services/positions/positionPnLService';
 import type { AprBreakdown } from '@/services/positions/positionAprService';
 import type { CurveData } from '@/components/charts/mini-pnl-curve';
+import type { DiscoveredPositionSummary, PositionLookupResult } from '@/services/positions/positionLookupService';
 
 // Enhanced position interface for API responses (includes PnL data)
 export interface PositionWithPnL extends BasicPosition {
@@ -165,6 +166,33 @@ export interface ImportNFTResponse extends ApiResponse<{ position: NFTPosition }
   };
 }
 
+// Position Discovery Types
+export interface DiscoverPositionsRequest {
+  address: string;
+  chain: string;
+  limit?: number;
+}
+
+export interface DiscoverPositionsData {
+  address: string;
+  chain: string;
+  totalNFTs: number;
+  existingPositions: number;
+  newPositionsFound: number;
+  positions: BasicPosition[];
+  summary: DiscoveredPositionSummary[];
+}
+
+export interface DiscoverPositionsResponse extends ApiResponse<DiscoverPositionsData> {
+  meta: {
+    requestedAt: string;
+    address: string;
+    chain: string;
+    limit: number;
+    dataSource: 'onchain';
+  };
+}
+
 
 // Authentication API Types
 export interface RegisterRequest {
@@ -265,6 +293,7 @@ export const QUERY_KEYS = {
 export const MUTATION_KEYS = {
   // Positions
   importNFT: ['positions', 'import-nft'] as const,
+  discoverPositions: ['positions', 'discover'] as const,
   refreshPosition: ['positions', 'refresh'] as const,
   
   // Authentication

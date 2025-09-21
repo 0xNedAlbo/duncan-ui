@@ -6,6 +6,7 @@ import { PoolService } from "@/services/pools/poolService";
 import { PoolPriceService } from "@/services/prices/poolPriceService";
 import { QuoteTokenService } from "@/services/positions/quoteTokenService";
 import { PositionImportService } from "@/services/positions/positionImportService";
+import { PositionLookupService } from "@/services/positions/positionLookupService";
 import { PositionLedgerService } from "@/services/positions/positionLedgerService";
 import { PositionService } from "@/services/positions/positionService";
 import { PositionPnLService } from "@/services/positions/positionPnLService";
@@ -144,6 +145,17 @@ export class ApiServiceFactory {
             );
         }
         return this.serviceInstances.positionImportService;
+    }
+
+    public get positionLookupService(): PositionLookupService {
+        if (!this.serviceInstances.positionLookupService) {
+            const { prisma, rpcClients } = this.clients;
+            this.serviceInstances.positionLookupService = new PositionLookupService(
+                { prisma, rpcClients },
+                { poolService: this.poolService, positionService: this.positionService }
+            );
+        }
+        return this.serviceInstances.positionLookupService;
     }
 
     public get positionPnLService(): PositionPnLService {

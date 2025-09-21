@@ -6,6 +6,7 @@ import { PoolService } from "./pools/poolService";
 import { PoolPriceService } from "./prices/poolPriceService";
 import { QuoteTokenService } from "./positions/quoteTokenService";
 import { PositionImportService } from "./positions/positionImportService";
+import { PositionLookupService } from "./positions/positionLookupService";
 import { PositionLedgerService } from "./positions/positionLedgerService";
 import { PositionService } from "./positions/positionService";
 import { PositionPnLService } from "./positions/positionPnLService";
@@ -24,6 +25,7 @@ export interface Services {
     poolPriceService: PoolPriceService;
     quoteTokenService: QuoteTokenService;
     positionImportService: PositionImportService;
+    positionLookupService: PositionLookupService;
     positionLedgerService: PositionLedgerService;
     positionService: PositionService;
     positionPnLService: PositionPnLService;
@@ -84,6 +86,11 @@ export class DefaultServiceFactory implements ServiceFactory {
             { positionService, poolService, positionPnLService, positionLedgerService }
         );
 
+        const positionLookupService = new PositionLookupService(
+            { prisma, rpcClients },
+            { poolService, positionService }
+        );
+
         const curveDataService = new CurveDataService(
             { prisma },
             { positionPnLService }
@@ -100,6 +107,7 @@ export class DefaultServiceFactory implements ServiceFactory {
             poolPriceService,
             quoteTokenService,
             positionImportService,
+            positionLookupService,
             positionLedgerService,
             positionService,
             positionPnLService,
