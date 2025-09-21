@@ -45,16 +45,16 @@ model Session {
 }
 
 model User {
-  id            String      @id @default(cuid())
+  id            String     @id @default(cuid())
   name          String?
-  email         String      @unique
+  email         String     @unique
   password      String // Hashed password
   emailVerified DateTime?
   image         String?
   accounts      Account[]
   sessions      Session[]
   positions     Position[]
-  apiKeys       ApiKey[]    // User's API keys
+  apiKeys       ApiKey[] // User's API keys
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -73,20 +73,20 @@ model VerificationToken {
 
 // API Key Model - for API authentication
 model ApiKey {
-  id           String   @id @default(cuid())
-  userId       String   // User who owns this key
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name         String   // "CI on repo X", "Zapier", etc.
-  prefix       String   // first ~6-8 chars for quick lookup
-  hash         String   // argon2/bcrypt hash of full key
-  scopes       String[] // e.g. ["read:positions","write:orders"]
-  createdAt    DateTime @default(now())
-  lastUsedAt   DateTime?
-  revokedAt    DateTime?
+  id         String    @id @default(cuid())
+  userId     String // User who owns this key
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String // "CI on repo X", "Zapier", etc.
+  prefix     String // first ~6-8 chars for quick lookup
+  hash       String // argon2/bcrypt hash of full key
+  scopes     String[] // e.g. ["read:positions","write:orders"]
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
 
   // Future: usage counters
-  monthlyUsage Int      @default(0)
-  dailyUsage   Int      @default(0)
+  monthlyUsage Int @default(0)
+  dailyUsage   Int @default(0)
 
   @@index([userId])
   @@index([prefix])
@@ -106,10 +106,8 @@ model Token {
   logoUrl  String?
 
   // Source and verification
-  source     String  // "alchemy", "contract"
-  verified   Boolean @default(false)
-
-
+  source   String // "alchemy", "contract"
+  verified Boolean @default(false)
 
   // Relations (direct token references)
   poolsAsToken0 Pool[] @relation("PoolToken0")
@@ -135,21 +133,21 @@ model Pool {
 
   // Direct token references using pool's chain + token addresses
   token0Address String
-  token0        Token @relation("PoolToken0", fields: [chain, token0Address], references: [chain, address])
+  token0        Token  @relation("PoolToken0", fields: [chain, token0Address], references: [chain, address])
 
   token1Address String
-  token1        Token @relation("PoolToken1", fields: [chain, token1Address], references: [chain, address])
+  token1        Token  @relation("PoolToken1", fields: [chain, token1Address], references: [chain, address])
 
   // Pool Parameters
   fee         Int // Fee in basis points (100 = 0.01%, 500 = 0.05%, 3000 = 0.3%, 10000 = 1%)
   tickSpacing Int
 
   // Current State (updated periodically)
-  currentTick           Int?
-  currentPrice          String? // BigInt as string (token1 per token0 in smallest unit)
-  sqrtPriceX96          String? // Uniswap V3 price format
-  feeGrowthGlobal0X128  String  @default("0") // Q128.128 fee growth of token0
-  feeGrowthGlobal1X128  String  @default("0") // Q128.128 fee growth of token1
+  currentTick          Int?
+  currentPrice         String? // BigInt as string (token1 per token0 in smallest unit)
+  sqrtPriceX96         String? // Uniswap V3 price format
+  feeGrowthGlobal0X128 String  @default("0") // Q128.128 fee growth of token0
+  feeGrowthGlobal1X128 String  @default("0") // Q128.128 fee growth of token1
 
   // Relations
   positions Position[]
@@ -168,9 +166,9 @@ model Pool {
 // Simplified Position Model
 model Position {
   // Composite Primary Key: chain + protocol + nftId
-  chain    String  // "ethereum", "arbitrum", "base"
+  chain    String // "ethereum", "arbitrum", "base"
   protocol String @default("uniswapv3") // "uniswapv3", future: "uniswapv2", etc.
-  nftId    String  // For NFT imports
+  nftId    String // For NFT imports
 
   // Relations
   userId String
@@ -198,15 +196,15 @@ model Position {
   status String @default("active") // "active", "closed", "archived"
 
   // Relations
-  events PositionEvent[]
-  pnlCache PositionPnL? // Optional cached PnL data
+  events     PositionEvent[]
+  pnlCache   PositionPnL? // Optional cached PnL data
   curveCache PositionCurve? // Optional cached curve data
 
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@id([chain, protocol, nftId]) // Composite primary key
+  @@id([userId, chain, protocol, nftId]) // Composite primary key including userId
   @@index([userId, status])
   @@index([owner])
   @@index([chain, poolAddress])
@@ -218,10 +216,11 @@ model PositionEvent {
   id String @id @default(cuid())
 
   // Relations
+  positionUserId   String
   positionChain    String
   positionProtocol String
   positionNftId    String
-  position         Position @relation(fields: [positionChain, positionProtocol, positionNftId], references: [chain, protocol, nftId], onDelete: Cascade)
+  position         Position @relation(fields: [positionUserId, positionChain, positionProtocol, positionNftId], references: [userId, chain, protocol, nftId], onDelete: Cascade)
 
   // Ledger Order
   ledgerIgnore Boolean // Ignore this event in the ledger
@@ -274,10 +273,10 @@ model PositionEvent {
   // APR Calculation
   aprData PositionEventApr? // 1:1 relationship
 
-  @@unique([transactionHash, logIndex, positionChain, positionProtocol, positionNftId]) // Prevent exact duplicates
+  @@unique([transactionHash, logIndex, positionUserId, positionChain, positionProtocol, positionNftId]) // Prevent exact duplicates
   @@unique([inputHash]) // Prvent duplicates during sync
   // Indexes for performance and ordering
-  @@index([positionChain, positionProtocol, positionNftId, blockNumber, transactionIndex, logIndex]) // Natural blockchain ordering
+  @@index([positionUserId, positionChain, positionProtocol, positionNftId, blockNumber, transactionIndex, logIndex]) // Natural blockchain ordering
   @@map("position_events")
 }
 
@@ -286,13 +285,13 @@ model PositionEventApr {
   id String @id @default(cuid())
 
   // 1:1 Relationship with PositionEvent
-  eventId String @unique
+  eventId String        @unique
   event   PositionEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   // Period Definition
   periodStartDate DateTime // This event's timestamp
   periodEndDate   DateTime? // Next event's timestamp (null for latest event)
-  periodDays      Float?   // Period duration in days (null for latest)
+  periodDays      Float? // Period duration in days (null for latest)
 
   // Financial Data for this Period (BigInt as String)
   periodCostBasis String // Cost basis during this period (from costBasisAfter)
@@ -319,15 +318,15 @@ model PoolPriceCache {
 
   // Price Data (BigInt as String for precision)
   sqrtPriceX96 String // Uniswap V3 price format
-  tick         Int    // Current tick
+  tick         Int // Current tick
 
   // Block Information
   blockTimestamp DateTime // Block timestamp
 
   // Metadata
   source      String   @default("alchemy-rpc") // Always "alchemy-rpc"
-  confidence  String   @default("exact")       // Always "exact"
-  retrievedAt DateTime @default(now())         // When cached
+  confidence  String   @default("exact") // Always "exact"
+  retrievedAt DateTime @default(now()) // When cached
 
   // TTL Management
   expiresAt DateTime? // For future TTL implementation
@@ -344,10 +343,11 @@ model PositionPnL {
   id String @id @default(cuid())
 
   // Relations
+  positionUserId   String
   positionChain    String
   positionProtocol String
   positionNftId    String
-  position         Position @relation(fields: [positionChain, positionProtocol, positionNftId], references: [chain, protocol, nftId], onDelete: Cascade)
+  position         Position @relation(fields: [positionUserId, positionChain, positionProtocol, positionNftId], references: [userId, chain, protocol, nftId], onDelete: Cascade)
 
   // Core PnL Metrics (all in quote token units as strings for BigInt precision)
   currentValue     String // Current position value
@@ -362,17 +362,17 @@ model PositionPnL {
 
   // Cache Metadata
   calculatedAt DateTime @default(now()) // When this PnL was calculated
-  updatedAt    DateTime @updatedAt      // Auto-updated on changes
-  isValid      Boolean  @default(true)  // Cache validity flag
+  updatedAt    DateTime @updatedAt // Auto-updated on changes
+  isValid      Boolean  @default(true) // Cache validity flag
 
   // Pool state at calculation time (for cache invalidation logic)
-  poolTick         Int?    // Pool tick when calculated
+  poolTick         Int? // Pool tick when calculated
   poolSqrtPriceX96 String? // Pool price when calculated
 
   // Performance Indexes
-  @@unique([positionChain, positionProtocol, positionNftId]) // One-to-one with Position
-  @@index([positionChain, positionProtocol, positionNftId, isValid]) // Quick cache lookups
-  @@index([calculatedAt])        // Cleanup old cache entries
+  @@unique([positionUserId, positionChain, positionProtocol, positionNftId]) // One-to-one with Position
+  @@index([positionUserId, positionChain, positionProtocol, positionNftId, isValid]) // Quick cache lookups
+  @@index([calculatedAt]) // Cleanup old cache entries
   @@map("position_pnl_cache")
 }
 
@@ -381,27 +381,28 @@ model PositionCurve {
   id String @id @default(cuid())
 
   // Relations
+  positionUserId   String
   positionChain    String
   positionProtocol String
   positionNftId    String
-  position         Position @relation(fields: [positionChain, positionProtocol, positionNftId], references: [chain, protocol, nftId], onDelete: Cascade)
+  position         Position @relation(fields: [positionUserId, positionChain, positionProtocol, positionNftId], references: [userId, chain, protocol, nftId], onDelete: Cascade)
 
   // Curve Data (JSON for atomic operations)
   curveData Json // Complete CurveData object as JSON
 
   // Cache Metadata
   calculatedAt DateTime @default(now()) // When this curve was calculated
-  updatedAt    DateTime @updatedAt      // Auto-updated on changes
-  isValid      Boolean  @default(true)  // Cache validity flag
+  updatedAt    DateTime @updatedAt // Auto-updated on changes
+  isValid      Boolean  @default(true) // Cache validity flag
 
   // Invalidation triggers (for cache dependency tracking)
-  poolTick         Int?    // Pool tick when calculated
+  poolTick         Int? // Pool tick when calculated
   poolSqrtPriceX96 String? // Pool price when calculated
   pnlCacheVersion  String? // Link to PositionPnL cache version for invalidation
 
   // Performance Indexes
-  @@unique([positionChain, positionProtocol, positionNftId]) // One-to-one with Position
-  @@index([positionChain, positionProtocol, positionNftId, isValid]) // Quick cache lookups
-  @@index([calculatedAt])        // Cleanup old cache entries
+  @@unique([positionUserId, positionChain, positionProtocol, positionNftId]) // One-to-one with Position
+  @@index([positionUserId, positionChain, positionProtocol, positionNftId, isValid]) // Quick cache lookups
+  @@index([calculatedAt]) // Cleanup old cache entries
   @@map("position_curve_cache")
 }

@@ -152,11 +152,13 @@ export const POST = withAuthAndLogging<{ success: boolean; data?: any; error?: s
 
       // Get the full position data with all relationships (pool, tokens, etc.)
       // This ensures the frontend gets the same format as the position list endpoint
-      const fullPosition = await apiFactory.positionService.getPosition(
-        chain as SupportedChainsType,
-        "uniswapv3", // protocol
+      const positionId = {
+        userId: user.userId,
+        chain: chain as SupportedChainsType,
+        protocol: "uniswapv3",
         nftId
-      );
+      };
+      const fullPosition = await apiFactory.positionService.getPosition(positionId);
 
       if (!fullPosition) {
         log.error(

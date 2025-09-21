@@ -4,6 +4,7 @@ import { logError } from "@/lib/api/withLogging";
 import { ApiServiceFactory } from "@/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
 import type { AprApiResponse, PositionAprSummary } from "@/types/apr";
+import type { PositionId } from "@/services/positions/positionService";
 
 /**
  * GET /api/positions/uniswapv3/[chain]/[nft]/apr - Get position APR calculation
@@ -103,10 +104,18 @@ export const GET = withAuthAndLogging<AprApiResponse>(
                 );
             }
 
+            // Create position ID for service calls
+            const positionId: PositionId = {
+                userId: user.userId,
+                chain: position.chain,
+                protocol: position.protocol,
+                nftId: position.nftId
+            };
+
             // Get PnL data first for APR breakdown calculation
             let unclaimedFees = undefined;
             try {
-                const pnlBreakdown = await positionPnLService.getPnlBreakdown(position.chain, position.protocol, position.nftId);
+                const pnlBreakdown = await positionPnLService.getPnlBreakdown(positionId);
                 unclaimedFees = pnlBreakdown?.unclaimedFees;
             } catch (error) {
                 log.debug(
@@ -116,10 +125,10 @@ export const GET = withAuthAndLogging<AprApiResponse>(
             }
 
             // Get APR breakdown for corrected time-weighted calculation
-            const aprBreakdown = await positionAprService.getAprBreakdown(position.chain, position.protocol, position.nftId, unclaimedFees);
+            const aprBreakdown = await positionAprService.getAprBreakdown(positionId, unclaimedFees);
 
             // Get detailed periods data for API response
-            const aprDetailResult = await positionAprService.getPositionApr(position.chain, position.protocol, position.nftId, false);
+            const aprDetailResult = await positionAprService.getPositionApr(positionId, false);
 
             // Transform periods data for API response
             const periodsData = aprDetailResult.periods.map(period => ({

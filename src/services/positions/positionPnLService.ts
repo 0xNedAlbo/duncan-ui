@@ -25,7 +25,7 @@ import {
   calculateIncrementalFees
 } from "@/lib/utils/uniswap-v3/fees";
 import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
-import { PositionService } from "./positionService";
+import { PositionService, PositionId } from "./positionService";
 import { PoolService } from "../pools/poolService";
 import { PositionLedgerService } from "./positionLedgerService";
 
@@ -70,19 +70,17 @@ export class PositionPnLService {
    * Calculate unclaimed fees for a position
    */
   private async getUnclaimedFees(
-    chain: string,
-    protocol: string,
-    nftId: string
+    positionId: PositionId
   ): Promise<UnclaimedFeesWithMetadata> {
     // 1. Fetch position using PositionService
-    const position = await this.positionService.getPosition(chain, protocol, nftId);
+    const position = await this.positionService.getPosition(positionId);
 
     if (!position) {
-      throw new Error(`Position not found: ${chain}-${protocol}-${nftId}`);
+      throw new Error(`Position not found: ${positionId.userId}-${positionId.chain}-${positionId.protocol}-${positionId.nftId}`);
     }
 
     if (!position.nftId) {
-      throw new Error(`Position ${chain}-${protocol}-${nftId} has no NFT ID - cannot calculate fees`);
+      throw new Error(`Position ${positionId.userId}-${positionId.chain}-${positionId.protocol}-${positionId.nftId} has no NFT ID - cannot calculate fees`);
     }
 
     const { pool } = position;
@@ -241,7 +239,7 @@ export class PositionPnLService {
     );
 
     // 7. Get uncollected principal to separate from pure fees
-    const uncollectedPrincipal = await this.getLatestUncollectedPrincipal(chain, protocol, nftId);
+    const uncollectedPrincipal = await this.getLatestUncollectedPrincipal(positionId);
 
     // 8. Calculate pure checkpointed fees (tokensOwed includes both fees and principal)
     const pureCheckpointedFees0 = nftData.tokensOwed0 > uncollectedPrincipal.uncollectedPrincipal0
@@ -296,15 +294,13 @@ export class PositionPnLService {
    * Current Value = quoteAmount + baseAmount * poolPrice
    */
   private async calculateCurrentValue(
-    chain: string,
-    protocol: string,
-    nftId: string
+    positionId: PositionId
   ): Promise<string> {
     // 1. Fetch position using PositionService
-    const position = await this.positionService.getPosition(chain, protocol, nftId);
+    const position = await this.positionService.getPosition(positionId);
 
     if (!position) {
-      throw new Error(`Position not found: ${chain}-${protocol}-${nftId}`);
+      throw new Error(`Position not found: ${positionId.userId}-${positionId.chain}-${positionId.protocol}-${positionId.nftId}`);
     }
 
     // 2. Get current pool data using PoolService
@@ -356,12 +352,13 @@ export class PositionPnLService {
   /**
    * Get the current cost basis for a position from the latest PositionEvent
    */
-  private async getCurrentCostBasis(chain: string, protocol: string, nftId: string): Promise<string> {
+  private async getCurrentCostBasis(positionId: PositionId): Promise<string> {
     const latestEvent = await this.prisma.positionEvent.findFirst({
       where: {
-        positionChain: chain,
-        positionProtocol: protocol,
-        positionNftId: nftId,
+        positionUserId: positionId.userId,
+        positionChain: positionId.chain,
+        positionProtocol: positionId.protocol,
+        positionNftId: positionId.nftId,
       },
       select: {
         costBasisAfter: true,
@@ -384,12 +381,13 @@ export class PositionPnLService {
   /**
    * Get total value of all collected fees for a position in quote token units
    */
-  private async getTotalCollectedFeesValue(chain: string, protocol: string, nftId: string): Promise<string> {
+  private async getTotalCollectedFeesValue(positionId: PositionId): Promise<string> {
     const collectEvents = await this.prisma.positionEvent.findMany({
       where: {
-        positionChain: chain,
-        positionProtocol: protocol,
-        positionNftId: nftId,
+        positionUserId: positionId.userId,
+        positionChain: positionId.chain,
+        positionProtocol: positionId.protocol,
+        positionNftId: positionId.nftId,
         eventType: 'COLLECT',
       },
       select: {
@@ -409,12 +407,13 @@ export class PositionPnLService {
   /**
    * Get the current realized PnL for a position from the latest PositionEvent
    */
-  private async getCurrentRealizedPnL(chain: string, protocol: string, nftId: string): Promise<string> {
+  private async getCurrentRealizedPnL(positionId: PositionId): Promise<string> {
     const latestEvent = await this.prisma.positionEvent.findFirst({
       where: {
-        positionChain: chain,
-        positionProtocol: protocol,
-        positionNftId: nftId,
+        positionUserId: positionId.userId,
+        positionChain: positionId.chain,
+        positionProtocol: positionId.protocol,
+        positionNftId: positionId.nftId,
       },
       select: {
         realizedPnLAfter: true,
@@ -438,22 +437,21 @@ export class PositionPnLService {
    * Get comprehensive PnL breakdown for a position
    */
   async getPnlBreakdown(
-    chain: string,
-    protocol: string,
-    nftId: string
+    positionId: PositionId
   ): Promise<PnlBreakdown> {
     // Validate position exists
-    const position = await this.positionService.getPosition(chain, protocol, nftId);
+    const position = await this.positionService.getPosition(positionId);
     if (!position) {
-      throw new Error(`Position not found: ${chain}-${protocol}-${nftId}`);
+      throw new Error(`Position not found: ${positionId.userId}-${positionId.chain}-${positionId.protocol}-${positionId.nftId}`);
     }
 
     // Check for valid cached PnL data
     const cachedPnL = await this.prisma.positionPnL.findFirst({
       where: {
-        positionChain: chain,
-        positionProtocol: protocol,
-        positionNftId: nftId,
+        positionUserId: positionId.userId,
+        positionChain: positionId.chain,
+        positionProtocol: positionId.protocol,
+        positionNftId: positionId.nftId,
         isValid: true
       }
     });
@@ -468,9 +466,9 @@ export class PositionPnLService {
         realizedPnL: cachedPnL.realizedPnL,
         unrealizedPnL: cachedPnL.unrealizedPnL,
         totalPnL: cachedPnL.totalPnL,
-        positionChain: chain,
-        positionProtocol: protocol,
-        positionNftId: nftId,
+        positionChain: positionId.chain,
+        positionProtocol: positionId.protocol,
+        positionNftId: positionId.nftId,
         calculatedAt: cachedPnL.calculatedAt,
       };
     }
@@ -484,17 +482,18 @@ export class PositionPnLService {
       await this.positionLedgerService.syncPositionEvents(positionSyncInfo, position.nftId);
     }
 
-    await this.calculateAndCachePnL(chain, protocol, nftId, position);
+    await this.calculateAndCachePnL(positionId, position);
 
     // Update position's updatedAt timestamp to reflect the refresh
-    await this.positionService.touchPosition(chain, protocol, nftId);
+    await this.positionService.touchPosition(positionId);
 
     // Fetch the newly cached data
     const newCachedPnL = await this.prisma.positionPnL.findFirstOrThrow({
       where: {
-        positionChain: chain,
-        positionProtocol: protocol,
-        positionNftId: nftId,
+        positionUserId: positionId.userId,
+        positionChain: positionId.chain,
+        positionProtocol: positionId.protocol,
+        positionNftId: positionId.nftId,
       }
     });
 
@@ -506,9 +505,9 @@ export class PositionPnLService {
       realizedPnL: newCachedPnL.realizedPnL,
       unrealizedPnL: newCachedPnL.unrealizedPnL,
       totalPnL: newCachedPnL.totalPnL,
-      positionChain: chain,
-      positionProtocol: protocol,
-      positionNftId: nftId,
+      positionChain: positionId.chain,
+      positionProtocol: positionId.protocol,
+      positionNftId: positionId.nftId,
       calculatedAt: newCachedPnL.calculatedAt,
     };
   }
@@ -516,15 +515,15 @@ export class PositionPnLService {
   /**
    * Calculate fresh PnL data and cache it
    */
-  private async calculateAndCachePnL(chain: string, protocol: string, nftId: string, position: any): Promise<void> {
+  private async calculateAndCachePnL(positionId: PositionId, position: any): Promise<void> {
 
     // Fetch all PnL components in parallel for efficiency
     const [currentValue, currentCostBasis, collectedFees, realizedPnL, unclaimedFeesData] = await Promise.all([
-      this.calculateCurrentValue(chain, protocol, nftId),
-      this.getCurrentCostBasis(chain, protocol, nftId),
-      this.getTotalCollectedFeesValue(chain, protocol, nftId),
-      this.getCurrentRealizedPnL(chain, protocol, nftId),
-      this.getUnclaimedFees(chain, protocol, nftId),
+      this.calculateCurrentValue(positionId),
+      this.getCurrentCostBasis(positionId),
+      this.getTotalCollectedFeesValue(positionId),
+      this.getCurrentRealizedPnL(positionId),
+      this.getUnclaimedFees(positionId),
     ]);
 
     // Calculate derived metrics using BigInt arithmetic
@@ -550,10 +549,11 @@ export class PositionPnLService {
     // Upsert the cache entry
     await this.prisma.positionPnL.upsert({
       where: {
-        positionChain_positionProtocol_positionNftId: {
-          positionChain: chain,
-          positionProtocol: protocol,
-          positionNftId: nftId,
+        positionUserId_positionChain_positionProtocol_positionNftId: {
+          positionUserId: positionId.userId,
+          positionChain: positionId.chain,
+          positionProtocol: positionId.protocol,
+          positionNftId: positionId.nftId,
         },
       },
       update: {
@@ -569,9 +569,10 @@ export class PositionPnLService {
         poolSqrtPriceX96: poolData?.sqrtPriceX96,
       },
       create: {
-        positionChain: chain,
-        positionProtocol: protocol,
-        positionNftId: nftId,
+        positionUserId: positionId.userId,
+        positionChain: positionId.chain,
+        positionProtocol: positionId.protocol,
+        positionNftId: positionId.nftId,
         currentValue,
         currentCostBasis,
         collectedFees,
@@ -590,15 +591,14 @@ export class PositionPnLService {
    * Invalidate cached PnL data for a position
    */
   async invalidateCache(
-    chain: string,
-    protocol: string,
-    nftId: string
+    positionId: PositionId
   ): Promise<void> {
     await this.prisma.positionPnL.updateMany({
       where: {
-        positionChain: chain,
-        positionProtocol: protocol,
-        positionNftId: nftId,
+        positionUserId: positionId.userId,
+        positionChain: positionId.chain,
+        positionProtocol: positionId.protocol,
+        positionNftId: positionId.nftId,
       },
       data: { isValid: false }
     });
@@ -617,15 +617,16 @@ export class PositionPnLService {
   /**
    * Get the latest uncollected principal amounts for a position from PositionEvents
    */
-  private async getLatestUncollectedPrincipal(chain: string, protocol: string, nftId: string): Promise<{
+  private async getLatestUncollectedPrincipal(positionId: PositionId): Promise<{
     uncollectedPrincipal0: bigint;
     uncollectedPrincipal1: bigint;
   }> {
     const latestEvent = await this.prisma.positionEvent.findFirst({
       where: {
-        positionChain: chain,
-        positionProtocol: protocol,
-        positionNftId: nftId,
+        positionUserId: positionId.userId,
+        positionChain: positionId.chain,
+        positionProtocol: positionId.protocol,
+        positionNftId: positionId.nftId,
       },
       select: {
         uncollectedPrincipal0: true,

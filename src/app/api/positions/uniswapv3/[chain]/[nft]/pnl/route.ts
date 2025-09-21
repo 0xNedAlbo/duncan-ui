@@ -121,11 +121,13 @@ export const GET = withAuthAndLogging<PositionPnlResponse>(
             }
 
             // Calculate PnL breakdown using the service
-            const pnlBreakdown = await positionPnLService.getPnlBreakdown(
-                position.chain,
-                position.protocol,
-                position.nftId
-            );
+            const positionId = {
+                userId: user.userId,
+                chain: position.chain,
+                protocol: position.protocol,
+                nftId: position.nftId
+            };
+            const pnlBreakdown = await positionPnLService.getPnlBreakdown(positionId);
 
             log.debug(
                 {

@@ -51,6 +51,7 @@ export type PositionSyncInfo = Pick<
     BasicPosition,
     "chain" | "protocol" | "nftId" | "token0IsQuote"
 > & {
+    userId: string; // Added userId for composite key support
     pool: Pick<BasicPosition["pool"], "poolAddress" | "chain"> & {
         token0: Pick<BasicPosition["pool"]["token0"], "decimals">;
         token1: Pick<BasicPosition["pool"]["token1"], "decimals">;
@@ -71,6 +72,7 @@ export class PositionLedgerService {
      */
     static createSyncInfo(position: BasicPosition): PositionSyncInfo {
         return {
+            userId: position.userId,
             chain: position.chain,
             protocol: position.protocol,
             nftId: position.nftId,
@@ -171,6 +173,7 @@ export class PositionLedgerService {
         // Check if this is a first-time import (no events in database yet)
         const existingEventCount = await this.prisma.positionEvent.count({
             where: {
+                positionUserId: positionInfo.userId,
                 positionChain: positionInfo.chain,
                 positionProtocol: positionInfo.protocol,
                 positionNftId: positionInfo.nftId,
@@ -247,6 +250,7 @@ export class PositionLedgerService {
         // Query all position events ordered by blockchain order
         const allEvents = await this.prisma.positionEvent.findMany({
             where: {
+                positionUserId: positionInfo.userId,
                 positionChain: positionInfo.chain,
                 positionProtocol: positionInfo.protocol,
                 positionNftId: positionInfo.nftId,
@@ -331,6 +335,7 @@ export class PositionLedgerService {
             (
                 await this.prisma.positionEvent.findMany({
                     where: {
+                        positionUserId: positionInfo.userId,
                         positionChain: positionInfo.chain,
                         positionProtocol: positionInfo.protocol,
                         positionNftId: positionInfo.nftId,
@@ -407,6 +412,7 @@ export class PositionLedgerService {
         // Still preserve manual events and ledgerIgnore events
         const result = await this.prisma.positionEvent.deleteMany({
             where: {
+                positionUserId: positionInfo.userId,
                 positionChain: positionInfo.chain,
                 positionProtocol: positionInfo.protocol,
                 positionNftId: positionInfo.nftId,
@@ -681,6 +687,7 @@ export class PositionLedgerService {
         // Return the processed events for reporting
         const processedEvents = await this.prisma.positionEvent.findMany({
             where: {
+                positionUserId: positionInfo.userId,
                 positionChain: positionInfo.chain,
                 positionProtocol: positionInfo.protocol,
                 positionNftId: positionInfo.nftId,
@@ -716,6 +723,7 @@ export class PositionLedgerService {
     ): Promise<number> {
         const result = await this.prisma.positionEvent.deleteMany({
             where: {
+                positionUserId: positionInfo.userId,
                 positionChain: positionInfo.chain,
                 positionProtocol: positionInfo.protocol,
                 positionNftId: positionInfo.nftId,
@@ -761,6 +769,7 @@ export class PositionLedgerService {
     ): Promise<number> {
         const result = await this.prisma.positionEvent.deleteMany({
             where: {
+                positionUserId: positionInfo.userId,
                 positionChain: positionInfo.chain,
                 positionProtocol: positionInfo.protocol,
                 positionNftId: positionInfo.nftId,
@@ -799,6 +808,7 @@ export class PositionLedgerService {
         // Get existing manual and ledgerIgnore events from DB
         const existingEvents = await this.prisma.positionEvent.findMany({
             where: {
+                positionUserId: positionInfo.userId,
                 positionChain: positionInfo.chain,
                 positionProtocol: positionInfo.protocol,
                 positionNftId: positionInfo.nftId,
@@ -887,6 +897,7 @@ export class PositionLedgerService {
 
         const createdEvent = await this.prisma.positionEvent.create({
             data: {
+                positionUserId: positionInfo.userId,
                 positionChain: positionInfo.chain,
                 positionProtocol: positionInfo.protocol,
                 positionNftId: positionInfo.nftId,
@@ -1415,6 +1426,7 @@ export class PositionLedgerService {
 
         // Build where clause
         const whereClause: any = {
+            positionUserId: positionInfo.userId,
             positionChain: positionInfo.chain,
             positionProtocol: positionInfo.protocol,
             positionNftId: positionInfo.nftId,
@@ -1503,6 +1515,7 @@ export class PositionLedgerService {
         // Count existing manual events at the same blockNumber for this position
         const existingManualEvents = await this.prisma.positionEvent.count({
             where: {
+                positionUserId: positionInfo.userId,
                 positionChain: positionInfo.chain,
                 positionProtocol: positionInfo.protocol,
                 positionNftId: positionInfo.nftId,

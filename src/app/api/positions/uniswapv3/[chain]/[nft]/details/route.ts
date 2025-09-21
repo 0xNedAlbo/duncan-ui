@@ -156,7 +156,13 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
             // First, load PnL data since APR breakdown depends on unclaimed fees
             let pnlBreakdown = null;
             try {
-                pnlBreakdown = await positionPnLService.getPnlBreakdown(position.chain, position.protocol, position.nftId);
+                const positionId = {
+                    userId: user.userId,
+                    chain: position.chain,
+                    protocol: position.protocol,
+                    nftId: position.nftId
+                };
+                pnlBreakdown = await positionPnLService.getPnlBreakdown(positionId);
                 log.debug(
                     { chain: position.chain, protocol: position.protocol, nftId: position.nftId, pnlBreakdown },
                     "PnL breakdown loaded for APR calculation"
@@ -174,7 +180,13 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
                     try {
                         // Calculate APR breakdown with or without PnL data
                         const unclaimedFees = pnlBreakdown?.unclaimedFees;
-                        const aprBreakdownResult = await positionAprService.getAprBreakdown(position.chain, position.protocol, position.nftId, unclaimedFees);
+                        const positionId = {
+                            userId: user.userId,
+                            chain: position.chain,
+                            protocol: position.protocol,
+                            nftId: position.nftId
+                        };
+                        const aprBreakdownResult = await positionAprService.getAprBreakdown(positionId, unclaimedFees);
                         log.debug(
                             { chain: position.chain, protocol: position.protocol, nftId: position.nftId, aprBreakdownResult, unclaimedFees: unclaimedFees || "not available" },
                             "APR breakdown calculation completed"

@@ -203,6 +203,7 @@ export class PositionImportService {
             // Step 10: Sync position events
             await this.positionLedgerService.syncPositionEvents(
                 {
+                    userId,
                     chain: savedPosition.chain,
                     protocol: savedPosition.protocol,
                     nftId: savedPosition.nftId,
@@ -222,11 +223,13 @@ export class PositionImportService {
             );
 
             // Step 11: Calculate PnL breakdown
-            await this.positionPnLService.getPnlBreakdown(
-                savedPosition.chain,
-                savedPosition.protocol,
-                savedPosition.nftId
-            );
+            const positionId = {
+                userId,
+                chain: savedPosition.chain,
+                protocol: savedPosition.protocol,
+                nftId: savedPosition.nftId
+            };
+            await this.positionPnLService.getPnlBreakdown(positionId);
 
             return {
                 success: true,

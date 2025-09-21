@@ -35,6 +35,7 @@ export interface PoolData {
 
 // Basic position interface (no PnL data)
 export interface BasicPosition {
+    userId: string;
     chain: string;
     protocol: string;
     nftId: string;
@@ -65,6 +66,23 @@ export interface CreatePositionData {
     owner?: string;
     importType: "manual" | "wallet" | "nft";
     status?: string;
+}
+
+// Position composite primary key interface
+export interface PositionId {
+    userId: string;
+    chain: string;
+    protocol: string;
+    nftId: string;
+}
+
+// Helper functions for PositionId
+export function createPositionId(userId: string, chain: string, protocol: string, nftId: string): PositionId {
+    return { userId, chain, protocol, nftId };
+}
+
+export function formatPositionKey(positionId: PositionId): string {
+    return `${positionId.userId}-${positionId.chain}-${positionId.protocol}-${positionId.nftId}`;
 }
 
 // Position update data
@@ -98,15 +116,16 @@ export class PositionService {
     }
 
     /**
-     * Get a single position by composite key
+     * Get a single position by PositionId
      */
-    async getPosition(chain: string, protocol: string, nftId: string): Promise<BasicPosition | null> {
+    async getPosition(positionId: PositionId): Promise<BasicPosition | null> {
         const position = await this.prisma.position.findUnique({
             where: {
-                chain_protocol_nftId: {
-                    chain,
-                    protocol,
-                    nftId,
+                userId_chain_protocol_nftId: {
+                    userId: positionId.userId,
+                    chain: positionId.chain,
+                    protocol: positionId.protocol,
+                    nftId: positionId.nftId,
                 },
             },
             include: {
@@ -214,17 +233,16 @@ export class PositionService {
      * Update an existing position
      */
     async updatePosition(
-        chain: string,
-        protocol: string,
-        nftId: string,
+        positionId: PositionId,
         data: UpdatePositionData
     ): Promise<BasicPosition> {
         const position = await this.prisma.position.update({
             where: {
-                chain_protocol_nftId: {
-                    chain,
-                    protocol,
-                    nftId,
+                userId_chain_protocol_nftId: {
+                    userId: positionId.userId,
+                    chain: positionId.chain,
+                    protocol: positionId.protocol,
+                    nftId: positionId.nftId,
                 },
             },
             data,
@@ -245,17 +263,16 @@ export class PositionService {
      * Update mutable on-chain fields of a position (liquidity)
      */
     async updatePositionOnChainData(
-        chain: string,
-        protocol: string,
-        nftId: string,
+        positionId: PositionId,
         liquidity: string
     ): Promise<BasicPosition> {
         const position = await this.prisma.position.update({
             where: {
-                chain_protocol_nftId: {
-                    chain,
-                    protocol,
-                    nftId,
+                userId_chain_protocol_nftId: {
+                    userId: positionId.userId,
+                    chain: positionId.chain,
+                    protocol: positionId.protocol,
+                    nftId: positionId.nftId,
                 },
             },
             data: {
@@ -278,13 +295,14 @@ export class PositionService {
     /**
      * Touch a position to update its updatedAt timestamp
      */
-    async touchPosition(chain: string, protocol: string, nftId: string): Promise<void> {
+    async touchPosition(positionId: PositionId): Promise<void> {
         await this.prisma.position.update({
             where: {
-                chain_protocol_nftId: {
-                    chain,
-                    protocol,
-                    nftId,
+                userId_chain_protocol_nftId: {
+                    userId: positionId.userId,
+                    chain: positionId.chain,
+                    protocol: positionId.protocol,
+                    nftId: positionId.nftId,
                 },
             },
             data: {
@@ -296,13 +314,14 @@ export class PositionService {
     /**
      * Delete a position
      */
-    async deletePosition(chain: string, protocol: string, nftId: string): Promise<void> {
+    async deletePosition(positionId: PositionId): Promise<void> {
         await this.prisma.position.delete({
             where: {
-                chain_protocol_nftId: {
-                    chain,
-                    protocol,
-                    nftId,
+                userId_chain_protocol_nftId: {
+                    userId: positionId.userId,
+                    chain: positionId.chain,
+                    protocol: positionId.protocol,
+                    nftId: positionId.nftId,
                 },
             },
         });
@@ -370,13 +389,14 @@ export class PositionService {
     /**
      * Check if position exists
      */
-    async positionExists(chain: string, protocol: string, nftId: string): Promise<boolean> {
+    async positionExists(positionId: PositionId): Promise<boolean> {
         const position = await this.prisma.position.findUnique({
             where: {
-                chain_protocol_nftId: {
-                    chain,
-                    protocol,
-                    nftId,
+                userId_chain_protocol_nftId: {
+                    userId: positionId.userId,
+                    chain: positionId.chain,
+                    protocol: positionId.protocol,
+                    nftId: positionId.nftId,
                 },
             },
             select: { chain: true },
@@ -390,6 +410,7 @@ export class PositionService {
      */
     private mapToBasicPosition(position: any): BasicPosition {
         return {
+            userId: position.userId,
             chain: position.chain,
             protocol: position.protocol,
             nftId: position.nftId,

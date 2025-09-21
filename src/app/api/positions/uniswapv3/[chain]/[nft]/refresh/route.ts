@@ -128,8 +128,14 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
             }
 
             // Invalidate existing caches to force fresh calculation
-            await positionPnLService.invalidateCache(position.chain, position.protocol, position.nftId);
-            await curveDataService.invalidateCache(position.chain, position.protocol, position.nftId);
+            const positionId = {
+                userId: user.userId,
+                chain: position.chain,
+                protocol: position.protocol,
+                nftId: position.nftId
+            };
+            await positionPnLService.invalidateCache(positionId);
+            await curveDataService.invalidateCache(positionId);
 
             log.debug(
                 { chain: position.chain, protocol: position.protocol, nftId: position.nftId },
@@ -143,7 +149,13 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
             // - Cache update with new data
             let pnlBreakdown = null;
             try {
-                pnlBreakdown = await positionPnLService.getPnlBreakdown(position.chain, position.protocol, position.nftId);
+                const positionId = {
+                    userId: user.userId,
+                    chain: position.chain,
+                    protocol: position.protocol,
+                    nftId: position.nftId
+                };
+                pnlBreakdown = await positionPnLService.getPnlBreakdown(positionId);
                 log.debug(
                     { chain: position.chain, protocol: position.protocol, nftId: position.nftId },
                     "Fresh PnL calculation completed"
@@ -159,12 +171,13 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
             let aprBreakdown = undefined;
             try {
                 const unclaimedFees = pnlBreakdown?.unclaimedFees;
-                aprBreakdown = await positionAprService.getAprBreakdown(
-                    position.chain,
-                    position.protocol,
-                    position.nftId,
-                    unclaimedFees
-                );
+                const positionId = {
+                    userId: user.userId,
+                    chain: position.chain,
+                    protocol: position.protocol,
+                    nftId: position.nftId
+                };
+                aprBreakdown = await positionAprService.getAprBreakdown(positionId, unclaimedFees);
                 log.debug(
                     { chain: position.chain, protocol: position.protocol, nftId: position.nftId, realizedApr: aprBreakdown.realizedApr, unrealizedApr: aprBreakdown.unrealizedApr },
                     "Successfully calculated fresh APR breakdown"
@@ -178,7 +191,7 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
             }
 
             // Fetch the updated position data
-            const refreshedPosition = await positionService.getPosition(position.chain, position.protocol, position.nftId);
+            const refreshedPosition = await positionService.getPosition(positionId);
 
             // Calculate fresh curve data and include in response
             // This eliminates the need for a separate curve data fetch

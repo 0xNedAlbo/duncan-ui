@@ -11,7 +11,7 @@ import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 import type { CurvePoint, CurveData } from "@/components/charts/mini-pnl-curve";
 import type { Services } from "../ServiceFactory";
 import type { Clients } from "../ClientsFactory";
-import type { BasicPosition } from "./positionService";
+import type { BasicPosition, PositionId } from "./positionService";
 import { PositionPnLService } from "./positionPnLService";
 
 interface CurvePositionParams {
@@ -155,11 +155,13 @@ export class CurveDataService {
         }
 
         // Get current cost basis from PnL service
-        const pnlBreakdown = await this.positionPnLService.getPnlBreakdown(
-            position.chain,
-            position.protocol,
-            position.nftId
-        );
+        const positionId: PositionId = {
+            userId: position.userId,
+            chain: position.chain,
+            protocol: position.protocol,
+            nftId: position.nftId
+        };
+        const pnlBreakdown = await this.positionPnLService.getPnlBreakdown(positionId);
         const currentCostBasis = BigInt(pnlBreakdown.currentCostBasis);
 
         const result = {
@@ -190,6 +192,7 @@ export class CurveDataService {
         // Check for valid cached curve data
         const cachedCurve = await this.prisma.positionCurve.findFirst({
             where: {
+                positionUserId: position.userId,
                 positionChain: position.chain,
                 positionProtocol: position.protocol,
                 positionNftId: position.nftId,
@@ -203,8 +206,14 @@ export class CurveDataService {
         }
 
         // No valid cache found - generate fresh curve data and cache it
+        const positionId: PositionId = {
+            userId: position.userId,
+            chain: position.chain,
+            protocol: position.protocol,
+            nftId: position.nftId
+        };
         const freshCurveData = await this.generateCurveData(position);
-        await this.cacheCurveData(position.chain, position.protocol, position.nftId, freshCurveData, position);
+        await this.cacheCurveData(positionId, freshCurveData, position);
 
         return freshCurveData;
     }
@@ -308,7 +317,7 @@ export class CurveDataService {
     /**
      * Cache curve data to database
      */
-    private async cacheCurveData(chain: string, protocol: string, nftId: string, curveData: CurveData, position: BasicPosition): Promise<void> {
+    private async cacheCurveData(positionId: PositionId, curveData: CurveData, position: BasicPosition): Promise<void> {
         // Get current pool state for cache metadata
         const poolData = await this.prisma.pool.findUnique({
             where: {
@@ -323,9 +332,10 @@ export class CurveDataService {
         // Get PnL cache version for dependency tracking
         const pnlCache = await this.prisma.positionPnL.findFirst({
             where: {
-                positionChain: chain,
-                positionProtocol: protocol,
-                positionNftId: nftId,
+                positionUserId: positionId.userId,
+                positionChain: positionId.chain,
+                positionProtocol: positionId.protocol,
+                positionNftId: positionId.nftId,
             },
             select: { id: true, updatedAt: true }
         });
@@ -333,10 +343,11 @@ export class CurveDataService {
         // Upsert the cache entry
         await this.prisma.positionCurve.upsert({
             where: {
-                positionChain_positionProtocol_positionNftId: {
-                    positionChain: chain,
-                    positionProtocol: protocol,
-                    positionNftId: nftId,
+                positionUserId_positionChain_positionProtocol_positionNftId: {
+                    positionUserId: positionId.userId,
+                    positionChain: positionId.chain,
+                    positionProtocol: positionId.protocol,
+                    positionNftId: positionId.nftId,
                 },
             },
             update: {
@@ -348,9 +359,10 @@ export class CurveDataService {
                 updatedAt: new Date()
             },
             create: {
-                positionChain: chain,
-                positionProtocol: protocol,
-                positionNftId: nftId,
+                positionUserId: positionId.userId,
+                positionChain: positionId.chain,
+                positionProtocol: positionId.protocol,
+                positionNftId: positionId.nftId,
                 curveData: curveData as any, // Prisma Json type
                 poolTick: poolData?.currentTick,
                 poolSqrtPriceX96: poolData?.sqrtPriceX96,
@@ -451,12 +463,13 @@ export class CurveDataService {
     /**
      * Invalidate cached curve data for a position
      */
-    async invalidateCache(chain: string, protocol: string, nftId: string): Promise<void> {
+    async invalidateCache(positionId: PositionId): Promise<void> {
         await this.prisma.positionCurve.updateMany({
             where: {
-                positionChain: chain,
-                positionProtocol: protocol,
-                positionNftId: nftId,
+                positionUserId: positionId.userId,
+                positionChain: positionId.chain,
+                positionProtocol: positionId.protocol,
+                positionNftId: positionId.nftId,
             },
             data: { isValid: false }
         });
@@ -465,13 +478,14 @@ export class CurveDataService {
     /**
      * Invalidate curve cache for multiple positions (batch operation)
      */
-    async invalidateBatchCache(positions: Array<{ chain: string; protocol: string; nftId: string }>): Promise<void> {
+    async invalidateBatchCache(positions: PositionId[]): Promise<void> {
         // For batch operations with composite keys, we need to use OR conditions
         if (positions.length === 0) return;
 
         await this.prisma.positionCurve.updateMany({
             where: {
                 OR: positions.map(pos => ({
+                    positionUserId: pos.userId,
                     positionChain: pos.chain,
                     positionProtocol: pos.protocol,
                     positionNftId: pos.nftId,

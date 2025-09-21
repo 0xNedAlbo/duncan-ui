@@ -139,6 +139,7 @@ export const GET = withAuthAndLogging<PositionEventsResponse>(
             // Get events from position ledger service
             const eventsResult = await positionLedgerService.getPositionEvents(
                 {
+                    userId: user.userId,
                     chain: position.chain,
                     protocol: position.protocol,
                     nftId: position.nftId,
