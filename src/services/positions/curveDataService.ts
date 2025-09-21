@@ -155,7 +155,11 @@ export class CurveDataService {
         }
 
         // Get current cost basis from PnL service
-        const pnlBreakdown = await this.positionPnLService.getPnlBreakdown(position.id);
+        const pnlBreakdown = await this.positionPnLService.getPnlBreakdown(
+            position.chain,
+            position.protocol,
+            position.nftId
+        );
         const currentCostBasis = BigInt(pnlBreakdown.currentCostBasis);
 
         const result = {
@@ -184,9 +188,11 @@ export class CurveDataService {
      */
     async getCurveData(position: BasicPosition): Promise<CurveData> {
         // Check for valid cached curve data
-        const cachedCurve = await this.prisma.positionCurve.findUnique({
+        const cachedCurve = await this.prisma.positionCurve.findFirst({
             where: {
-                positionId: position.id,
+                positionChain: position.chain,
+                positionProtocol: position.protocol,
+                positionNftId: position.nftId,
                 isValid: true
             }
         });
@@ -198,7 +204,7 @@ export class CurveDataService {
 
         // No valid cache found - generate fresh curve data and cache it
         const freshCurveData = await this.generateCurveData(position);
-        await this.cacheCurveData(position.id, freshCurveData, position);
+        await this.cacheCurveData(position.chain, position.protocol, position.nftId, freshCurveData, position);
 
         return freshCurveData;
     }
@@ -302,22 +308,37 @@ export class CurveDataService {
     /**
      * Cache curve data to database
      */
-    private async cacheCurveData(positionId: string, curveData: CurveData, position: BasicPosition): Promise<void> {
+    private async cacheCurveData(chain: string, protocol: string, nftId: string, curveData: CurveData, position: BasicPosition): Promise<void> {
         // Get current pool state for cache metadata
         const poolData = await this.prisma.pool.findUnique({
-            where: { id: position.pool.id },
+            where: {
+                chain_poolAddress: {
+                    chain: position.pool.chain,
+                    poolAddress: position.pool.poolAddress,
+                },
+            },
             select: { currentTick: true, sqrtPriceX96: true }
         });
 
         // Get PnL cache version for dependency tracking
-        const pnlCache = await this.prisma.positionPnL.findUnique({
-            where: { positionId },
+        const pnlCache = await this.prisma.positionPnL.findFirst({
+            where: {
+                positionChain: chain,
+                positionProtocol: protocol,
+                positionNftId: nftId,
+            },
             select: { id: true, updatedAt: true }
         });
 
         // Upsert the cache entry
         await this.prisma.positionCurve.upsert({
-            where: { positionId },
+            where: {
+                positionChain_positionProtocol_positionNftId: {
+                    positionChain: chain,
+                    positionProtocol: protocol,
+                    positionNftId: nftId,
+                },
+            },
             update: {
                 curveData: curveData as any, // Prisma Json type
                 poolTick: poolData?.currentTick,
@@ -327,7 +348,9 @@ export class CurveDataService {
                 updatedAt: new Date()
             },
             create: {
-                positionId,
+                positionChain: chain,
+                positionProtocol: protocol,
+                positionNftId: nftId,
                 curveData: curveData as any, // Prisma Json type
                 poolTick: poolData?.currentTick,
                 poolSqrtPriceX96: poolData?.sqrtPriceX96,
@@ -392,14 +415,16 @@ export class CurveDataService {
 
         for (const position of positions) {
             try {
+                const positionKey = `${position.chain}-${position.protocol}-${position.nftId}`;
                 if (this.validatePosition(position)) {
                     const curveData = await this.generateCurveData(position);
-                    results.set(position.id, curveData);
+                    results.set(positionKey, curveData);
                 } else {
-                    results.set(position.id, null);
+                    results.set(positionKey, null);
                 }
             } catch {
-                results.set(position.id, null);
+                const positionKey = `${position.chain}-${position.protocol}-${position.nftId}`;
+                results.set(positionKey, null);
             }
         }
 
@@ -426,9 +451,13 @@ export class CurveDataService {
     /**
      * Invalidate cached curve data for a position
      */
-    async invalidateCache(positionId: string): Promise<void> {
+    async invalidateCache(chain: string, protocol: string, nftId: string): Promise<void> {
         await this.prisma.positionCurve.updateMany({
-            where: { positionId },
+            where: {
+                positionChain: chain,
+                positionProtocol: protocol,
+                positionNftId: nftId,
+            },
             data: { isValid: false }
         });
     }
@@ -436,9 +465,18 @@ export class CurveDataService {
     /**
      * Invalidate curve cache for multiple positions (batch operation)
      */
-    async invalidateBatchCache(positionIds: string[]): Promise<void> {
+    async invalidateBatchCache(positions: Array<{ chain: string; protocol: string; nftId: string }>): Promise<void> {
+        // For batch operations with composite keys, we need to use OR conditions
+        if (positions.length === 0) return;
+
         await this.prisma.positionCurve.updateMany({
-            where: { positionId: { in: positionIds } },
+            where: {
+                OR: positions.map(pos => ({
+                    positionChain: pos.chain,
+                    positionProtocol: pos.protocol,
+                    positionNftId: pos.nftId,
+                }))
+            },
             data: { isValid: false }
         });
     }
@@ -447,11 +485,12 @@ export class CurveDataService {
      * Invalidate all curve cache for positions in a specific pool
      * Useful when pool state changes significantly
      */
-    async invalidatePoolCache(poolId: string): Promise<void> {
+    async invalidatePoolCache(chain: string, poolAddress: string): Promise<void> {
         await this.prisma.positionCurve.updateMany({
             where: {
                 position: {
-                    poolId: poolId
+                    chain: chain,
+                    poolAddress: poolAddress
                 }
             },
             data: { isValid: false }

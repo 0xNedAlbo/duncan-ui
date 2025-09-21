@@ -47,7 +47,10 @@ interface ProcessableEvent {
 }
 
 // Position sync information interface - picks necessary fields from BasicPosition
-export type PositionSyncInfo = Pick<BasicPosition, "chain" | "protocol" | "nftId" | "token0IsQuote"> & {
+export type PositionSyncInfo = Pick<
+    BasicPosition,
+    "chain" | "protocol" | "nftId" | "token0IsQuote"
+> & {
     pool: Pick<BasicPosition["pool"], "poolAddress" | "chain"> & {
         token0: Pick<BasicPosition["pool"]["token0"], "decimals">;
         token1: Pick<BasicPosition["pool"]["token1"], "decimals">;
@@ -167,11 +170,20 @@ export class PositionLedgerService {
 
         // Check if this is a first-time import (no events in database yet)
         const existingEventCount = await this.prisma.positionEvent.count({
-            where: { positionId: positionInfo.id },
+            where: {
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
+            },
         });
 
         this.logger.debug(
-            { existingEventCount, positionId: positionInfo.id },
+            {
+                existingEventCount,
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
+            },
             "Existing events for position"
         );
 
@@ -216,7 +228,7 @@ export class PositionLedgerService {
      * This helps establish the initial state for processing non-final events
      */
     private async findFinalityBoundary(
-        positionId: string,
+        positionInfo: PositionSyncInfo,
         chain: SupportedChainsType
     ): Promise<{
         lastFinalEvent: PositionEvent | null;
@@ -234,7 +246,11 @@ export class PositionLedgerService {
 
         // Query all position events ordered by blockchain order
         const allEvents = await this.prisma.positionEvent.findMany({
-            where: { positionId },
+            where: {
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
+            },
             orderBy: [
                 { blockNumber: "asc" },
                 { transactionIndex: "asc" },
@@ -284,7 +300,7 @@ export class PositionLedgerService {
     private async filterNonFinalEvents(
         rawEvents: RawPositionEvent[],
         chain: SupportedChainsType,
-        positionId: string
+        positionInfo: PositionSyncInfo
     ): Promise<RawPositionEvent[]> {
         if (rawEvents.length === 0) {
             return [];
@@ -315,7 +331,9 @@ export class PositionLedgerService {
             (
                 await this.prisma.positionEvent.findMany({
                     where: {
-                        positionId,
+                        positionChain: positionInfo.chain,
+                        positionProtocol: positionInfo.protocol,
+                        positionNftId: positionInfo.nftId,
                         blockNumber: { gt: lastFinalizedBlock },
                     },
                     select: { transactionHash: true },
@@ -373,7 +391,7 @@ export class PositionLedgerService {
      * This is a more targeted deletion than the clean slate approach
      */
     private async deleteNonFinalEvents(
-        positionId: string,
+        positionInfo: PositionSyncInfo,
         chain: SupportedChainsType
     ): Promise<number> {
         // Get the last finalized block number
@@ -382,14 +400,16 @@ export class PositionLedgerService {
 
         if (lastFinalizedBlock === null) {
             // No finalized blocks yet, all events are non-final, delete all onchain events
-            return this.deletePositionEvents(positionId);
+            return this.deletePositionEvents(positionInfo);
         }
 
         // Delete only non-final events (blockNumber > lastFinalizedBlock)
         // Still preserve manual events and ledgerIgnore events
         const result = await this.prisma.positionEvent.deleteMany({
             where: {
-                positionId,
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
                 blockNumber: { gt: lastFinalizedBlock },
                 AND: [
                     { source: { not: "manual" } }, // Exclude manual events
@@ -444,14 +464,14 @@ export class PositionLedgerService {
 
         // Find the finality boundary and establish initial state from last final event
         const { lastFinalEvent, initialState } =
-            await this.findFinalityBoundary(positionInfo.id, chain);
+            await this.findFinalityBoundary(positionInfo, chain);
 
         // Filter input events to exclude already-final ones (but keep final events not yet in DB)
         this.logger.debug("Filtering non-final events");
         const nonFinalRawEvents = await this.filterNonFinalEvents(
             rawEvents,
             chain,
-            positionInfo.id
+            positionInfo
         );
         this.logger.debug(
             { nonFinalCount: nonFinalRawEvents.length },
@@ -471,14 +491,14 @@ export class PositionLedgerService {
         }
 
         // Delete only non-final events (preserve final events, manual events, and ledgerIgnore)
-        await this.deleteNonFinalEvents(positionInfo.id, chain);
+        await this.deleteNonFinalEvents(positionInfo, chain);
 
         // Start from the state after the last final event (not zero state)
         let currentState = initialState;
 
         // Get all events (manual + non-final existing + non-final new) in natural blockchain order
         const allEvents = await this.getAllPositionEventsWithRaw(
-            positionInfo.id,
+            positionInfo,
             nonFinalRawEvents
         );
 
@@ -602,7 +622,9 @@ export class PositionLedgerService {
                     });
                     eventId = event.dbEvent.id;
                 } else {
-                    throw new Error('Event must have either rawEvent or dbEvent');
+                    throw new Error(
+                        "Event must have either rawEvent or dbEvent"
+                    );
                 }
 
                 // Create APR record for this event (incremental processing)
@@ -619,15 +641,22 @@ export class PositionLedgerService {
                 // If there was a previous event, close its period
                 if (i > 0) {
                     await this.positionAprService.updatePreviousEventPeriodEnd(
-                        positionInfo.id,
+                        positionInfo.chain,
+                        positionInfo.protocol,
+                        positionInfo.nftId,
                         event.blockTimestamp
                     );
                 }
 
                 // If this is a COLLECT event, distribute fees across existing periods
-                if (event.eventType === 'COLLECT' && calculatedFeeValue !== '0') {
+                if (
+                    event.eventType === "COLLECT" &&
+                    calculatedFeeValue !== "0"
+                ) {
                     await this.positionAprService.distributeSingleCollectEventFees(
-                        positionInfo.id,
+                        positionInfo.chain,
+                        positionInfo.protocol,
+                        positionInfo.nftId,
                         event.blockTimestamp,
                         calculatedFeeValue
                     );
@@ -641,13 +670,21 @@ export class PositionLedgerService {
         // APR records are already calculated incrementally during sync
         // No need to invalidate cache since records are created/updated in real-time
         this.logger.debug(
-            { positionId: positionInfo.id },
+            {
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
+            },
             "APR records updated incrementally during event sync"
         );
 
         // Return the processed events for reporting
         const processedEvents = await this.prisma.positionEvent.findMany({
-            where: { positionId: positionInfo.id },
+            where: {
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
+            },
             orderBy: [
                 { blockNumber: "asc" },
                 { transactionIndex: "asc" },
@@ -671,13 +708,17 @@ export class PositionLedgerService {
      * Use this method for normal cleanup operations that respect user data.
      * For complete deletion, use hardResetPositionEvents() instead.
      *
-     * @param positionId - ID of the position to clean up
+     * @param positionInfo - Position information with composite key
      * @returns Number of deleted records
      */
-    async deletePositionEvents(positionId: string): Promise<number> {
+    async deletePositionEvents(
+        positionInfo: PositionSyncInfo
+    ): Promise<number> {
         const result = await this.prisma.positionEvent.deleteMany({
             where: {
-                positionId,
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
                 AND: [
                     { source: { not: "manual" } }, // Exclude manual events
                     { ledgerIgnore: false }, // Exclude ledgerIgnore events
@@ -687,9 +728,18 @@ export class PositionLedgerService {
 
         // Invalidate APR cache since events have been deleted
         if (result.count > 0) {
-            await this.positionAprService.invalidatePositionApr(positionId);
+            await this.positionAprService.invalidatePositionApr(
+                positionInfo.chain,
+                positionInfo.protocol,
+                positionInfo.nftId
+            );
             this.logger.debug(
-                { positionId, deletedCount: result.count },
+                {
+                    positionChain: positionInfo.chain,
+                    positionProtocol: positionInfo.protocol,
+                    positionNftId: positionInfo.nftId,
+                    deletedCount: result.count,
+                },
                 "APR cache invalidated after event deletion"
             );
         }
@@ -703,19 +753,34 @@ export class PositionLedgerService {
      * Use this for complete position resyncs or cleanup operations.
      * For business-logic deletion, use deletePositionEvents() instead.
      *
-     * @param positionId - ID of the position to reset
+     * @param positionInfo - Position information with composite key
      * @returns Number of deleted records
      */
-    async hardResetPositionEvents(positionId: string): Promise<number> {
+    async hardResetPositionEvents(
+        positionInfo: PositionSyncInfo
+    ): Promise<number> {
         const result = await this.prisma.positionEvent.deleteMany({
-            where: { positionId },
+            where: {
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
+            },
         });
 
         // Invalidate APR cache since all events have been deleted
         if (result.count > 0) {
-            await this.positionAprService.invalidatePositionApr(positionId);
+            await this.positionAprService.invalidatePositionApr(
+                positionInfo.chain,
+                positionInfo.protocol,
+                positionInfo.nftId
+            );
             this.logger.debug(
-                { positionId, deletedCount: result.count },
+                {
+                    positionChain: positionInfo.chain,
+                    positionProtocol: positionInfo.protocol,
+                    positionNftId: positionInfo.nftId,
+                    deletedCount: result.count,
+                },
                 "APR cache invalidated after hard reset"
             );
         }
@@ -728,13 +793,15 @@ export class PositionLedgerService {
      * Merges existing manual events from DB with new RawPositionEvents
      */
     private async getAllPositionEventsWithRaw(
-        positionId: string,
+        positionInfo: PositionSyncInfo,
         rawEvents: RawPositionEvent[]
     ): Promise<ProcessableEvent[]> {
         // Get existing manual and ledgerIgnore events from DB
         const existingEvents = await this.prisma.positionEvent.findMany({
             where: {
-                positionId,
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
                 OR: [
                     { source: "manual" }, // Keep manual events
                     { ledgerIgnore: true }, // Keep ledgerIgnore events
@@ -820,7 +887,9 @@ export class PositionLedgerService {
 
         const createdEvent = await this.prisma.positionEvent.create({
             data: {
-                positionId: positionInfo.id,
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
                 ledgerIgnore: false, // New events are never ignored by default
 
                 // Blockchain ordering
@@ -1310,12 +1379,12 @@ export class PositionLedgerService {
      * Get position events with pagination and filtering
      * Returns events in chronological order (oldest first)
      *
-     * @param positionId - ID of the position
+     * @param positionInfo - Position information with composite key
      * @param options - Query options for filtering, sorting, and pagination
      * @returns Paginated list of position events
      */
     async getPositionEvents(
-        positionId: string,
+        positionInfo: PositionSyncInfo,
         options: {
             eventType?:
                 | "CREATE"
@@ -1346,7 +1415,9 @@ export class PositionLedgerService {
 
         // Build where clause
         const whereClause: any = {
-            positionId,
+            positionChain: positionInfo.chain,
+            positionProtocol: positionInfo.protocol,
+            positionNftId: positionInfo.nftId,
         };
 
         if (eventType) {
@@ -1375,7 +1446,9 @@ export class PositionLedgerService {
 
         this.logger.debug(
             {
-                positionId,
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
                 eventType,
                 sortOrder,
                 limit,
@@ -1405,14 +1478,14 @@ export class PositionLedgerService {
      * and sequential negative logIndex values to avoid conflicts with onchain events
      *
      * @param timestamp - Timestamp for the manual event
-     * @param positionId - ID of the position
+     * @param positionInfo - Position information with composite key
      * @param chain - Chain to get block information from
      * @returns Blockchain identifiers for chronological ordering
      * @throws Error if timestamp is too old or too new for block data
      */
     async generateManualEventBlockData(
         timestamp: Date,
-        positionId: string,
+        positionInfo: PositionSyncInfo,
         chain: SupportedChainsType
     ): Promise<{
         blockNumber: bigint;
@@ -1430,7 +1503,9 @@ export class PositionLedgerService {
         // Count existing manual events at the same blockNumber for this position
         const existingManualEvents = await this.prisma.positionEvent.count({
             where: {
-                positionId,
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
                 blockNumber: blockNumber,
                 source: "manual",
             },

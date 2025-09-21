@@ -15,7 +15,9 @@ import { PrismaClient, type PositionEvent, type PositionEventApr } from "@prisma
 import { createServiceLogger, type ServiceLogger } from "@/lib/logging/loggerFactory";
 
 export interface AprCalculationResult {
-    positionId: string;
+    positionChain: string;
+    positionProtocol: string;
+    positionNftId: string;
     totalApr: number;
     timeWeightedCostBasis: string;
     totalFeesCollected: string;
@@ -25,7 +27,9 @@ export interface AprCalculationResult {
 }
 
 export interface AprBreakdown {
-    positionId: string;
+    positionChain: string;
+    positionProtocol: string;
+    positionNftId: string;
 
     // Realized metrics
     realizedApr: number;              // APR from collected fees only
@@ -69,12 +73,20 @@ export class PositionAprService {
      * Calculate APR for a position
      * Creates/updates PositionEventApr records and returns aggregated results
      */
-    async calculatePositionApr(positionId: string): Promise<AprCalculationResult> {
-        this.logger.debug({ positionId }, 'Starting APR calculation');
+    async calculatePositionApr(
+        chain: string,
+        protocol: string,
+        nftId: string
+    ): Promise<AprCalculationResult> {
+        this.logger.debug({ positionChain: chain, positionProtocol: protocol, positionNftId: nftId }, 'Starting APR calculation');
 
         // Get all position events in chronological order
         const events = await this.prisma.positionEvent.findMany({
-            where: { positionId },
+            where: {
+                positionChain: chain,
+                positionProtocol: protocol,
+                positionNftId: nftId,
+            },
             orderBy: [
                 { blockNumber: 'asc' },
                 { transactionIndex: 'asc' },
@@ -83,32 +95,38 @@ export class PositionAprService {
         });
 
         if (events.length === 0) {
-            throw new Error(`No events found for position ${positionId}`);
+            throw new Error(`No events found for position ${chain}-${protocol}-${nftId}`);
         }
 
         // Create or update APR periods for all events
         await this.createEventPeriods(events);
 
         // Distribute fees from COLLECT events
-        await this.distributeFees(positionId);
+        await this.distributeFees(chain, protocol, nftId);
 
         // Calculate period APRs
-        await this.calculatePeriodAprs(positionId);
+        await this.calculatePeriodAprs(chain, protocol, nftId);
 
         // Get final results and calculate totals
         const aprPeriods = await this.prisma.positionEventApr.findMany({
             where: {
-                event: { positionId },
+                event: {
+                    positionChain: chain,
+                    positionProtocol: protocol,
+                    positionNftId: nftId,
+                },
                 isValid: true
             },
             include: { event: true },
             orderBy: { periodStartDate: 'asc' },
         });
 
-        const result = this.aggregateAprResults(positionId, aprPeriods);
+        const result = this.aggregateAprResults(chain, protocol, nftId, aprPeriods);
 
         this.logger.debug({
-            positionId,
+            positionChain: chain,
+            positionProtocol: protocol,
+            positionNftId: nftId,
             totalApr: result.totalApr,
             periodsCount: result.periods.length
         }, 'APR calculation completed');
@@ -161,11 +179,17 @@ export class PositionAprService {
     /**
      * Distribute fees from COLLECT events across preceding capital periods
      */
-    private async distributeFees(positionId: string): Promise<void> {
+    private async distributeFees(
+        chain: string,
+        protocol: string,
+        nftId: string
+    ): Promise<void> {
         // Get all COLLECT events with fees
         const collectEvents = await this.prisma.positionEvent.findMany({
             where: {
-                positionId,
+                positionChain: chain,
+                positionProtocol: protocol,
+                positionNftId: nftId,
                 eventType: 'COLLECT',
                 feeValueInQuote: { not: '0' }
             },
@@ -194,7 +218,11 @@ export class PositionAprService {
         // Get all periods that existed before this collect event
         const eligiblePeriods = await this.prisma.positionEventApr.findMany({
             where: {
-                event: { positionId: collectEvent.positionId },
+                event: {
+                    positionChain: collectEvent.positionChain,
+                    positionProtocol: collectEvent.positionProtocol,
+                    positionNftId: collectEvent.positionNftId,
+                },
                 periodStartDate: { lt: collectEvent.blockTimestamp },
                 periodDays: { not: null }, // Exclude open periods
                 periodCostBasis: { not: '0' }, // Exclude zero cost basis periods
@@ -250,10 +278,18 @@ export class PositionAprService {
     /**
      * Calculate APR for each period based on allocated fees
      */
-    private async calculatePeriodAprs(positionId: string): Promise<void> {
+    private async calculatePeriodAprs(
+        chain: string,
+        protocol: string,
+        nftId: string
+    ): Promise<void> {
         const periods = await this.prisma.positionEventApr.findMany({
             where: {
-                event: { positionId },
+                event: {
+                    positionChain: chain,
+                    positionProtocol: protocol,
+                    positionNftId: nftId,
+                },
                 periodDays: { not: null },
                 periodCostBasis: { not: '0' },
                 isValid: true,
@@ -292,7 +328,9 @@ export class PositionAprService {
      * Aggregate APR results from all periods
      */
     private aggregateAprResults(
-        positionId: string,
+        chain: string,
+        protocol: string,
+        nftId: string,
         aprPeriods: (PositionEventApr & { event: PositionEvent })[]
     ): AprCalculationResult {
         // Filter only closed periods with valid APR calculations
@@ -304,7 +342,9 @@ export class PositionAprService {
 
         if (activePeriods.length === 0) {
             return {
-                positionId,
+                positionChain: chain,
+                positionProtocol: protocol,
+                positionNftId: nftId,
                 totalApr: 0,
                 timeWeightedCostBasis: '0',
                 totalFeesCollected: '0',
@@ -339,7 +379,9 @@ export class PositionAprService {
             : 0;
 
         return {
-            positionId,
+            positionChain: chain,
+            positionProtocol: protocol,
+            positionNftId: nftId,
             totalApr,
             timeWeightedCostBasis: timeWeightedCostBasis.toString(),
             totalFeesCollected: totalFeesCollected.toString(),
@@ -353,10 +395,18 @@ export class PositionAprService {
      * Invalidate APR cache for a position
      * Call this when position events change
      */
-    async invalidatePositionApr(positionId: string): Promise<void> {
+    async invalidatePositionApr(
+        chain: string,
+        protocol: string,
+        nftId: string
+    ): Promise<void> {
         await this.prisma.positionEventApr.updateMany({
             where: {
-                event: { positionId },
+                event: {
+                    positionChain: chain,
+                    positionProtocol: protocol,
+                    positionNftId: nftId,
+                },
             },
             data: {
                 isValid: false,
@@ -364,7 +414,11 @@ export class PositionAprService {
             },
         });
 
-        this.logger.debug({ positionId }, 'APR cache invalidated');
+        this.logger.debug({
+            positionChain: chain,
+            positionProtocol: protocol,
+            positionNftId: nftId
+        }, 'APR cache invalidated');
     }
 
     /**
@@ -414,13 +468,19 @@ export class PositionAprService {
      * Called when processing events to close previous periods
      */
     async updatePreviousEventPeriodEnd(
-        positionId: string,
+        chain: string,
+        protocol: string,
+        nftId: string,
         newEventDate: Date
     ): Promise<void> {
         // Find the most recent event that doesn't have an end date (open period)
         const openPeriods = await this.prisma.positionEventApr.findMany({
             where: {
-                event: { positionId },
+                event: {
+                    positionChain: chain,
+                    positionProtocol: protocol,
+                    positionNftId: nftId,
+                },
                 periodEndDate: null,
                 isValid: true,
             },
@@ -453,7 +513,9 @@ export class PositionAprService {
      * Called during sync when processing COLLECT events
      */
     async distributeSingleCollectEventFees(
-        positionId: string,
+        chain: string,
+        protocol: string,
+        nftId: string,
         collectEventDate: Date,
         feeValueInQuote: string
     ): Promise<void> {
@@ -466,7 +528,11 @@ export class PositionAprService {
         // Get all periods that existed before this collect event and are closed
         const eligiblePeriods = await this.prisma.positionEventApr.findMany({
             where: {
-                event: { positionId },
+                event: {
+                    positionChain: chain,
+                    positionProtocol: protocol,
+                    positionNftId: nftId,
+                },
                 periodStartDate: { lt: collectEventDate },
                 periodDays: { not: null }, // Only closed periods
                 periodCostBasis: { not: '0' }, // Only periods with capital
@@ -477,7 +543,9 @@ export class PositionAprService {
 
         if (eligiblePeriods.length === 0) {
             this.logger.debug({
-                positionId,
+                positionChain: chain,
+                positionProtocol: protocol,
+                positionNftId: nftId,
                 collectDate: collectEventDate,
                 feeValue: feeValueInQuote
             }, 'No eligible periods for fee distribution');
@@ -538,26 +606,48 @@ export class PositionAprService {
     /**
      * Delete APR data for a position (when position events are deleted)
      */
-    async deletePositionAprData(positionId: string): Promise<number> {
+    async deletePositionAprData(
+        chain: string,
+        protocol: string,
+        nftId: string
+    ): Promise<number> {
         const result = await this.prisma.positionEventApr.deleteMany({
             where: {
-                event: { positionId },
+                event: {
+                    positionChain: chain,
+                    positionProtocol: protocol,
+                    positionNftId: nftId,
+                },
             },
         });
 
-        this.logger.debug({ positionId, deletedCount: result.count }, 'APR data deleted');
+        this.logger.debug({
+            positionChain: chain,
+            positionProtocol: protocol,
+            positionNftId: nftId,
+            deletedCount: result.count
+        }, 'APR data deleted');
         return result.count;
     }
 
     /**
      * Get cached APR data if valid, otherwise calculate fresh
      */
-    async getPositionApr(positionId: string, forceRecalculate: boolean = false): Promise<AprCalculationResult> {
+    async getPositionApr(
+        chain: string,
+        protocol: string,
+        nftId: string,
+        forceRecalculate: boolean = false
+    ): Promise<AprCalculationResult> {
         if (!forceRecalculate) {
             // Check if we have valid cached data
             const cachedPeriods = await this.prisma.positionEventApr.findMany({
                 where: {
-                    event: { positionId },
+                    event: {
+                        positionChain: chain,
+                        positionProtocol: protocol,
+                        positionNftId: nftId,
+                    },
                     isValid: true
                 },
                 include: { event: true },
@@ -566,17 +656,25 @@ export class PositionAprService {
 
             // If we have cached data and all events have APR records, return cached results
             const eventCount = await this.prisma.positionEvent.count({
-                where: { positionId }
+                where: {
+                    positionChain: chain,
+                    positionProtocol: protocol,
+                    positionNftId: nftId,
+                }
             });
 
             if (cachedPeriods.length === eventCount && cachedPeriods.length > 0) {
-                this.logger.debug({ positionId }, 'Returning cached APR data');
-                return this.aggregateAprResults(positionId, cachedPeriods);
+                this.logger.debug({
+                    positionChain: chain,
+                    positionProtocol: protocol,
+                    positionNftId: nftId
+                }, 'Returning cached APR data');
+                return this.aggregateAprResults(chain, protocol, nftId, cachedPeriods);
             }
         }
 
         // Calculate fresh APR data
-        return this.calculatePositionApr(positionId);
+        return this.calculatePositionApr(chain, protocol, nftId);
     }
 
     /**
@@ -588,17 +686,28 @@ export class PositionAprService {
      * The unrealized portion covers the period after the last collect event
      * (or from the beginning if no collects have occurred yet).
      *
-     * @param positionId - The position ID
+     * @param chain - Chain name
+     * @param protocol - Protocol name
+     * @param nftId - NFT ID
      * @param unclaimedFeesValue - Current unclaimed fees value in quote token (from PnL breakdown) - optional
      */
-    async getAprBreakdown(positionId: string, unclaimedFeesValue?: string): Promise<AprBreakdown> {
+    async getAprBreakdown(
+        chain: string,
+        protocol: string,
+        nftId: string,
+        unclaimedFeesValue?: string
+    ): Promise<AprBreakdown> {
         // Get all APR periods (realized portion)
-        const aprData = await this.getPositionApr(positionId, false);
+        const aprData = await this.getPositionApr(chain, protocol, nftId, false);
         const realizedApr = aprData.totalApr;
 
         // Get position events to find the last collect and current unclaimed fees
         const events = await this.prisma.positionEvent.findMany({
-            where: { positionId },
+            where: {
+                positionChain: chain,
+                positionProtocol: protocol,
+                positionNftId: nftId,
+            },
             orderBy: [
                 { blockNumber: 'asc' },
                 { transactionIndex: 'asc' },
@@ -608,7 +717,9 @@ export class PositionAprService {
 
         if (events.length === 0) {
             return {
-                positionId,
+                positionChain: chain,
+                positionProtocol: protocol,
+                positionNftId: nftId,
                 realizedApr: 0,
                 realizedFeesCollected: '0',
                 realizedTWCostBasis: '0',
@@ -655,7 +766,9 @@ export class PositionAprService {
             const totalApr = totalActiveDays > 0 ? finalUnrealizedApr : 0;
 
             return {
-                positionId,
+                positionChain: chain,
+                positionProtocol: protocol,
+                positionNftId: nftId,
                 realizedApr: 0,
                 realizedFeesCollected: '0',
                 realizedTWCostBasis: '0',
@@ -706,7 +819,9 @@ export class PositionAprService {
             : aprData.timeWeightedCostBasis;
 
         return {
-            positionId,
+            positionChain: chain,
+            positionProtocol: protocol,
+            positionNftId: nftId,
             realizedApr,
             realizedFeesCollected: aprData.totalFeesCollected,
             realizedTWCostBasis: aprData.timeWeightedCostBasis,
