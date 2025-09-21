@@ -102,6 +102,49 @@ export const POST = withAuthAndLogging<{ success: boolean; data?: any; error?: s
       const apiFactory = ApiServiceFactory.getInstance();
       const positionImportService = apiFactory.positionImportService;
 
+      // Check for duplicate position before importing
+      const positionId = {
+        userId: user.userId,
+        chain: chain as SupportedChainsType,
+        protocol: "uniswapv3",
+        nftId
+      };
+
+      const existingPosition = await apiFactory.positionService.getPosition(positionId);
+
+      if (existingPosition) {
+        log.debug(
+          { chain, nftId, userId: user.userId },
+          'Position already exists - preventing duplicate import'
+        );
+
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Position already imported. This NFT position already exists in your portfolio.',
+            data: {
+              existingPosition: {
+                chain: existingPosition.chain,
+                protocol: existingPosition.protocol,
+                nftId: existingPosition.nftId,
+                poolAddress: existingPosition.pool.poolAddress,
+                token0Symbol: existingPosition.pool.token0.symbol,
+                token1Symbol: existingPosition.pool.token1.symbol,
+                status: existingPosition.status,
+                createdAt: existingPosition.createdAt
+              }
+            },
+            meta: {
+              requestedAt: new Date().toISOString(),
+              chain,
+              nftId,
+              dataSource: 'database'
+            }
+          },
+          { status: 409 }
+        );
+      }
+
       // Import the position
       const importResult = await positionImportService.importPositionForUserByNftId(
         user.userId,
@@ -114,6 +157,21 @@ export const POST = withAuthAndLogging<{ success: boolean; data?: any; error?: s
           { chain, nftId, userId: user.userId, error: importResult.message },
           'NFT position import failed'
         );
+
+        // Clean up any partially created position data
+        try {
+          await apiFactory.positionService.deletePosition(positionId);
+          log.debug(
+            { chain, nftId, userId: user.userId },
+            'Cleaned up partially created position after import failure'
+          );
+        } catch (cleanupError) {
+          log.error(
+            { chain, nftId, userId: user.userId, cleanupError },
+            'Failed to clean up position after import failure'
+          );
+          // Don't fail the response due to cleanup errors
+        }
 
         // Determine appropriate HTTP status code based on error message
         let statusCode = 500;
@@ -152,12 +210,6 @@ export const POST = withAuthAndLogging<{ success: boolean; data?: any; error?: s
 
       // Get the full position data with all relationships (pool, tokens, etc.)
       // This ensures the frontend gets the same format as the position list endpoint
-      const positionId = {
-        userId: user.userId,
-        chain: chain as SupportedChainsType,
-        protocol: "uniswapv3",
-        nftId
-      };
       const fullPosition = await apiFactory.positionService.getPosition(positionId);
 
       if (!fullPosition) {
@@ -211,14 +263,37 @@ export const POST = withAuthAndLogging<{ success: boolean; data?: any; error?: s
         userId: user?.userId
       });
 
+      // Clean up any partially created position data on unexpected errors
+      if (chain && nftId) {
+        try {
+          const cleanupPositionId = {
+            userId: user.userId,
+            chain: chain as SupportedChainsType,
+            protocol: "uniswapv3",
+            nftId
+          };
+          await ApiServiceFactory.getInstance().positionService.deletePosition(cleanupPositionId);
+          log.debug(
+            { chain, nftId, userId: user.userId },
+            'Cleaned up partially created position after unexpected error'
+          );
+        } catch (cleanupError) {
+          log.error(
+            { chain, nftId, userId: user.userId, cleanupError },
+            'Failed to clean up position after unexpected error'
+          );
+          // Don't fail the response due to cleanup errors
+        }
+      }
+
       return NextResponse.json(
         {
           success: false,
           error: 'Internal server error',
           meta: {
             requestedAt: new Date().toISOString(),
-            chain: '',
-            nftId: '',
+            chain: chain || '',
+            nftId: nftId || '',
             dataSource: 'onchain'
           }
         },
