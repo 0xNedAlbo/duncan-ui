@@ -33,7 +33,7 @@ export function usePositionPnL(
       }
 
       const response = await apiClient.get<PositionPnlResponse>(
-        `/api/positions/uniswapv3/nft/${chain}/${nftId}/pnl`
+        `/api/positions/uniswapv3/${chain}/${nftId}/pnl`
       );
 
       if (!response.data) {

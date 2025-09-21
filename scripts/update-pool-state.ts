@@ -8,7 +8,7 @@ config({ path: resolve(process.cwd(), ".env") });
 
 import { DefaultServiceFactory } from '@/services/ServiceFactory';
 import { DefaultClientsFactory } from '@/services/ClientsFactory';
-import { normalizeAddress } from '@/lib/contracts/erc20';
+import { normalizeAddress } from '@/lib/utils/evm';
 
 /**
  * Update Pool State Script

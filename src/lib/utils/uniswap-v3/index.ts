@@ -44,7 +44,6 @@ export {
 export {
   // Utility functions
   sameAddress,
-  isValidAddress,
   isToken0,
   sortTokens,
   getTokenMapping,

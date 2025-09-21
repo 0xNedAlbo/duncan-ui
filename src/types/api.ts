@@ -133,7 +133,9 @@ export interface PositionDetailsResponse extends ApiResponse<PositionWithPnL> {
 export interface PositionRefreshResponse extends ApiResponse<{ position: BasicPosition | null; pnlBreakdown: PnlBreakdown | null; aprBreakdown?: AprBreakdown; curveData?: CurveData }> {
   meta: {
     requestedAt: string;
-    positionId: string;
+    chain: string;
+    protocol: string;
+    nftId: string;
     refreshedAt: string;
   };
 }
@@ -141,7 +143,9 @@ export interface PositionRefreshResponse extends ApiResponse<{ position: BasicPo
 export interface PositionPnlResponse extends ApiResponse<PnlBreakdown> {
   meta: {
     requestedAt: string;
-    positionId: string;
+    chain: string;
+    protocol: string;
+    nftId: string;
   };
 }
 
@@ -161,50 +165,6 @@ export interface ImportNFTResponse extends ApiResponse<{ position: NFTPosition }
   };
 }
 
-// Token API Types
-export interface TokenSearchParams {
-  query: string;
-  chain?: string;
-  limit?: number;
-}
-
-export interface TokenData {
-  address: string;
-  name: string;
-  symbol: string;
-  decimals: number;
-  logoURI?: string;
-  verified?: boolean;
-  chainId: number;
-}
-
-export interface TokenSearchResponse extends ApiResponse<TokenData[]> {
-  meta: {
-    requestedAt: string;
-    query: string;
-    chain?: string;
-    resultCount: number;
-  };
-}
-
-export interface TokenBatchRequest {
-  addresses: string[];
-  chain: string;
-}
-
-export interface TokenBatchResponse extends ApiResponse<TokenData[]> {
-  meta: {
-    requestedAt: string;
-    chain: string;
-    requestedAddresses: string[];
-    foundCount: number;
-    notFoundAddresses: string[];
-  };
-}
-
-export interface TokenDetailsResponse extends ApiResponse<TokenData> {
-  data?: TokenData;
-}
 
 // Authentication API Types
 export interface RegisterRequest {
@@ -294,11 +254,6 @@ export const QUERY_KEYS = {
   positionEvents: (chain: string, nftId: string, params: PositionEventsParams) => 
     ['positions', 'events', chain, nftId, params] as const,
   
-  // Tokens
-  tokens: ['tokens'] as const,
-  tokenSearch: (params: TokenSearchParams) => ['tokens', 'search', params] as const,
-  tokenBatch: (addresses: string[], chain: string) => ['tokens', 'batch', addresses, chain] as const,
-  tokenDetails: (address: string, chain: string) => ['tokens', 'details', address, chain] as const,
   
   // User
   user: ['user'] as const,
@@ -338,15 +293,6 @@ export const QUERY_OPTIONS = {
     cacheTime: 15 * 60 * 1000, // 15 minutes
   },
   
-  // Token queries
-  tokenSearch: {
-    staleTime: 60 * 1000, // 1 minute
-    cacheTime: 10 * 60 * 1000, // 10 minutes
-  },
-  tokenDetails: {
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 30 * 60 * 1000, // 30 minutes
-  },
   
   // User queries
   userProfile: {

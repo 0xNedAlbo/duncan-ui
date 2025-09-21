@@ -229,7 +229,7 @@ Total APR: (150 / 12,750) / (60 / 365) * 100 = 7.35%
 ### API Design
 
 ```
-GET /api/positions/uniswapv3/nft/[chain]/[nft]/apr
+GET /api/positions/uniswapv3/[chain]/[nft]/apr
 - Returns calculated APR data
 - Automatically calculates if not cached or invalid
 - To force fresh data, use the refresh endpoint first

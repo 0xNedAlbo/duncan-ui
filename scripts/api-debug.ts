@@ -204,12 +204,6 @@ class ApiDebugger {
     // Test health endpoint
     await this.get('/api/health');
 
-    // Test tokens endpoint
-    await this.get('/api/tokens');
-
-    // Test specific token
-    await this.get('/api/tokens/ethereum/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2');
-
     // Test positions endpoint (new Uniswap V3 route)
     await this.get('/api/positions/uniswapv3/list');
 
@@ -298,7 +292,7 @@ Examples:
   npx tsx scripts/debug/api-debug.ts -m GET -e "/api/positions/uniswapv3/list"
 
   # GET request to different port
-  npx tsx scripts/debug/api-debug.ts -m GET -u "http://localhost:3001/api/tokens"
+  npx tsx scripts/debug/api-debug.ts -m GET -u "http://localhost:3001/api/positions/uniswapv3/list"
 
   # GET request to remote server
   npx tsx scripts/debug/api-debug.ts -m GET -u "https://api.example.com/api/positions/uniswapv3/list"
@@ -307,10 +301,10 @@ Examples:
   npx tsx scripts/debug/api-debug.ts -m GET -e "/api/positions/uniswapv3/list?limit=5&chain=ethereum"
 
   # POST request with body to remote URL
-  npx tsx scripts/debug/api-debug.ts -m POST -u "https://api.example.com/api/tokens" -b '{"chain":"ethereum","address":"0x..."}'
+  npx tsx scripts/debug/api-debug.ts -m POST -u "https://api.example.com/api/positions/uniswapv3/list" -b '{"chain":"ethereum"}'
 
   # Using custom base URL for multiple endpoints
-  npx tsx scripts/debug/api-debug.ts --base-url "http://localhost:3001" -m GET -e "/api/tokens"
+  npx tsx scripts/debug/api-debug.ts --base-url "http://localhost:3001" -m GET -e "/api/positions/uniswapv3/list"
 
   # Run examples
   npx tsx scripts/debug/api-debug.ts --examples

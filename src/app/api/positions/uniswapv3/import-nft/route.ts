@@ -140,8 +140,8 @@ export const POST = withAuthAndLogging<{ success: boolean; data?: any; error?: s
 
       log.debug(
         {
-          positionId: importResult.positionId,
           chain,
+          protocol: "uniswapv3",
           nftId,
           userId: user.userId,
           poolAddress: importResult.data?.poolAddress,
@@ -152,11 +152,15 @@ export const POST = withAuthAndLogging<{ success: boolean; data?: any; error?: s
 
       // Get the full position data with all relationships (pool, tokens, etc.)
       // This ensures the frontend gets the same format as the position list endpoint
-      const fullPosition = await apiFactory.positionService.getPosition(importResult.positionId!);
+      const fullPosition = await apiFactory.positionService.getPosition(
+        chain as SupportedChainsType,
+        "uniswapv3", // protocol
+        nftId
+      );
 
       if (!fullPosition) {
         log.error(
-          { positionId: importResult.positionId, chain, nftId },
+          { chain, nftId, protocol: "uniswapv3" },
           'Failed to retrieve full position data after import'
         );
         return NextResponse.json(
@@ -176,8 +180,8 @@ export const POST = withAuthAndLogging<{ success: boolean; data?: any; error?: s
 
       log.debug(
         {
-          positionId: fullPosition.id,
-          chain: fullPosition.pool.chain,
+          chain: fullPosition.chain,
+          protocol: fullPosition.protocol,
           nftId: fullPosition.nftId,
           poolAddress: fullPosition.pool.poolAddress,
           token0Symbol: fullPosition.pool.token0.symbol,

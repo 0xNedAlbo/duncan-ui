@@ -158,11 +158,11 @@ function MiniPnLCurveComponent({
                 {/* PnL-based fill areas */}
                 <defs>
                     {/* Clip path for positive PnL area */}
-                    <clipPath id={`positivePnLClip-${position.id}`}>
+                    <clipPath id={`positivePnLClip-${position.chain}-${position.protocol}-${position.nftId}`}>
                         <rect x="0" y="0" width={width} height={Math.max(0, Math.min(height, zeroLineY))} />
                     </clipPath>
                     {/* Clip path for negative PnL area */}
-                    <clipPath id={`negativePnLClip-${position.id}`}>
+                    <clipPath id={`negativePnLClip-${position.chain}-${position.protocol}-${position.nftId}`}>
                         <rect x="0" y={Math.max(0, Math.min(height, zeroLineY))} width={width} height={height - Math.max(0, Math.min(height, zeroLineY))} />
                     </clipPath>
                 </defs>
@@ -180,7 +180,7 @@ function MiniPnLCurveComponent({
                         <path
                             d={`${pathData} L ${width} ${effectiveZeroY} L 0 ${effectiveZeroY} Z`}
                             fill="rgba(34, 197, 94, 0.3)"
-                            clipPath={`url(#positivePnLClip-${position.id})`}
+                            clipPath={`url(#positivePnLClip-${position.chain}-${position.protocol}-${position.nftId})`}
                         />
                     );
                 })()}
@@ -198,7 +198,7 @@ function MiniPnLCurveComponent({
                         <path
                             d={`${pathData} L ${width} ${effectiveZeroY} L 0 ${effectiveZeroY} Z`}
                             fill="rgba(239, 68, 68, 0.3)"
-                            clipPath={`url(#negativePnLClip-${position.id})`}
+                            clipPath={`url(#negativePnLClip-${position.chain}-${position.protocol}-${position.nftId})`}
                         />
                     );
                 })()}
@@ -309,7 +309,9 @@ function arePropsEqual(
     nextProps: MiniPnLCurveProps
 ): boolean {
     // Primary optimization: compare position ID and current price
-    if (prevProps.position.id !== nextProps.position.id) return false;
+    if (prevProps.position.chain !== nextProps.position.chain ||
+        prevProps.position.protocol !== nextProps.position.protocol ||
+        prevProps.position.nftId !== nextProps.position.nftId) return false;
     if (
         prevProps.position.pool.currentPrice !==
         nextProps.position.pool.currentPrice

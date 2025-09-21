@@ -54,8 +54,6 @@ model User {
   accounts      Account[]
   sessions      Session[]
   positions     Position[]
-  userTokens    UserToken[] // User's custom token list
-  ownedPools    Pool[]      @relation("PoolOwner") // Pools with custom tokens
   apiKeys       ApiKey[]    // User's API keys
 
   createdAt DateTime @default(now())
@@ -95,139 +93,52 @@ model ApiKey {
   @@map("api_keys")
 }
 
-// Token Model - ONLY verified tokens from Alchemy (global)
+// Global Token Model - All tokens in one table with composite primary key
 model Token {
-  id String @id @default(cuid())
-
-  // Chain & Address (unique together)
+  // Composite Primary Key: chain + address (no auto-generated ID)
   chain   String // "ethereum", "arbitrum", "base"
   address String
 
-  // Token Information
+  // Core token metadata
   symbol   String
   name     String
   decimals Int
-
-  // Alchemy Metadata
   logoUrl  String?
-  verified Boolean @default(true) // Always true for global tokens
 
-  // Metadata Caching
-  lastUpdatedAt DateTime? // When last updated from Alchemy
+  // Source and verification
+  source     String  // "alchemy", "contract"
+  verified   Boolean @default(false)
 
-  // Relations
-  // poolsAsToken0 Pool[]   @relation("Token0")
-  // poolsAsToken1 Pool[]   @relation("Token1")
-  references TokenReference[] @relation("TokenReferenceToGlobal")
+
+
+  // Relations (direct token references)
+  poolsAsToken0 Pool[] @relation("PoolToken0")
+  poolsAsToken1 Pool[] @relation("PoolToken1")
 
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([chain, address])
+  // Primary key and indexes
+  @@id([chain, address]) // Composite primary key
   @@index([chain, symbol])
+  @@index([verified, source]) // Global verified tokens
   @@map("tokens")
-}
-
-// UserToken Model - User-specific Custom Tokens
-model UserToken {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Chain & Address
-  chain   String // "ethereum", "arbitrum", "base"
-  address String
-
-  // Token Information
-  symbol   String
-  name     String
-  decimals Int
-  logoUrl  String?
-
-  // Metadata
-  source     String // "contract", "manual", "placeholder"
-  addedAt    DateTime @default(now())
-  lastUsedAt DateTime @updatedAt
-
-  // User can assign custom labels
-  userLabel String? // e.g. "My Test Token"
-  notes     String? // User notes
-
-  // Relations
-  references TokenReference[] @relation("TokenReferenceToUser")
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, chain, address])
-  @@index([userId, chain])
-  @@index([userId, symbol])
-  @@map("user_tokens")
-}
-
-// TokenReference Model - Polymorphic token reference for unified Pool relations
-model TokenReference {
-  id String @id @default(cuid())
-
-  // Polymorphic token type discriminator
-  tokenType String // "global" | "user"
-
-  // XOR relationship - exactly one must be set
-  globalTokenId String?
-  globalToken   Token?  @relation("TokenReferenceToGlobal", fields: [globalTokenId], references: [id], onDelete: Cascade)
-
-  userTokenId String?
-  userToken   UserToken? @relation("TokenReferenceToUser", fields: [userTokenId], references: [id], onDelete: Cascade)
-
-  // Denormalized fields for query performance
-  chain   String
-  address String
-  symbol  String // Cached for quick access
-
-  // Pool relations
-  poolsAsToken0 Pool[] @relation("PoolToken0Reference")
-  poolsAsToken1 Pool[] @relation("PoolToken1Reference")
-
-  // Metadata
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Constraints
-  @@unique([tokenType, globalTokenId]) // Each global token has max one reference
-  @@unique([tokenType, userTokenId]) // Each user token has max one reference
-  @@unique([chain, address, tokenType, globalTokenId]) // Prevent duplicate global references
-  @@unique([chain, address, tokenType, userTokenId]) // Prevent duplicate user references
-  @@index([chain, address])
-  @@index([tokenType])
-  @@index([symbol])
-  @@map("token_references")
 }
 
 // Pool Model - central Pool data with flexible Token references
 model Pool {
-  id String @id @default(cuid())
-
-  // Chain & Address (unique together)
+  // Chain & Address (composite primary key)
   chain       String // "ethereum", "arbitrum", "base"
   poolAddress String
+  protocol    String @default("uniswapv3") // "uniswapv3", future: "uniswapv2", "sushiswap", etc.
 
-  // TokenReference Relations (polymorphic token handling)
-  token0RefId String
-  token0Ref   TokenReference @relation("PoolToken0Reference", fields: [token0RefId], references: [id])
-  token1RefId String
-  token1Ref   TokenReference @relation("PoolToken1Reference", fields: [token1RefId], references: [id])
-
-  // Token Addresses (kept for backward compatibility and direct queries)
+  // Direct token references using pool's chain + token addresses
   token0Address String
-  token1Address String
+  token0        Token @relation("PoolToken0", fields: [chain, token0Address], references: [chain, address])
 
-  // Legacy token relations (deprecated, will be removed after migration)
-  // token0Id      String?
-  // token0        Token?   @relation("Token0", fields: [token0Id], references: [id])
-  // token1Id      String?
-  // token1        Token?   @relation("Token1", fields: [token1Id], references: [id])
+  token1Address String
+  token1        Token @relation("PoolToken1", fields: [chain, token1Address], references: [chain, address])
 
   // Pool Parameters
   fee         Int // Fee in basis points (100 = 0.01%, 500 = 0.05%, 3000 = 0.3%, 10000 = 1%)
@@ -239,13 +150,6 @@ model Pool {
   sqrtPriceX96          String? // Uniswap V3 price format
   feeGrowthGlobal0X128  String  @default("0") // Q128.128 fee growth of token0
   feeGrowthGlobal1X128  String  @default("0") // Q128.128 fee growth of token1
-  tvl                   String?
-  volume24h             String?
-  apr                   Float?
-
-  // Pool Owner (for custom tokens)
-  ownerId String?
-  owner   User?   @relation("PoolOwner", fields: [ownerId], references: [id])
 
   // Relations
   positions Position[]
@@ -254,23 +158,27 @@ model Pool {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([chain, poolAddress])
-  @@unique([chain, token0Address, token1Address, fee])
-  // @@index([chain, token0Id, token1Id])
-  @@index([chain, token0Address, token1Address])
-  @@index([ownerId])
+  @@id([chain, poolAddress]) // Composite primary key
+  @@unique([chain, protocol, token0Address, token1Address, fee])
+  @@index([chain, protocol, token0Address, token1Address])
+  @@index([protocol])
   @@map("pools")
 }
 
 // Simplified Position Model
 model Position {
-  id String @id @default(cuid())
+  // Composite Primary Key: chain + protocol + nftId
+  chain    String  // "ethereum", "arbitrum", "base"
+  protocol String @default("uniswapv3") // "uniswapv3", future: "uniswapv2", etc.
+  nftId    String  // For NFT imports
 
   // Relations
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  poolId String
-  pool   Pool   @relation(fields: [poolId], references: [id])
+
+  // Pool reference using composite key
+  poolAddress String
+  pool        Pool   @relation(fields: [chain, poolAddress], references: [chain, poolAddress])
 
   // Position Details
   tickLower Int
@@ -285,7 +193,6 @@ model Position {
 
   // Import Metadata
   importType String // "manual", "wallet", "nft"
-  nftId      String? // For NFT imports
 
   // Position State
   status String @default("active") // "active", "closed", "archived"
@@ -299,8 +206,10 @@ model Position {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@id([chain, protocol, nftId]) // Composite primary key
   @@index([userId, status])
   @@index([owner])
+  @@index([chain, poolAddress])
   @@map("positions")
 }
 
@@ -309,8 +218,10 @@ model PositionEvent {
   id String @id @default(cuid())
 
   // Relations
-  positionId String
-  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  positionChain    String
+  positionProtocol String
+  positionNftId    String
+  position         Position @relation(fields: [positionChain, positionProtocol, positionNftId], references: [chain, protocol, nftId], onDelete: Cascade)
 
   // Ledger Order
   ledgerIgnore Boolean // Ignore this event in the ledger
@@ -363,10 +274,10 @@ model PositionEvent {
   // APR Calculation
   aprData PositionEventApr? // 1:1 relationship
 
-  @@unique([transactionHash, logIndex, positionId]) // Prevent exact duplicates
+  @@unique([transactionHash, logIndex, positionChain, positionProtocol, positionNftId]) // Prevent exact duplicates
   @@unique([inputHash]) // Prvent duplicates during sync
   // Indexes for performance and ordering
-  @@index([positionId, blockNumber, transactionIndex, logIndex]) // Natural blockchain ordering
+  @@index([positionChain, positionProtocol, positionNftId, blockNumber, transactionIndex, logIndex]) // Natural blockchain ordering
   @@map("position_events")
 }
 
@@ -433,8 +344,10 @@ model PositionPnL {
   id String @id @default(cuid())
 
   // Relations
-  positionId String   @unique // One-to-one with Position
-  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  positionChain    String
+  positionProtocol String
+  positionNftId    String
+  position         Position @relation(fields: [positionChain, positionProtocol, positionNftId], references: [chain, protocol, nftId], onDelete: Cascade)
 
   // Core PnL Metrics (all in quote token units as strings for BigInt precision)
   currentValue     String // Current position value
@@ -457,7 +370,8 @@ model PositionPnL {
   poolSqrtPriceX96 String? // Pool price when calculated
 
   // Performance Indexes
-  @@index([positionId, isValid]) // Quick cache lookups
+  @@unique([positionChain, positionProtocol, positionNftId]) // One-to-one with Position
+  @@index([positionChain, positionProtocol, positionNftId, isValid]) // Quick cache lookups
   @@index([calculatedAt])        // Cleanup old cache entries
   @@map("position_pnl_cache")
 }
@@ -467,8 +381,10 @@ model PositionCurve {
   id String @id @default(cuid())
 
   // Relations
-  positionId String   @unique // One-to-one with Position
-  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  positionChain    String
+  positionProtocol String
+  positionNftId    String
+  position         Position @relation(fields: [positionChain, positionProtocol, positionNftId], references: [chain, protocol, nftId], onDelete: Cascade)
 
   // Curve Data (JSON for atomic operations)
   curveData Json // Complete CurveData object as JSON
@@ -484,7 +400,8 @@ model PositionCurve {
   pnlCacheVersion  String? // Link to PositionPnL cache version for invalidation
 
   // Performance Indexes
-  @@index([positionId, isValid]) // Quick cache lookups
+  @@unique([positionChain, positionProtocol, positionNftId]) // One-to-one with Position
+  @@index([positionChain, positionProtocol, positionNftId, isValid]) // Quick cache lookups
   @@index([calculatedAt])        // Cleanup old cache entries
   @@map("position_curve_cache")
 }

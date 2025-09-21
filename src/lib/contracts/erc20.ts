@@ -42,35 +42,3 @@ export interface TokenMetadata {
   totalSupply?: bigint;
 }
 
-/**
- * Validates if an address is a proper Ethereum address format
- */
-export function isValidEthereumAddress(address: string): boolean {
-  return /^0x[a-fA-F0-9]{40}$/i.test(address);
-}
-
-/**
- * Normalize address to lowercase for consistency
- */
-export function normalizeAddress(address: string): string {
-  if (!isValidEthereumAddress(address)) {
-    throw new Error(`Invalid Ethereum address: ${address}`);
-  }
-  return address.toLowerCase();
-}
-
-/**
- * Generate a placeholder token symbol from address
- */
-export function generatePlaceholderSymbol(address: string): string {
-  const normalized = normalizeAddress(address);
-  return `${normalized.slice(0, 6)}...${normalized.slice(-4)}`;
-}
-
-/**
- * Generate a placeholder token name from address
- */
-export function generatePlaceholderName(address: string): string {
-  const normalized = normalizeAddress(address);
-  return `Unknown Token (${normalized.slice(0, 6)}...${normalized.slice(-4)})`;
-}

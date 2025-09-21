@@ -1,5 +1,6 @@
 import { PrismaClient, Token } from "@prisma/client";
 import { AlchemyTokenService } from "../alchemy/tokenMetadata";
+import { normalizeAddress } from "@/lib/utils/evm";
 import type { Services } from "../ServiceFactory";
 import type { Clients } from "../ClientsFactory";
 
@@ -39,8 +40,8 @@ export class TokenService {
     async findOrCreateToken(chain: string, address: string): Promise<Token> {
         this.validateInput(chain, address);
 
-        // Normalize address to lowercase for consistency
-        const normalizedAddress = address.toLowerCase();
+        // Normalize address to EIP-55 checksum format
+        const normalizedAddress = normalizeAddress(address);
 
         // Try to find existing token
         const existingToken = await this.prisma.token.findUnique({
@@ -72,7 +73,7 @@ export class TokenService {
                     decimals: metadata.decimals,
                     logoUrl: metadata.logo,
                     verified: true,
-                    lastUpdatedAt: new Date(),
+                    source: "alchemy",
                 },
             });
         } catch {
@@ -87,6 +88,7 @@ export class TokenService {
                     name: "Unknown Token",
                     decimals: 18, // Default for most ERC-20 tokens
                     verified: false,
+                    source: "contract",
                 },
             });
         }
@@ -98,7 +100,7 @@ export class TokenService {
     async upsertToken(data: TokenCreateInput): Promise<Token> {
         this.validateInput(data.chain, data.address);
 
-        const normalizedAddress = data.address.toLowerCase();
+        const normalizedAddress = normalizeAddress(data.address);
 
         return await this.prisma.token.upsert({
             where: {
@@ -113,8 +115,6 @@ export class TokenService {
                 decimals: data.decimals,
                 logoUrl: data.logoUrl,
                 verified: data.verified,
-                lastUpdatedAt: new Date(),
-                updatedAt: new Date(),
             },
             create: {
                 chain: data.chain,
@@ -124,7 +124,7 @@ export class TokenService {
                 decimals: data.decimals || 18,
                 logoUrl: data.logoUrl,
                 verified: data.verified || false,
-                lastUpdatedAt: new Date(),
+                source: "alchemy",
             },
         });
     }
@@ -135,7 +135,7 @@ export class TokenService {
     async updateTokenMetadata(chain: string, address: string): Promise<Token> {
         this.validateInput(chain, address);
 
-        const normalizedAddress = address.toLowerCase();
+        const normalizedAddress = normalizeAddress(address);
 
         // Fetch fresh metadata from Alchemy
         const metadata = await this.alchemyService.getTokenMetadata(
@@ -157,8 +157,7 @@ export class TokenService {
                 decimals: metadata.decimals,
                 logoUrl: metadata.logo,
                 verified: true,
-                lastUpdatedAt: new Date(),
-                updatedAt: new Date(),
+                source: "alchemy",
             },
         });
     }
@@ -219,7 +218,7 @@ export class TokenService {
     async getToken(chain: string, address: string): Promise<Token | null> {
         this.validateInput(chain, address);
 
-        const normalizedAddress = address.toLowerCase();
+        const normalizedAddress = normalizeAddress(address);
 
         return await this.prisma.token.findUnique({
             where: {
@@ -242,7 +241,7 @@ export class TokenService {
             return [];
         }
 
-        const normalizedAddresses = addresses.map((addr) => addr.toLowerCase());
+        const normalizedAddresses = addresses.map((addr) => normalizeAddress(addr));
 
         return await this.prisma.token.findMany({
             where: {
@@ -268,7 +267,7 @@ export class TokenService {
             return [];
         }
 
-        const normalizedAddresses = addresses.map((addr) => addr.toLowerCase());
+        const normalizedAddresses = addresses.map((addr) => normalizeAddress(addr));
 
         // Check which tokens already exist
         const existingTokens = await this.getTokensByAddresses(
@@ -313,7 +312,7 @@ export class TokenService {
                             decimals: metadata.decimals,
                             logoUrl: metadata.logo,
                             verified: true,
-                            lastUpdatedAt: new Date(),
+                            source: "alchemy",
                         },
                     });
                     newTokens.push(token);
@@ -327,6 +326,7 @@ export class TokenService {
                             name: "Unknown Token",
                             decimals: 18,
                             verified: false,
+                            source: "contract",
                         },
                     });
                     newTokens.push(token);
@@ -349,6 +349,7 @@ export class TokenService {
                         name: "Unknown Token",
                         decimals: 18,
                         verified: false,
+                        source: "contract",
                     },
                 });
                 fallbackTokens.push(token);
@@ -365,11 +366,7 @@ export class TokenService {
         token: Token,
         maxAgeMs: number = 7 * 24 * 60 * 60 * 1000
     ): boolean {
-        if (!token.lastUpdatedAt) {
-            return true; // Never updated
-        }
-
-        const age = Date.now() - token.lastUpdatedAt.getTime();
+        const age = Date.now() - token.updatedAt.getTime();
         return age > maxAgeMs;
     }
 
@@ -389,14 +386,9 @@ export class TokenService {
         const staleTokens = await this.prisma.token.findMany({
             where: {
                 ...where,
-                OR: [
-                    { lastUpdatedAt: null },
-                    {
-                        lastUpdatedAt: {
-                            lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-                        },
-                    },
-                ],
+                updatedAt: {
+                    lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
+                },
             },
             take: 100, // Limit to avoid rate limits
         });

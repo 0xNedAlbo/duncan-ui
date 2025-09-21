@@ -15,8 +15,8 @@ import {
 import { PrismaClient } from "@prisma/client";
 import { PoolService } from "../pools/poolService";
 import { PositionService } from "./positionService";
-// import { PositionPnLService } from "./positionPnLService";
-// import { PositionLedgerService } from "./positionLedgerService";
+import { PositionPnLService } from "./positionPnLService";
+import { PositionLedgerService } from "./positionLedgerService";
 import { EtherscanEventService } from "../etherscan/etherscanEventService";
 import { QuoteTokenService } from "./quoteTokenService";
 import type { Services } from "../ServiceFactory";
@@ -55,8 +55,8 @@ export class PositionImportService {
     private rpcClients: Map<SupportedChainsType, PublicClient>;
     private pools: PoolService;
     private positions: PositionService;
-    // private positionPnLService: PositionPnLService;
-    // private positionLedgerService: PositionLedgerService;
+    private positionPnLService: PositionPnLService;
+    private positionLedgerService: PositionLedgerService;
     private etherscanEventService: EtherscanEventService;
     private quoteTokenService: QuoteTokenService;
     private logger: ServiceLogger;
@@ -66,15 +66,14 @@ export class PositionImportService {
             Clients,
             "prisma" | "rpcClients" | "etherscanClient"
         >,
-        requiredServices: Pick<Services, "positionService" | "poolService">
-        // requiredServices: Pick<Services, "positionService" | "poolService" | "positionPnLService" | "positionLedgerService">
+        requiredServices: Pick<Services, "positionService" | "poolService" | "positionPnLService" | "positionLedgerService">
     ) {
         this.prisma = requiredClients.prisma;
         this.rpcClients = requiredClients.rpcClients;
         this.positions = requiredServices.positionService;
         this.pools = requiredServices.poolService;
-        // this.positionPnLService = requiredServices.positionPnLService;
-        // this.positionLedgerService = requiredServices.positionLedgerService;
+        this.positionPnLService = requiredServices.positionPnLService;
+        this.positionLedgerService = requiredServices.positionLedgerService;
         this.etherscanEventService = new EtherscanEventService({
             etherscanClient: requiredClients.etherscanClient,
         });
@@ -201,21 +200,33 @@ export class PositionImportService {
                 status: positionStatus.status === "closed" ? "closed" : "active",
             });
 
-            // Step 10: Sync position events (temporarily disabled - requires PositionLedgerService updates)
-            // TODO: Re-enable after PositionLedgerService is updated for composite keys
-            this.logger.debug({
-                chain: savedPosition.chain,
-                protocol: savedPosition.protocol,
-                nftId: savedPosition.nftId
-            }, 'Event sync temporarily disabled during schema migration');
+            // Step 10: Sync position events
+            await this.positionLedgerService.syncPositionEvents(
+                {
+                    chain: savedPosition.chain,
+                    protocol: savedPosition.protocol,
+                    nftId: savedPosition.nftId,
+                    token0IsQuote: savedPosition.token0IsQuote,
+                    pool: {
+                        poolAddress: poolData.poolAddress,
+                        chain: poolData.chain,
+                        token0: {
+                            decimals: poolData.token0.decimals
+                        },
+                        token1: {
+                            decimals: poolData.token1.decimals
+                        }
+                    }
+                },
+                savedPosition.nftId
+            );
 
-            // Step 11: Calculate PnL breakdown (temporarily disabled - requires PositionPnLService updates)
-            // TODO: Re-enable after PositionPnLService is updated for composite keys
-            this.logger.debug({
-                chain: savedPosition.chain,
-                protocol: savedPosition.protocol,
-                nftId: savedPosition.nftId
-            }, 'PnL calculation temporarily disabled during schema migration');
+            // Step 11: Calculate PnL breakdown
+            await this.positionPnLService.getPnlBreakdown(
+                savedPosition.chain,
+                savedPosition.protocol,
+                savedPosition.nftId
+            );
 
             return {
                 success: true,

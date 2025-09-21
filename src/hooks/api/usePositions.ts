@@ -17,7 +17,7 @@ import type {
   PositionEventsResponse,
   ApiResponse
 } from '@/types/api';
-import type { PositionDetailsResponse } from '@/app/api/positions/uniswapv3/nft/[chain]/[nft]/details/route';
+import type { PositionDetailsResponse } from '@/app/api/positions/uniswapv3/[chain]/[nft]/details/route';
 import type { AprApiResponse } from '@/types/apr';
 import { QUERY_KEYS, MUTATION_KEYS, QUERY_OPTIONS } from '@/types/api';
 import type { BasicPosition } from '@/services/positions/positionService';
@@ -33,7 +33,7 @@ export function usePosition(
 ) {
   return useQuery({
     queryKey: ['position', chain, nftId] as const,
-    queryFn: () => apiClient.get<ApiResponse<BasicPosition>>(`/api/positions/uniswapv3/nft/${chain}/${nftId}`),
+    queryFn: () => apiClient.get<ApiResponse<BasicPosition>>(`/api/positions/uniswapv3/${chain}/${nftId}`),
 
     // Default options
     staleTime: QUERY_OPTIONS.positionDetails.staleTime,
@@ -86,7 +86,7 @@ export function usePositionEvents(
   return useQuery({
     queryKey: QUERY_KEYS.positionEvents(chain, nftId, params),
     queryFn: () => apiClient.get<PositionEventsResponse>(
-      `/api/positions/uniswapv3/nft/${chain}/${nftId}/events`,
+      `/api/positions/uniswapv3/${chain}/${nftId}/events`,
       { params }
     ),
 
@@ -116,7 +116,7 @@ export function useRefreshNFTPosition(
     mutationKey: ['refreshNFTPosition'] as const,
     mutationFn: ({ chain, nftId }: { chain: string; nftId: string }) => {
       return apiClient.post<PositionRefreshResponse>(
-        `/api/positions/uniswapv3/nft/${chain}/${nftId}/refresh`
+        `/api/positions/uniswapv3/${chain}/${nftId}/refresh`
       );
     },
     
@@ -228,7 +228,7 @@ export function useRefreshPosition(
       // Use new protocol-aware endpoint for NFT positions
       if (position.nftId && position.pool.chain) {
         return apiClient.post<PositionRefreshResponse>(
-          `/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/refresh`
+          `/api/positions/uniswapv3/${position.pool.chain}/${position.nftId}/refresh`
         );
       }
       // Fallback for non-NFT positions - they can't be refreshed with new API structure
@@ -252,7 +252,7 @@ export function useRefreshPosition(
               data: {
                 ...oldData.data,
                 positions: oldData.data.positions.map(pos =>
-                  pos.id === position.id ? refreshedPosition : pos
+                  pos.chain === position.chain && pos.protocol === position.protocol && pos.nftId === position.nftId ? refreshedPosition : pos
                 ),
               },
             };
@@ -277,7 +277,7 @@ export function useRefreshPosition(
     },
     
     onError: (error, position) => {
-      console.error(`Failed to refresh position ${position.id}:`, error);
+      console.error(`Failed to refresh position ${position.chain}-${position.protocol}-${position.nftId}:`, error);
     },
     
     ...options,
@@ -355,7 +355,7 @@ export function usePositionDetails(
 ) {
   return useQuery({
     queryKey: ['positions', 'details', chain, nftId] as const,
-    queryFn: () => apiClient.get<PositionDetailsResponse>(`/api/positions/uniswapv3/nft/${chain}/${nftId}/details`),
+    queryFn: () => apiClient.get<PositionDetailsResponse>(`/api/positions/uniswapv3/${chain}/${nftId}/details`),
 
     // Default options
     staleTime: QUERY_OPTIONS.positionDetails.staleTime,
@@ -382,7 +382,7 @@ export function usePositionAprPeriods(
 ) {
   return useQuery({
     queryKey: ['positions', 'apr-periods', chain, nftId] as const,
-    queryFn: () => apiClient.get<AprApiResponse>(`/api/positions/uniswapv3/nft/${chain}/${nftId}/apr`),
+    queryFn: () => apiClient.get<AprApiResponse>(`/api/positions/uniswapv3/${chain}/${nftId}/apr`),
 
     // Default options
     staleTime: QUERY_OPTIONS.positionDetails.staleTime,

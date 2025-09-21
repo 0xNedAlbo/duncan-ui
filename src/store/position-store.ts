@@ -291,7 +291,7 @@ export const usePositionStore = create<PositionStore>()(
                         // Make API call to refresh endpoint
                         const response =
                             await apiClient.post<PositionRefreshResponse>(
-                                `/api/positions/uniswapv3/nft/${chain}/${nftId}/refresh`
+                                `/api/positions/uniswapv3/${chain}/${nftId}/refresh`
                             );
 
                         if (
@@ -365,7 +365,7 @@ export const usePositionStore = create<PositionStore>()(
 
 
                         // Call unified details endpoint
-                        const response = await apiClient.get(`/api/positions/uniswapv3/nft/${chain}/${nftId}/details`);
+                        const response = await apiClient.get(`/api/positions/uniswapv3/${chain}/${nftId}/details`);
 
                         if (response.success && response.data) {
                             const { basicData, pnlBreakdown, aprBreakdown, curveData } = response.data;

@@ -135,7 +135,12 @@ export class ApiServiceFactory {
             const { prisma, rpcClients, etherscanClient } = this.clients;
             this.serviceInstances.positionImportService = new PositionImportService(
                 { prisma, rpcClients, etherscanClient },
-                { positionService: this.positionService, poolService: this.poolService }
+                {
+                    positionService: this.positionService,
+                    poolService: this.poolService,
+                    positionPnLService: this.positionPnLService,
+                    positionLedgerService: this.positionLedgerService
+                }
             );
         }
         return this.serviceInstances.positionImportService;

@@ -142,6 +142,39 @@ export const GET = withAuth<ResponseType>(
   - APIs pass through BigInt strings without conversion
 - **Rationale:** Prevents precision loss, maintains compatibility with smart contract values, enables exact BigInt calculations throughout entire system
 
+**EVM Address Handling Rule:**
+- **ALWAYS use centralized EVM address utilities from `src/lib/utils/evm.ts` - single source of truth for all address operations**
+- **Required functions for all address operations:**
+  - `normalizeAddress(address)` - Convert to EIP-55 checksum format for storage/display
+  - `isValidAddress(address)` - Validate Ethereum address format
+  - `compareAddresses(addressA, addressB)` - Deterministic comparison for sorting
+  - `generatePlaceholderSymbol/Name(address)` - Generate display names from addresses
+- **Usage patterns:**
+  - **Normalization:** Always use `normalizeAddress()` before database storage or external API calls
+  - **Validation:** Use `isValidAddress()` for input validation in services
+  - **Comparison/Sorting:** Use `compareAddresses()` for deterministic token ordering (Uniswap V3)
+  - **Never use direct BigInt(), getAddress(), or custom normalization functions**
+- **Examples:**
+  ```typescript
+  import { normalizeAddress, compareAddresses, isValidAddress } from "@/lib/utils/evm";
+
+  // ✅ Correct - normalize before storage
+  const checksumAddress = normalizeAddress(userInput);
+
+  // ✅ Correct - deterministic comparison
+  const isToken0First = compareAddresses(tokenA, tokenB) < 0;
+
+  // ✅ Correct - validation
+  if (!isValidAddress(address)) throw new Error("Invalid address");
+
+  // ❌ Wrong - direct viem usage
+  const addr = getAddress(userInput);
+
+  // ❌ Wrong - direct BigInt comparison
+  const isFirst = BigInt(tokenA) < BigInt(tokenB);
+  ```
+- **EIP-55 is the canonical format** for storing addresses in database and displaying to users
+- **Rationale:** Single source of truth prevents inconsistencies, ensures deterministic sorting, maintains EIP-55 compliance, and enables proper checksum validation across entire codebase
 
 **Script Organization:**
 - **Always place debug, test, and verification scripts under `scripts/debug/` directory, never in project root**

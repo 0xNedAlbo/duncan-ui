@@ -5,7 +5,7 @@
 import { useQuery, type UseQueryOptions, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/app/apiClient';
 import type { ApiError } from '@/lib/app/apiError';
-import type { PositionCurveResponse } from '@/app/api/positions/uniswapv3/nft/[chain]/[nft]/curve/route';
+import type { PositionCurveResponse } from '@/app/api/positions/uniswapv3/[chain]/[nft]/curve/route';
 import type { CurveData } from '@/components/charts/mini-pnl-curve';
 
 export interface UsePositionCurveOptions extends Omit<UseQueryOptions<CurveData, ApiError>, 'queryKey' | 'queryFn'> {
@@ -42,7 +42,7 @@ export function usePositionCurve(
 
 
       const response = await apiClient.get<PositionCurveResponse>(
-        `/api/positions/uniswapv3/nft/${chain}/${nftId}/curve`
+        `/api/positions/uniswapv3/${chain}/${nftId}/curve`
       );
 
       if (!response.data) {

@@ -458,7 +458,7 @@ export function PositionCard({
                     {/* Details Button */}
                     {position.nftId ? (
                         <Link
-                            href={`/position/uniswapv3/nft/${position.pool.chain}/${position.nftId}`}
+                            href={`/position/uniswapv3/${position.pool.chain}/${position.nftId}`}
                             className="p-3 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
                             title={t("dashboard.positions.viewDetails")}
                         >

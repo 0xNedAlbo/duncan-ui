@@ -94,8 +94,8 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
             if (position.nftId && position.pool?.chain) {
               // Load both PnL and curve data in parallel
               const [pnlResponse, curveResponse] = await Promise.allSettled([
-                apiClient.get(`/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/pnl`),
-                apiClient.get(`/api/positions/uniswapv3/nft/${position.pool.chain}/${position.nftId}/curve`)
+                apiClient.get(`/api/positions/uniswapv3/${position.pool.chain}/${position.nftId}/pnl`),
+                apiClient.get(`/api/positions/uniswapv3/${position.pool.chain}/${position.nftId}/curve`)
               ]);
 
               // Update position with loaded data in store
@@ -292,7 +292,7 @@ export function PositionList({ className, refreshTrigger }: PositionListProps) {
         <div className="space-y-4">
           {positions.map((position: BasicPosition) => (
             <PositionCard
-              key={position.id}
+              key={`${position.chain}-${position.protocol}-${position.nftId}`}
               position={position}
               onRefresh={handleRefreshPosition}
               isRefreshing={isPositionRefreshing(position)}

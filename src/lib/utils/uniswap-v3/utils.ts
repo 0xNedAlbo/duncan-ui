@@ -3,18 +3,13 @@
  * Pure helper functions without dependencies on custom data structures
  */
 
+import { compareAddresses, normalizeAddress } from "@/lib/utils/evm";
+
 /**
  * Check if two addresses are the same (case-insensitive)
  */
 export function sameAddress(a: string, b: string): boolean {
-  return a.toLowerCase() === b.toLowerCase();
-}
-
-/**
- * Check if an address is valid Ethereum format
- */
-export function isValidAddress(address: string): boolean {
-  return /^0x[a-fA-F0-9]{40}$/.test(address);
+  return normalizeAddress(a) === normalizeAddress(b);
 }
 
 /**
@@ -24,7 +19,7 @@ export function isValidAddress(address: string): boolean {
  * @returns true if addressA < addressB
  */
 export function isToken0(addressA: string, addressB: string): boolean {
-  return BigInt(addressA) < BigInt(addressB);
+  return compareAddresses(addressA, addressB) < 0;
 }
 
 /**
