@@ -100,6 +100,8 @@ export interface PoolState {
   sqrtPriceX96: bigint;
   tick: number;
   liquidity: bigint;
+  feeGrowthGlobal0X128: bigint;
+  feeGrowthGlobal1X128: bigint;
 }
 
 export interface TickData {

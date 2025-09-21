@@ -158,6 +158,8 @@ export class PoolService {
                     currentTick: poolState.tick,
                     currentPrice: currentPrice.toString(),
                     sqrtPriceX96: poolState.sqrtPriceX96.toString(),
+                    feeGrowthGlobal0X128: poolState.feeGrowthGlobal0X128.toString(),
+                    feeGrowthGlobal1X128: poolState.feeGrowthGlobal1X128.toString(),
                     updatedAt: new Date(),
                 },
             });
@@ -232,7 +234,7 @@ export class PoolService {
         }
 
         try {
-            const [slot0, liquidity] = (await Promise.all([
+            const [slot0, liquidity, feeGrowthGlobal0X128, feeGrowthGlobal1X128] = (await Promise.all([
                 publicClient.readContract({
                     address: poolAddress as `0x${string}`,
                     abi: UNISWAP_V3_POOL_ABI,
@@ -243,12 +245,24 @@ export class PoolService {
                     abi: UNISWAP_V3_POOL_ABI,
                     functionName: "liquidity",
                 }),
-            ])) as [any, bigint];
+                publicClient.readContract({
+                    address: poolAddress as `0x${string}`,
+                    abi: UNISWAP_V3_POOL_ABI,
+                    functionName: "feeGrowthGlobal0X128",
+                }),
+                publicClient.readContract({
+                    address: poolAddress as `0x${string}`,
+                    abi: UNISWAP_V3_POOL_ABI,
+                    functionName: "feeGrowthGlobal1X128",
+                }),
+            ])) as [any, bigint, bigint, bigint];
 
             return {
                 sqrtPriceX96: slot0[0],
                 tick: slot0[1],
                 liquidity,
+                feeGrowthGlobal0X128,
+                feeGrowthGlobal1X128,
             };
         } catch (error) {
             // Pool state fetch failed
