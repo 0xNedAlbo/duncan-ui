@@ -540,7 +540,7 @@ export class PositionPnLService {
       where: {
         chain_poolAddress: {
           chain: position.chain,
-          poolAddress: position.poolAddress,
+          poolAddress: position.pool.poolAddress,
         },
       },
       select: { currentTick: true, sqrtPriceX96: true }
