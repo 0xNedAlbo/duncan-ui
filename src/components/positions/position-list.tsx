@@ -71,21 +71,11 @@ export function PositionList({ className }: PositionListProps) {
 
   // Handle successful position deletion - update cache with correct key
   const handleDeleteSuccess = useCallback((deletedPosition: BasicPosition) => {
-    console.log("position list delete success handler called");
-    console.log("queryParams:", queryParams);
-    console.log("cache key:", QUERY_KEYS.positionsList(queryParams));
-
-    // Check what's actually in the cache
-    const cacheData = queryClient.getQueryData(QUERY_KEYS.positionsList(queryParams));
-    console.log("current cache data:", cacheData);
-
     // Update the cache with the correct query key that includes parameters
     queryClient.setQueryData(
       QUERY_KEYS.positionsList(queryParams),
       (oldData: any) => {
-        console.log("setQueryData called with oldData:", oldData);
         if (!oldData?.data?.positions) {
-          console.log("no positions in oldData.data, returning early");
           return oldData;
         }
 
@@ -98,10 +88,7 @@ export function PositionList({ className }: PositionListProps) {
             )
         );
 
-        console.log("original positions count:", oldData.data.positions.length);
-        console.log("updated positions count:", updatedPositions.length);
-
-        const result = {
+        return {
           ...oldData,
           data: {
             ...oldData.data,
@@ -114,9 +101,6 @@ export function PositionList({ className }: PositionListProps) {
               : undefined,
           }
         };
-
-        console.log("returning updated data:", result);
-        return result;
       }
     );
   }, [queryClient, queryParams]);

@@ -151,8 +151,6 @@ export function PositionCard({
 
     // Handle successful position deletion - call parent callback
     const handleDeleteSuccess = () => {
-        console.log("position card success handler called");
-
         // Remove the specific position detail cache
         queryClient.removeQueries({
             queryKey: [
