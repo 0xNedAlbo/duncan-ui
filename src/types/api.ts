@@ -55,7 +55,7 @@ export interface SortParams {
 }
 
 export interface FilterParams {
-  status?: 'active' | 'closed' | 'archived';
+  status?: 'active' | 'closed' | 'archived' | 'all';
   chain?: string;
 }
 

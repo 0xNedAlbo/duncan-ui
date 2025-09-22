@@ -160,6 +160,10 @@
         "outOfRange": "Out of Range",
         "unknown": "Unbekannt"
       },
+      "status": {
+        "active": "Aktiv",
+        "closed": "Geschlossen"
+      },
       "dataQuality": {
         "exact": "Exakter PnL",
         "estimated": "PnL seit Import",

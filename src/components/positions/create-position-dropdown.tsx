@@ -16,7 +16,6 @@ interface CreatePositionDropdownProps {
     showImportModal?: boolean;
     onImportModalOpen?: () => void;
     onImportModalClose?: () => void;
-    connectedAddress?: string;
 }
 
 export function CreatePositionDropdown({
@@ -24,7 +23,6 @@ export function CreatePositionDropdown({
     showImportModal = false,
     onImportModalOpen,
     onImportModalClose,
-    connectedAddress,
 }: CreatePositionDropdownProps = {}) {
     const t = useTranslations();
     const queryClient = useQueryClient();
@@ -282,7 +280,6 @@ export function CreatePositionDropdown({
                     // Notify parent
                     onImportSuccess?.(positions);
                 }}
-                connectedAddress={connectedAddress}
             />
         </div>
     );

@@ -68,6 +68,78 @@ export function PositionCard({
         ? position.pool.token0.decimals
         : position.pool.token1.decimals;
 
+    // Helper functions for status badges
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case "active":
+                return "text-green-400 bg-green-500/10 border-green-500/20";
+            case "closed":
+                return "text-slate-400 bg-slate-500/10 border-slate-500/20";
+            default:
+                return "text-slate-400 bg-slate-500/10 border-slate-500/20";
+        }
+    };
+
+    const getStatusText = (status: string) => {
+        switch (status) {
+            case "active":
+                return t("dashboard.positions.status.active");
+            case "closed":
+                return t("dashboard.positions.status.closed");
+            default:
+                return t("dashboard.positions.status.active");
+        }
+    };
+
+    const getRangeStatus = () => {
+        if (position.status !== "active") {
+            return null;
+        }
+
+        // Check if position is in range based on current tick
+        if (
+            position.pool.currentTick !== undefined &&
+            position.pool.currentTick !== null
+        ) {
+            const currentTick = position.pool.currentTick;
+            if (
+                currentTick >= position.tickLower &&
+                currentTick <= position.tickUpper
+            ) {
+                return "in-range";
+            } else {
+                return "out-of-range";
+            }
+        }
+        return "unknown";
+    };
+
+    const getRangeStatusColor = (status: string | null) => {
+        switch (status) {
+            case "in-range":
+                return "text-green-400 bg-green-500/10 border-green-500/20";
+            case "out-of-range":
+                return "text-red-400 bg-red-500/10 border-red-500/20";
+            case "unknown":
+                return "text-slate-400 bg-slate-500/10 border-slate-500/20";
+            default:
+                return "text-slate-400 bg-slate-500/10 border-slate-500/20";
+        }
+    };
+
+    const getRangeStatusText = (status: string | null) => {
+        switch (status) {
+            case "in-range":
+                return t("dashboard.positions.rangeStatus.inRange");
+            case "out-of-range":
+                return t("dashboard.positions.rangeStatus.outOfRange");
+            case "unknown":
+                return t("dashboard.positions.rangeStatus.unknown");
+            default:
+                return "";
+        }
+    };
+
     // Get complete position data with new hook
     // TODO: Need to get userId from auth context once available
     const userId = "temp-user-id"; // Placeholder
@@ -198,9 +270,29 @@ export function PositionCard({
                                 />
                             </div>
                             <div className="ml-3">
-                                <div className="font-semibold text-white text-lg">
-                                    {position.pool.token0.symbol}/
-                                    {position.pool.token1.symbol}
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="font-semibold text-white text-lg">
+                                        {position.pool.token0.symbol}/
+                                        {position.pool.token1.symbol}
+                                    </div>
+                                    {/* Status Badge */}
+                                    <span
+                                        className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(
+                                            position.status || "active"
+                                        )}`}
+                                    >
+                                        {getStatusText(position.status || "active")}
+                                    </span>
+                                    {/* Range Status Badge - only for active positions */}
+                                    {position.status === "active" && (
+                                        <span
+                                            className={`px-2 py-0.5 rounded text-xs font-medium border ${getRangeStatusColor(
+                                                getRangeStatus()
+                                            )}`}
+                                        >
+                                            {getRangeStatusText(getRangeStatus())}
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="text-sm text-slate-400 flex items-center gap-2">
                                     <span className="capitalize">

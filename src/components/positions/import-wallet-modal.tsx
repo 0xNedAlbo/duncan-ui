@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, Wallet, Search, Circle, CheckCircle, Loader2, ExternalLink } from "lucide-react";
+import { useAccount } from "wagmi";
 import { useTranslations } from "@/i18n/client";
 import { useDiscoverPositions, useImportDiscoveredPositions } from "@/hooks/api/useDiscoverPositions";
 import { handleApiError } from "@/lib/app/apiError";
@@ -16,16 +17,15 @@ interface ImportWalletModalProps {
   onClose: () => void;
   // eslint-disable-next-line no-unused-vars
   onImportSuccess?: (positions: BasicPosition[]) => void;
-  connectedAddress?: string;
 }
 
 export function ImportWalletModal({
   isOpen,
   onClose,
   onImportSuccess,
-  connectedAddress,
 }: ImportWalletModalProps) {
   const t = useTranslations();
+  const { address: connectedAddress } = useAccount();
   const [address, setAddress] = useState("");
   const [selectedChain, setSelectedChain] = useState<SupportedChainsType>("ethereum");
   const [limit, setLimit] = useState(10);

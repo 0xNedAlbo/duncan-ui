@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { RotateCcw, Plus } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import type { BasicPosition } from "@/services/positions/positionService";
@@ -28,14 +28,14 @@ export function PositionList({ className }: PositionListProps) {
   const [offset, setOffset] = useState(0);
   const limit = 20;
 
-  // Build query parameters
-  const queryParams: PositionListParams = {
+  // Build query parameters - memoized to prevent unnecessary re-renders
+  const queryParams = useMemo<PositionListParams>(() => ({
     limit,
     offset,
     sortBy,
-    ...(filterStatus !== "all" && { status: filterStatus }),
+    status: filterStatus, // Always include status, let API handle "all"
     ...(filterChain !== "all" && { chain: filterChain }),
-  };
+  }), [limit, offset, sortBy, filterStatus, filterChain]);
 
   // Fetch positions with ReactQuery
   const {
