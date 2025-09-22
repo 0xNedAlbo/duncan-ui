@@ -42,8 +42,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                             chain: "",
                             protocol: "",
                             nftId: "",
-                            refreshedAt: new Date().toISOString()
-                        }
+                            refreshedAt: new Date().toISOString(),
+                        },
                     },
                     { status: 400 }
                 );
@@ -62,8 +62,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                             chain: "",
                             protocol: "",
                             nftId: "",
-                            refreshedAt: new Date().toISOString()
-                        }
+                            refreshedAt: new Date().toISOString(),
+                        },
                     },
                     { status: 400 }
                 );
@@ -80,8 +80,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                             chain: "",
                             protocol: "",
                             nftId: "",
-                            refreshedAt: new Date().toISOString()
-                        }
+                            refreshedAt: new Date().toISOString(),
+                        },
                     },
                     { status: 400 }
                 );
@@ -120,8 +120,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                             chain: "",
                             protocol: "",
                             nftId: "",
-                            refreshedAt: new Date().toISOString()
-                        }
+                            refreshedAt: new Date().toISOString(),
+                        },
                     },
                     { status: 404 }
                 );
@@ -132,15 +132,44 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                 userId: user.userId,
                 chain: position.chain,
                 protocol: position.protocol,
-                nftId: position.nftId
+                nftId: position.nftId,
             };
             await positionPnLService.invalidateCache(positionId);
             await curveDataService.invalidateCache(positionId);
 
             log.debug(
-                { chain: position.chain, protocol: position.protocol, nftId: position.nftId },
+                {
+                    chain: position.chain,
+                    protocol: position.protocol,
+                    nftId: position.nftId,
+                },
                 "Invalidated PnL and curve caches, starting fresh calculation"
             );
+
+            try {
+                await positionService.updatePositionOnChainData(positionId);
+                log.debug(
+                    {
+                        chain: position.chain,
+                        protocol: position.protocol,
+                        nftId: position.nftId,
+                    },
+                    "Updated position on-chain data (liquidity, owner)"
+                );
+            } catch (error) {
+                log.debug(
+                    {
+                        chain: position.chain,
+                        protocol: position.protocol,
+                        nftId: position.nftId,
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                    },
+                    "Position on-chain data update failed, continuing with PnL calculation"
+                );
+            }
 
             // Trigger fresh PnL calculation - this handles:
             // - Pool state update via poolService.updatePoolState()
@@ -149,20 +178,28 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
             // - Cache update with new data
             let pnlBreakdown = null;
             try {
-                const positionId = {
-                    userId: user.userId,
-                    chain: position.chain,
-                    protocol: position.protocol,
-                    nftId: position.nftId
-                };
-                pnlBreakdown = await positionPnLService.getPnlBreakdown(positionId);
+                pnlBreakdown = await positionPnLService.getPnlBreakdown(
+                    positionId
+                );
                 log.debug(
-                    { chain: position.chain, protocol: position.protocol, nftId: position.nftId },
+                    {
+                        chain: position.chain,
+                        protocol: position.protocol,
+                        nftId: position.nftId,
+                    },
                     "Fresh PnL calculation completed"
                 );
             } catch (error) {
                 log.debug(
-                    { chain: position.chain, protocol: position.protocol, nftId: position.nftId, error: error instanceof Error ? error.message : String(error) },
+                    {
+                        chain: position.chain,
+                        protocol: position.protocol,
+                        nftId: position.nftId,
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                    },
                     "PnL calculation failed during refresh"
                 );
             }
@@ -171,48 +208,76 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
             let aprBreakdown = undefined;
             try {
                 const unclaimedFees = pnlBreakdown?.unclaimedFees;
-                const positionId = {
-                    userId: user.userId,
-                    chain: position.chain,
-                    protocol: position.protocol,
-                    nftId: position.nftId
-                };
-                aprBreakdown = await positionAprService.getAprBreakdown(positionId, unclaimedFees);
+                aprBreakdown = await positionAprService.getAprBreakdown(
+                    positionId,
+                    unclaimedFees
+                );
                 log.debug(
-                    { chain: position.chain, protocol: position.protocol, nftId: position.nftId, realizedApr: aprBreakdown.realizedApr, unrealizedApr: aprBreakdown.unrealizedApr },
+                    {
+                        chain: position.chain,
+                        protocol: position.protocol,
+                        nftId: position.nftId,
+                        realizedApr: aprBreakdown.realizedApr,
+                        unrealizedApr: aprBreakdown.unrealizedApr,
+                    },
                     "Successfully calculated fresh APR breakdown"
                 );
             } catch (aprError) {
                 // Log APR calculation error but don't fail the refresh
                 log.debug(
-                    { chain: position.chain, protocol: position.protocol, nftId: position.nftId, error: aprError },
+                    {
+                        chain: position.chain,
+                        protocol: position.protocol,
+                        nftId: position.nftId,
+                        error: aprError,
+                    },
                     "Failed to calculate APR breakdown, but refresh completed successfully"
                 );
             }
 
             // Fetch the updated position data
-            const refreshedPosition = await positionService.getPosition(positionId);
+            const refreshedPosition = await positionService.getPosition(
+                positionId
+            );
 
             // Calculate fresh curve data and include in response
             // This eliminates the need for a separate curve data fetch
             let curveData = undefined;
             try {
-                if (refreshedPosition && curveDataService.validatePosition(refreshedPosition)) {
-                    curveData = await curveDataService.getCurveData(refreshedPosition);
+                if (
+                    refreshedPosition &&
+                    curveDataService.validatePosition(refreshedPosition)
+                ) {
+                    curveData = await curveDataService.getCurveData(
+                        refreshedPosition
+                    );
                     log.debug(
-                        { chain: position.chain, protocol: position.protocol, nftId: position.nftId },
+                        {
+                            chain: position.chain,
+                            protocol: position.protocol,
+                            nftId: position.nftId,
+                        },
                         "Successfully calculated fresh curve data for response"
                     );
                 } else {
                     log.debug(
-                        { chain: position.chain, protocol: position.protocol, nftId: position.nftId },
+                        {
+                            chain: position.chain,
+                            protocol: position.protocol,
+                            nftId: position.nftId,
+                        },
                         "Skipped curve data calculation due to invalid position data"
                     );
                 }
             } catch (curveError) {
                 // Log curve calculation error but don't fail the refresh
                 log.debug(
-                    { chain: position.chain, protocol: position.protocol, nftId: position.nftId, error: curveError },
+                    {
+                        chain: position.chain,
+                        protocol: position.protocol,
+                        nftId: position.nftId,
+                        error: curveError,
+                    },
                     "Failed to calculate curve data, but refresh completed successfully"
                 );
             }
@@ -224,7 +289,9 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                     nftId: position.nftId,
                     currentValue: pnlBreakdown?.currentValue || "not available",
                     totalPnL: pnlBreakdown?.totalPnL || "not available",
-                    calculatedAt: pnlBreakdown?.calculatedAt?.toISOString() || "not available",
+                    calculatedAt:
+                        pnlBreakdown?.calculatedAt?.toISOString() ||
+                        "not available",
                     includedAprBreakdown: !!aprBreakdown,
                     aprRealizedApr: aprBreakdown?.realizedApr || 0,
                     aprUnrealizedApr: aprBreakdown?.unrealizedApr || 0,
@@ -246,7 +313,9 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                     chain: position.chain,
                     protocol: position.protocol,
                     nftId: position.nftId,
-                    refreshedAt: pnlBreakdown?.calculatedAt?.toISOString() || new Date().toISOString(),
+                    refreshedAt:
+                        pnlBreakdown?.calculatedAt?.toISOString() ||
+                        new Date().toISOString(),
                 },
             });
         } catch (error) {
@@ -268,8 +337,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                                 chain: "",
                                 protocol: "",
                                 nftId: "",
-                                refreshedAt: new Date().toISOString()
-                            }
+                                refreshedAt: new Date().toISOString(),
+                            },
                         },
                         { status: 404 }
                     );
@@ -285,8 +354,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                                 chain: "",
                                 protocol: "",
                                 nftId: "",
-                                refreshedAt: new Date().toISOString()
-                            }
+                                refreshedAt: new Date().toISOString(),
+                            },
                         },
                         { status: 422 }
                     );
@@ -302,8 +371,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                                 chain: "",
                                 protocol: "",
                                 nftId: "",
-                                refreshedAt: new Date().toISOString()
-                            }
+                                refreshedAt: new Date().toISOString(),
+                            },
                         },
                         { status: 503 }
                     );
@@ -319,8 +388,8 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                                 chain: "",
                                 protocol: "",
                                 nftId: "",
-                                refreshedAt: new Date().toISOString()
-                            }
+                                refreshedAt: new Date().toISOString(),
+                            },
                         },
                         { status: 503 }
                     );
@@ -336,12 +405,11 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                         chain: "",
                         protocol: "",
                         nftId: "",
-                        refreshedAt: new Date().toISOString()
-                    }
+                        refreshedAt: new Date().toISOString(),
+                    },
                 },
                 { status: 500 }
             );
         }
     }
 );
-

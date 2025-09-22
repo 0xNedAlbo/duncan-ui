@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "@/i18n/client";
-import { usePositionAprPeriods } from "@/hooks/api/usePositions";
+import { usePositionAprPeriods } from "@/hooks/api/usePositionAprPeriods";
 import { AprBreakdown } from "@/components/positions/apr-breakdown";
 import type { AprBreakdown as AprBreakdownType } from "@/services/positions/positionAprService";
 import type { PnlBreakdown } from "@/services/positions/positionPnLService";
@@ -34,11 +34,15 @@ export function AprTab({
 }: AprTabProps) {
     const t = useTranslations();
 
+    // TODO: Need to get userId from auth context once available
+    const userId = "temp-user-id"; // Placeholder
+    const protocol = "uniswapv3";
+
     const {
         data: aprData,
         isLoading: aprLoading,
         error: aprError,
-    } = usePositionAprPeriods(chainSlug, nftId, {
+    } = usePositionAprPeriods(userId, chainSlug, protocol, nftId, {
         staleTime: 60000, // 1 minute
     });
 

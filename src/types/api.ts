@@ -308,21 +308,25 @@ export const MUTATION_KEYS = {
 
 // React Query options
 export const QUERY_OPTIONS = {
-  // Position queries
+  // Position queries - Unified 1-minute cache for consistency
   positions: {
-    staleTime: 30 * 1000, // 30 seconds
-    cacheTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 60 * 1000, // 1 minute
+    cacheTime: 60 * 1000, // 1 minute
   },
   positionDetails: {
     staleTime: 60 * 1000, // 1 minute
-    cacheTime: 10 * 60 * 1000, // 10 minutes
+    cacheTime: 60 * 1000, // 1 minute
   },
-  positionEvents: {
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    cacheTime: 15 * 60 * 1000, // 15 minutes
+  positionLedger: {
+    staleTime: 60 * 1000, // 1 minute (renamed from positionEvents)
+    cacheTime: 60 * 1000, // 1 minute
   },
-  
-  
+  positionAprPeriods: {
+    staleTime: 60 * 1000, // 1 minute (new for APR periods)
+    cacheTime: 60 * 1000, // 1 minute
+  },
+
+
   // User queries
   userProfile: {
     staleTime: 5 * 60 * 1000, // 5 minutes

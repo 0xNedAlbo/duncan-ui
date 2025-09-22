@@ -9,6 +9,7 @@ import { SupportedChainsType } from "@/config/chains";
 import { PrismaClient } from "@prisma/client";
 import { type PublicClient } from "viem";
 import { UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_FACTORY_ADDRESSES } from "@/lib/contracts/uniswapV3Factory";
+import { NONFUNGIBLE_POSITION_MANAGER_ABI, NONFUNGIBLE_POSITION_MANAGER_ADDRESSES, getChainId } from "@/lib/contracts/nonfungiblePositionManager";
 import { normalizeAddress, compareAddresses } from "@/lib/utils/evm";
 
 // Token data interface
@@ -260,12 +261,45 @@ export class PositionService {
     }
 
     /**
-     * Update mutable on-chain fields of a position (liquidity)
+     * Update mutable on-chain fields of a position by fetching current data from blockchain
      */
     async updatePositionOnChainData(
-        positionId: PositionId,
-        liquidity: string
+        positionId: PositionId
     ): Promise<BasicPosition> {
+        // Get RPC client for the chain
+        const publicClient = this.rpcClients.get(positionId.chain as SupportedChainsType);
+        if (!publicClient) {
+            throw new Error(`No RPC client available for chain: ${positionId.chain}`);
+        }
+
+        // Get NFT Position Manager address
+        const chainId = getChainId(positionId.chain);
+        const nftManagerAddress = NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[chainId];
+        if (!nftManagerAddress) {
+            throw new Error(`NFT Manager address not configured for chain: ${positionId.chain} (chainId: ${chainId})`);
+        }
+
+        const nftId = BigInt(positionId.nftId);
+
+        // Fetch current position data from NFT contract
+        const [positionData, owner] = await Promise.all([
+            publicClient.readContract({
+                address: nftManagerAddress as `0x${string}`,
+                abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
+                functionName: "positions",
+                args: [nftId],
+            }),
+            publicClient.readContract({
+                address: nftManagerAddress as `0x${string}`,
+                abi: NONFUNGIBLE_POSITION_MANAGER_ABI,
+                functionName: "ownerOf",
+                args: [nftId],
+            })
+        ]);
+
+        const liquidity = positionData[7].toString(); // liquidity is at index 7
+        const normalizedOwner = normalizeAddress(owner as string);
+
         const position = await this.prisma.position.update({
             where: {
                 userId_chain_protocol_nftId: {
@@ -277,6 +311,7 @@ export class PositionService {
             },
             data: {
                 liquidity,
+                owner: normalizedOwner,
                 updatedAt: new Date(),
             },
             include: {

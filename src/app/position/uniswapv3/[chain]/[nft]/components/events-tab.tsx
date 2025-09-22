@@ -1,8 +1,8 @@
 "use client";
 
 import { useTranslations } from "@/i18n/client";
-import { usePositionEvents } from "@/hooks/api/usePositions";
-import { useActivePosition } from "@/store/position-store";
+import { usePositionLedger } from "@/hooks/api/usePositionLedger";
+import { usePosition } from "@/hooks/api/usePosition";
 import { PnLBreakdown } from "@/components/positions/pnl-breakdown";
 import { EventsTable } from "./events-table";
 
@@ -14,20 +14,28 @@ interface EventsTabProps {
 export function EventsTab({ chainSlug, nftId }: EventsTabProps) {
     const t = useTranslations();
 
-    // Get position and PnL data from store
-    const positionWithDetails = useActivePosition();
-    const position = positionWithDetails?.basicData;
-    const pnlData = positionWithDetails?.pnlBreakdown;
-    // Loading and error states not used in this component currently
-    // const pnlLoading = !pnlData;
-    // const pnlError = null; // Store doesn't track individual errors
+    // TODO: Need to get userId from auth context once available
+    const userId = "temp-user-id"; // Placeholder
+    const protocol = "uniswapv3";
+
+    // Get position data using ReactQuery
+    const {
+        data: positionDetails,
+        isLoading: positionLoading,
+        error: positionError,
+    } = usePosition(userId, chainSlug, protocol, nftId, {
+        enabled: Boolean(nftId && chainSlug),
+    });
+
+    const position = positionDetails?.basicData;
+    const pnlData = positionDetails?.pnlBreakdown;
 
     const {
         data: eventsData,
         isLoading: eventsLoading,
         error: eventsError
-    } = usePositionEvents(chainSlug, nftId, {
-        limit: 100, // Increased to show more events
+    } = usePositionLedger(userId, chainSlug, protocol, nftId, {
+        limit: 100,
         sortOrder: 'desc'
     });
 
@@ -37,7 +45,7 @@ export function EventsTab({ chainSlug, nftId }: EventsTabProps) {
         : position?.pool.token1;
     const quoteTokenDecimals = quoteToken?.decimals;
 
-    if (eventsError) {
+    if (eventsError || positionError) {
         return (
             <div className="space-y-6">
                 <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8 text-center">
@@ -45,7 +53,7 @@ export function EventsTab({ chainSlug, nftId }: EventsTabProps) {
                         {t("positionDetails.tabs.ledger")}
                     </h2>
                     <div className="text-red-400 mb-4">
-                        Error loading events: {eventsError.message}
+                        Error loading data: {eventsError?.message || positionError?.message}
                     </div>
                     <p className="text-slate-500 text-sm">
                         Chain: {chainSlug} | NFT ID: #{nftId}

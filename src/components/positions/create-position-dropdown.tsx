@@ -3,9 +3,10 @@
 import { Plus, ChevronDown, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslations } from "@/i18n/client";
-import { useImportNFT } from "@/hooks/api/usePositions";
+import { useImportPositionByNftId } from "@/hooks/api/useImportPositionByNftId";
 import { handleApiError } from "@/lib/app/apiError";
-import { usePositionStore } from "@/store/position-store";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "@/types/api";
 import { ImportWalletModal } from "@/components/positions/import-wallet-modal";
 import type { BasicPosition } from "@/services/positions/positionService";
 
@@ -26,7 +27,7 @@ export function CreatePositionDropdown({
     connectedAddress,
 }: CreatePositionDropdownProps = {}) {
     const t = useTranslations();
-    const { addPosition } = usePositionStore();
+    const queryClient = useQueryClient();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [showNftForm, setShowNftForm] = useState(false);
     const [nftId, setNftId] = useState("");
@@ -52,15 +53,17 @@ export function CreatePositionDropdown({
     };
 
     // Use the import NFT mutation hook
-    const importNFT = useImportNFT({
+    const importNFT = useImportPositionByNftId({
         onSuccess: (response) => {
             if (response.data?.position) {
                 const importedPosition = response.data.position as unknown as BasicPosition;
 
-                // Add the imported position to current list
-                addPosition(importedPosition);
+                // Invalidate positions list to refresh the data
+                queryClient.invalidateQueries({
+                    queryKey: QUERY_KEYS.positions,
+                });
 
-                console.log(`✓ Added imported position to store: ${importedPosition.pool.chain}/${importedPosition.nftId}`);
+                console.log(`✓ Imported position: ${importedPosition.pool.chain}/${importedPosition.nftId}`);
 
                 // Create simple display data for success message
                 const displayData = {
@@ -272,8 +275,10 @@ export function CreatePositionDropdown({
                 isOpen={showImportModal}
                 onClose={onImportModalClose || (() => {})}
                 onImportSuccess={(positions) => {
-                    // Add positions to store
-                    positions.forEach(position => addPosition(position));
+                    // Invalidate positions list to refresh the data
+                    queryClient.invalidateQueries({
+                        queryKey: QUERY_KEYS.positions,
+                    });
                     // Notify parent
                     onImportSuccess?.(positions);
                 }}

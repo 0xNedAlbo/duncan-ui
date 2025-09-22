@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "@/i18n/client";
-import { usePnLDisplayValues } from "@/hooks/api/usePositionPnL";
+import { usePnLDisplayValues } from "@/hooks/usePnLDisplayValues";
 import {
     formatCompactValue,
 } from "@/lib/utils/fraction-format";

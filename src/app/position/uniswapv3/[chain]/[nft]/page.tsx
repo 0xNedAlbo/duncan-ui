@@ -3,17 +3,16 @@
 import { useParams, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { redirect, notFound } from "next/navigation";
-import { useEffect, useState } from "react";
 import { useTranslations } from "@/i18n/client";
 import { isValidChainSlug, getChainConfigBySlug } from "@/config/chains";
-import { usePositionStore } from "@/store/position-store";
+import { usePosition } from "@/hooks/api/usePosition";
+import { usePositionRefresh } from "@/hooks/api/usePositionRefresh";
 import { PositionHeader } from "./components/position-header";
 import { PositionTabs } from "./components/position-tabs";
 import { OverviewTab } from "./components/overview-tab";
 import { EventsTab } from "./components/events-tab";
 import { AprTab } from "./components/apr-tab";
 import { TechnicalDetails } from "./components/technical-details";
-import type { PositionWithDetails } from "@/store/position-store";
 
 export default function UniswapV3PositionPage() {
     const t = useTranslations();
@@ -25,58 +24,34 @@ export default function UniswapV3PositionPage() {
     const nftId = params.nft as string;
     const activeTab = searchParams.get("tab") || "overview";
 
-    // State for complete position data and loading
-    const [position, setPosition] = useState<PositionWithDetails | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    // TODO: Need to get userId from auth context once available
+    const userId = "temp-user-id"; // Placeholder
+    const protocol = "uniswapv3";
 
-    // Get store actions
-    const loadPositionDetails = usePositionStore((state) => state.loadPositionDetails);
-    const refreshPosition = usePositionStore((state) => state.refreshPosition);
-    const isRefreshing = usePositionStore((state) => state.isRefreshing);
+    // Get position data using ReactQuery
+    const {
+        data: position,
+        isLoading,
+        error,
+        refetch,
+    } = usePosition(userId, chainSlug, protocol, nftId, {
+        enabled: Boolean(nftId && chainSlug),
+    });
 
-    // Load position details using unified approach
-    useEffect(() => {
-        const loadPosition = async () => {
-            try {
-                console.log(`[Page] Starting to load position details for ${chainSlug}/${nftId}`);
-                setIsLoading(true);
-                setError(null);
+    // Refresh mutation
+    const refreshMutation = usePositionRefresh();
 
-                const positionDetails = await loadPositionDetails(chainSlug, nftId);
-
-                if (positionDetails) {
-                    console.log(`[Page] Successfully loaded position details for ${chainSlug}/${nftId}`, positionDetails);
-                    setPosition(positionDetails);
-                } else {
-                    console.log(`[Page] No position details returned for ${chainSlug}/${nftId}`);
-                    setError("Position not found");
-                }
-            } catch (err) {
-                console.error(`[Page] Failed to load position ${chainSlug}/${nftId}:`, err);
-                setError("Failed to load position");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        if (chainSlug && nftId) {
-            console.log(`[Page] Effect triggered for ${chainSlug}/${nftId}`);
-            loadPosition();
-        }
-    }, [chainSlug, nftId, loadPositionDetails]);
-
-    // Handle refresh - update local state when store is updated
+    // Handle refresh
     const handleRefresh = async () => {
         if (!chainSlug || !nftId) return;
 
         try {
-            await refreshPosition(chainSlug, nftId);
-            // After successful refresh, reload position details to get updated data
-            const updatedPosition = await loadPositionDetails(chainSlug, nftId);
-            if (updatedPosition) {
-                setPosition(updatedPosition);
-            }
+            await refreshMutation.mutateAsync({
+                userId,
+                chain: chainSlug,
+                protocol,
+                nftId,
+            });
         } catch (error) {
             console.error("Failed to refresh position:", error);
         }
@@ -125,7 +100,7 @@ export default function UniswapV3PositionPage() {
             <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
                 <div className="text-center">
                     <div className="text-red-400 mb-2">{t("common.error")}</div>
-                    <div className="text-slate-400 text-sm">{error}</div>
+                    <div className="text-slate-400 text-sm">{error.message}</div>
                 </div>
             </div>
         );
@@ -165,8 +140,8 @@ export default function UniswapV3PositionPage() {
                     <AprTab
                         chainSlug={chainSlug}
                         nftId={nftId}
-                        aprBreakdown={position.aprBreakdown}
-                        pnlBreakdown={position.pnlBreakdown}
+                        aprBreakdown={position.aprBreakdown || undefined}
+                        pnlBreakdown={position.pnlBreakdown || undefined}
                         quoteToken={position.basicData?.token0IsQuote
                             ? position.basicData.pool.token0
                             : position.basicData.pool.token1}
@@ -205,7 +180,7 @@ export default function UniswapV3PositionPage() {
                         nftId={nftId}
                         chainConfig={chainConfig}
                         onRefresh={handleRefresh}
-                        isRefreshing={isRefreshing}
+                        isRefreshing={refreshMutation.isPending}
                     />
                 )}
                 

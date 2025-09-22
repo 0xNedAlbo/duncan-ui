@@ -208,6 +208,15 @@ export const GET = withAuth<ResponseType>(
   - Error: `{"error": "Invalid pool address format"}`
 - **Exception**: Help messages (--help flag) may use console.error for usage instructions
 
+**ReactQuery Cache Key Standards:**
+- **Always use database primary keys in ReactQuery cache keys for data consistency and proper invalidation**
+- **For positions**: Use composite primary key `userId_chain_protocol_nftId` pattern
+- **Examples:**
+  - Position data: `['position', userId, chain, protocol, nftId]`
+  - Position ledger: `['position-ledger', userId, chain, protocol, nftId]`
+  - Position APR: `['position-apr-periods', userId, chain, protocol, nftId]`
+- **Benefits**: Prevents cache collisions, enables proper user data isolation, ensures cache invalidation matches database operations
+
 **API Service Layer Architecture:**
 - **APIs NEVER query database or external infrastructure directly** - only through service methods
 - **APIs NEVER use human-readable number formats** - always BigInt values scaled to token decimals
