@@ -36,6 +36,7 @@ export function ImportWalletModal({
     existingPositions: number;
     newPositionsFound: number;
   } | null>(null);
+  const [hasSuccessfulImport, setHasSuccessfulImport] = useState(false);
 
   // Discovery mutation
   const discoverPositions = useDiscoverPositions({
@@ -62,6 +63,7 @@ export function ImportWalletModal({
       const { imported, failed } = result;
 
       if (imported.length > 0) {
+        setHasSuccessfulImport(true);
         onImportSuccess?.(imported);
 
         // Show success message and close modal after delay
@@ -72,6 +74,7 @@ export function ImportWalletModal({
           setDiscoveredPositions([]);
           setDiscoveryStats(null);
           setSelectedPosition(null);
+          setHasSuccessfulImport(false);
         }, 2000);
       }
 
@@ -92,6 +95,7 @@ export function ImportWalletModal({
       setDiscoveredPositions([]);
       setDiscoveryStats(null);
       setSelectedPosition(null);
+      setHasSuccessfulImport(false);
     }
   }, [isOpen]);
 
@@ -324,7 +328,10 @@ export function ImportWalletModal({
                                   </span>
                                 </div>
                                 <div className="text-sm text-slate-400">
-                                  {t("dashboard.addPosition.wallet.currentValue")}: {formatCompactValue(calculateCurrentValue(position))} {position.pool.token1.symbol}
+                                  {t("dashboard.addPosition.wallet.currentValue")}: {formatCompactValue(
+                                    calculateCurrentValue(position),
+                                    position.token0IsQuote ? position.pool.token0.decimals : position.pool.token1.decimals
+                                  )} {position.token0IsQuote ? position.pool.token0.symbol : position.pool.token1.symbol}
                                 </div>
                               </div>
 
@@ -338,7 +345,7 @@ export function ImportWalletModal({
                     {/* Import Button */}
                     <button
                       onClick={handleImport}
-                      disabled={!selectedPosition || importPositions.isPending}
+                      disabled={!selectedPosition || importPositions.isPending || hasSuccessfulImport}
                       className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-slate-600 disabled:text-slate-400 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
                     >
                       {importPositions.isPending ? (
