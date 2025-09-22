@@ -5,12 +5,13 @@ import { RotateCcw, Plus } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import type { BasicPosition } from "@/services/positions/positionService";
 import type { PositionListParams } from "@/types/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "@/types/api";
 
 // New ReactQuery-only hooks
 import { usePositionsList } from "@/hooks/api/usePositionsList";
 
 import { PositionCard } from "./position-card";
-import { CreatePositionDropdown } from "./create-position-dropdown";
 
 interface PositionListProps {
   className?: string;
@@ -18,6 +19,7 @@ interface PositionListProps {
 
 export function PositionList({ className }: PositionListProps) {
   const t = useTranslations();
+  const queryClient = useQueryClient();
 
   // UI state (not stored globally anymore)
   const [sortBy, setSortBy] = useState("createdAt");
@@ -67,6 +69,58 @@ export function PositionList({ className }: PositionListProps) {
     refetch();
   }, [refetch]);
 
+  // Handle successful position deletion - update cache with correct key
+  const handleDeleteSuccess = useCallback((deletedPosition: BasicPosition) => {
+    console.log("position list delete success handler called");
+    console.log("queryParams:", queryParams);
+    console.log("cache key:", QUERY_KEYS.positionsList(queryParams));
+
+    // Check what's actually in the cache
+    const cacheData = queryClient.getQueryData(QUERY_KEYS.positionsList(queryParams));
+    console.log("current cache data:", cacheData);
+
+    // Update the cache with the correct query key that includes parameters
+    queryClient.setQueryData(
+      QUERY_KEYS.positionsList(queryParams),
+      (oldData: any) => {
+        console.log("setQueryData called with oldData:", oldData);
+        if (!oldData?.data?.positions) {
+          console.log("no positions in oldData.data, returning early");
+          return oldData;
+        }
+
+        // Filter out the deleted position
+        const updatedPositions = oldData.data.positions.filter(
+          (p: any) =>
+            !(
+              p.nftId === deletedPosition.nftId &&
+              p.pool?.chain === deletedPosition.pool.chain
+            )
+        );
+
+        console.log("original positions count:", oldData.data.positions.length);
+        console.log("updated positions count:", updatedPositions.length);
+
+        const result = {
+          ...oldData,
+          data: {
+            ...oldData.data,
+            positions: updatedPositions,
+            pagination: oldData.data.pagination
+              ? {
+                  ...oldData.data.pagination,
+                  total: oldData.data.pagination.total - 1,
+                }
+              : undefined,
+          }
+        };
+
+        console.log("returning updated data:", result);
+        return result;
+      }
+    );
+  }, [queryClient, queryParams]);
+
   if (error) {
     return (
       <div className={`text-center py-8 ${className}`}>
@@ -84,19 +138,6 @@ export function PositionList({ className }: PositionListProps) {
 
   return (
     <div className={className}>
-      {/* Header with filters */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-xl font-semibold text-white mb-2">
-            {t("dashboard.title")}
-          </h2>
-          <p className="text-slate-400 text-sm">
-            {t("dashboard.subtitle")}
-          </p>
-        </div>
-
-        <CreatePositionDropdown />
-      </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-4 mb-6">
@@ -159,7 +200,7 @@ export function PositionList({ className }: PositionListProps) {
             <p className="text-slate-400 mb-6">
               {t("dashboard.emptyState.description")}
             </p>
-            <CreatePositionDropdown />
+            {/* CreatePositionDropdown handled by parent dashboard */}
           </div>
         </div>
       ) : (
@@ -169,6 +210,7 @@ export function PositionList({ className }: PositionListProps) {
               <PositionCard
                 key={`${position.pool.chain}-${position.nftId}`}
                 position={position}
+                onDeleteSuccess={handleDeleteSuccess}
               />
             ))}
           </div>

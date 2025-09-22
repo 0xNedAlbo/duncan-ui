@@ -31,8 +31,8 @@ export function useDeletePosition(
       apiClient.delete<DeletePositionResponse>(`/api/positions/uniswapv3/${chain}/${nftId}`),
 
     onSuccess: () => {
-      // Note: Store update is now handled by parent component callback
-      // This prevents race conditions and keeps the hook focused on API calls only
+      // Cache updates are handled by parent component callback
+      // This keeps the hook focused on API calls only
     },
 
     onError: (error, variables) => {

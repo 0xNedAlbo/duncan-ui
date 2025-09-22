@@ -14,11 +14,17 @@ import { useTranslations } from "@/i18n/client";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import type { BasicPosition } from "@/services/positions/positionService";
 import { usePnLDisplayValues } from "@/hooks/usePnLDisplayValues";
+import { getChainConfig } from "@/config/chains";
+import {
+    NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
+    getChainId,
+} from "@/lib/contracts/nonfungiblePositionManager";
 
 // New ReactQuery hooks
 import { usePosition } from "@/hooks/api/usePosition";
 import { usePositionRefresh } from "@/hooks/api/usePositionRefresh";
 import { useIsDeletingPosition } from "@/hooks/api/useDeletePosition";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy";
 import { PositionActionsMenu } from "./position-actions-menu";
@@ -29,13 +35,33 @@ interface PositionCardProps {
     // eslint-disable-next-line no-unused-vars
     onRefresh?: (position: BasicPosition) => void;
     isRefreshing?: boolean;
+    // eslint-disable-next-line no-unused-vars
+    onDeleteSuccess?: (position: BasicPosition) => void;
 }
 
-export function PositionCard({ position, onRefresh, isRefreshing }: PositionCardProps) {
+export function PositionCard({
+    position,
+    onRefresh,
+    isRefreshing,
+    onDeleteSuccess,
+}: PositionCardProps) {
     const t = useTranslations();
+    const queryClient = useQueryClient();
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [copied, setCopied] = useState(false);
     const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+    // Helper function to build block explorer URL
+    const getBlockExplorerUrl = (chain: string, nftId: string) => {
+        const chainConfig = getChainConfig(chain);
+        const chainId = getChainId(chain);
+        const nftManagerAddress =
+            NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[chainId];
+
+        if (!chainConfig || !nftManagerAddress) return null;
+
+        return `${chainConfig.explorer}/token/${nftManagerAddress}?a=${nftId}`;
+    };
 
     // Token decimals for formatting
     const quoteTokenDecimals = position.token0IsQuote
@@ -51,12 +77,19 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
         data: positionDetails,
         isLoading: detailsLoading,
         error: detailsError,
-    } = usePosition(userId, position.pool.chain, protocol, position.nftId || "", {
-        enabled: Boolean(position.nftId && position.pool.chain),
-    });
+    } = usePosition(
+        userId,
+        position.pool.chain,
+        protocol,
+        position.nftId || "",
+        {
+            enabled: Boolean(position.nftId && position.pool.chain),
+        }
+    );
 
     // Extract data from unified response
     const pnlData = positionDetails?.pnlBreakdown;
+    const aprData = positionDetails?.aprBreakdown;
     const curveData = positionDetails?.curveData || null;
 
     // Loading states
@@ -91,7 +124,10 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
     };
 
     // Deletion state
-    const isDeleting = useIsDeletingPosition(position.pool.chain, position.nftId || "");
+    const isDeleting = useIsDeletingPosition(
+        position.pool.chain,
+        position.nftId || ""
+    );
 
     // Copy NFT ID to clipboard
     const handleCopyNftId = async () => {
@@ -113,42 +149,102 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
         }
     };
 
+    // Handle successful position deletion - call parent callback
+    const handleDeleteSuccess = () => {
+        console.log("position card success handler called");
+
+        // Remove the specific position detail cache
+        queryClient.removeQueries({
+            queryKey: [
+                "position",
+                undefined,
+                position.pool.chain,
+                "uniswapv3",
+                position.nftId,
+            ],
+        });
+
+        // Let parent (PositionList) handle the list cache update
+        onDeleteSuccess?.(position);
+    };
+
     return (
         <>
             <div className="bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur-sm border border-slate-700/50 rounded-xl p-6 hover:border-slate-600/50 transition-all duration-200">
-                {/* Position Header */}
-                <div className="flex items-center justify-between mb-4">
+                {/* Single Line Layout */}
+                <div className="flex items-center">
+                    {/* Left Side: Token Info */}
                     <div className="flex items-center gap-3">
                         {/* Token Icons */}
                         <div className="flex items-center">
-                            <div className="relative">
+                            <div className="flex items-center -space-x-2">
                                 <Image
-                                    src={position.pool.token0.logoUrl || "/images/tokens/unknown.png"}
+                                    src={
+                                        position.pool.token0.logoUrl ||
+                                        "/images/tokens/unknown.png"
+                                    }
                                     alt={position.pool.token0.symbol}
                                     width={32}
                                     height={32}
-                                    className="rounded-full border border-slate-600"
+                                    className="rounded-full border-2 border-slate-700 bg-slate-800 relative z-10"
                                 />
                                 <Image
-                                    src={position.pool.token1.logoUrl || "/images/tokens/unknown.png"}
+                                    src={
+                                        position.pool.token1.logoUrl ||
+                                        "/images/tokens/unknown.png"
+                                    }
                                     alt={position.pool.token1.symbol}
                                     width={32}
                                     height={32}
-                                    className="rounded-full border border-slate-600 -ml-3"
+                                    className="rounded-full border-2 border-slate-700 bg-slate-800"
                                 />
                             </div>
                             <div className="ml-3">
                                 <div className="font-semibold text-white text-lg">
-                                    {position.pool.token0.symbol}/{position.pool.token1.symbol}
+                                    {position.pool.token0.symbol}/
+                                    {position.pool.token1.symbol}
                                 </div>
                                 <div className="text-sm text-slate-400 flex items-center gap-2">
-                                    <span className="capitalize">{position.pool.chain}</span>
+                                    <span className="capitalize">
+                                        {position.pool.chain}
+                                    </span>
                                     <span>•</span>
-                                    <span>{(position.pool.fee / 10000).toFixed(2)}%</span>
+                                    <span>
+                                        {(position.pool.fee / 10000).toFixed(2)}
+                                        %
+                                    </span>
                                     {position.nftId && (
                                         <>
                                             <span>•</span>
-                                            <span>#{position.nftId}</span>
+                                            <span className="flex items-center gap-1">
+                                                <a
+                                                    href={
+                                                        getBlockExplorerUrl(
+                                                            position.pool.chain,
+                                                            position.nftId
+                                                        ) || "#"
+                                                    }
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-400 hover:text-blue-300 underline cursor-pointer"
+                                                    title="View on block explorer"
+                                                >
+                                                    #{position.nftId}
+                                                </a>
+                                                <button
+                                                    onClick={handleCopyNftId}
+                                                    className="p-0.5 hover:bg-slate-700/50 rounded transition-colors cursor-pointer"
+                                                    title="Copy NFT ID"
+                                                >
+                                                    {copied ? (
+                                                        <div className="text-green-400 text-xs">
+                                                            ✓
+                                                        </div>
+                                                    ) : (
+                                                        <Copy className="w-3 h-3 text-slate-400 hover:text-slate-300" />
+                                                    )}
+                                                </button>
+                                            </span>
                                         </>
                                     )}
                                 </div>
@@ -156,44 +252,144 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
                         </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-2">
-                        {/* Copy NFT ID */}
-                        {position.nftId && (
-                            <button
-                                onClick={handleCopyNftId}
-                                className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
-                                title="Copy NFT ID"
-                            >
-                                {copied ? (
-                                    <div className="text-green-400 text-xs">Copied!</div>
-                                ) : (
-                                    <Copy className="w-4 h-4 text-slate-400" />
-                                )}
-                            </button>
-                        )}
+                    {/* Middle: Position Data */}
+                    <div className="flex items-center gap-6 ml-6">
+                        {/* Current Value */}
+                        <div className="text-right">
+                            <div className="text-xs text-slate-400 mb-0.5">
+                                {t("dashboard.positions.currentValue")} (
+                                {position.token0IsQuote
+                                    ? position.pool.token0.symbol
+                                    : position.pool.token1.symbol}
+                                )
+                            </div>
+                            <div className="text-lg font-semibold text-white">
+                                {pnlDisplayValues.currentValue
+                                    ? formatCompactValue(
+                                          pnlDisplayValues.currentValue,
+                                          quoteTokenDecimals
+                                      )
+                                    : "0"}
+                            </div>
+                        </div>
 
-                        {/* Refresh Button */}
-                        <button
-                            onClick={handleRefresh}
-                            disabled={refreshMutation.isPending || isRefreshing}
-                            className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors disabled:opacity-50"
-                            title={t("dashboard.positions.refresh")}
-                        >
-                            <RefreshCw
-                                className={`w-4 h-4 text-slate-400 ${
-                                    refreshMutation.isPending || isRefreshing ? "animate-spin" : ""
+                        {/* PnL Curve Visualization */}
+                        <div className="text-right">
+                            <div className="text-xs text-slate-400 mb-0.5">
+                                {t("dashboard.positions.pnlCurve")}
+                            </div>
+                            <div className="flex justify-end">
+                                <MiniPnLCurveLazy
+                                    position={position}
+                                    curveData={curveData}
+                                    width={120}
+                                    height={60}
+                                    showTooltip={true}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Total PnL */}
+                        {pnlDisplayValues.totalPnL !== null ? (
+                            <div className="text-right">
+                                <div className="text-xs text-slate-400 mb-0.5">
+                                    {t("dashboard.positions.totalPnl")} (
+                                    {position.token0IsQuote
+                                        ? position.pool.token0.symbol
+                                        : position.pool.token1.symbol}
+                                    )
+                                </div>
+                                <div
+                                    className={`text-lg font-semibold ${pnlDisplayValues.pnlColor}`}
+                                >
+                                    <div className="flex items-center justify-end gap-1">
+                                        {pnlDisplayValues.isPositive ? (
+                                            <TrendingUp className="w-4 h-4" />
+                                        ) : pnlDisplayValues.isNegative ? (
+                                            <TrendingDown className="w-4 h-4" />
+                                        ) : null}
+                                        <span>
+                                            {formatCompactValue(
+                                                pnlDisplayValues.totalPnL,
+                                                quoteTokenDecimals
+                                            )}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : pnlLoading ? (
+                            <div className="text-right">
+                                <div className="text-xs text-slate-400 mb-0.5">
+                                    Loading PnL...
+                                </div>
+                                <div className="text-lg font-semibold text-slate-400">
+                                    --
+                                </div>
+                            </div>
+                        ) : pnlFailed ? (
+                            <div className="text-right">
+                                <div className="text-xs text-slate-400 mb-0.5">
+                                    PnL Unavailable
+                                </div>
+                                <div className="text-lg font-semibold text-slate-400">
+                                    --
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {/* Unclaimed Fees */}
+                        <div className="text-right">
+                            <div className="text-xs text-slate-400 mb-0.5">
+                                {t("dashboard.positions.unclaimedFees")} (
+                                {position.token0IsQuote
+                                    ? position.pool.token0.symbol
+                                    : position.pool.token1.symbol}
+                                )
+                            </div>
+                            <div
+                                className={`text-lg font-semibold ${
+                                    pnlDisplayValues.unclaimedFees
+                                        ? "text-amber-400"
+                                        : "text-white"
                                 }`}
-                            />
-                        </button>
+                            >
+                                {pnlDisplayValues.unclaimedFees
+                                    ? formatCompactValue(
+                                          pnlDisplayValues.unclaimedFees,
+                                          quoteTokenDecimals
+                                      )
+                                    : "0"}
+                            </div>
+                        </div>
 
-                        {/* Actions Menu */}
-                        <PositionActionsMenu
-                            position={position}
-                            onDelete={() => setShowDeleteModal(true)}
-                            isDeleting={isDeleting}
-                        />
+                        {/* APR */}
+                        {aprData ? (
+                            <div className="text-right">
+                                <div className="text-xs text-slate-400 mb-0.5">
+                                    APR (7d)
+                                </div>
+                                <div className="text-lg font-semibold text-white">
+                                    {aprData.totalApr !== null
+                                        ? `${Number(aprData.totalApr).toFixed(
+                                              2
+                                          )}%`
+                                        : "--"}
+                                </div>
+                            </div>
+                        ) : pnlLoading ? (
+                            <div className="text-right">
+                                <div className="text-xs text-slate-400 mb-0.5">
+                                    APR (7d)
+                                </div>
+                                <div className="text-lg font-semibold text-slate-400">
+                                    --
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
 
+                    {/* Right Side: Actions */}
+                    <div className="flex items-center gap-2 ml-auto">
                         {/* View Details Link */}
                         {position.nftId ? (
                             <Link
@@ -211,117 +407,29 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
                                 <Search className="w-4 h-4 text-slate-400" />
                             </div>
                         )}
-                    </div>
-                </div>
 
-                {/* Position Info with PnL Data */}
-                <div className="flex items-start gap-6 ml-6">
-                    {/* Current Value */}
-                    <div className="text-right">
-                        <div className="text-xs text-slate-400 mb-0.5">
-                            {t("dashboard.positions.currentValue")} (
-                            {position.token0IsQuote
-                                ? position.pool.token0.symbol
-                                : position.pool.token1.symbol}
-                            )
-                        </div>
-                        <div className="text-lg font-semibold text-white">
-                            {pnlDisplayValues.currentValue
-                                ? formatCompactValue(
-                                      pnlDisplayValues.currentValue,
-                                      quoteTokenDecimals
-                                  )
-                                : "0"}
-                        </div>
-                    </div>
-
-                    {/* PnL Curve Visualization */}
-                    <div className="text-right">
-                        <div className="text-xs text-slate-400 mb-0.5">
-                            {t("dashboard.positions.pnlCurve")}
-                        </div>
-                        <div className="flex justify-end">
-                            <MiniPnLCurveLazy
-                                position={position}
-                                curveData={curveData}
-                                width={120}
-                                height={60}
-                                showTooltip={true}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Total PnL */}
-                    {pnlDisplayValues.totalPnL !== null ? (
-                        <div className="text-right">
-                            <div className="text-xs text-slate-400 mb-0.5">
-                                {t("dashboard.positions.totalPnl")} (
-                                {position.token0IsQuote
-                                    ? position.pool.token0.symbol
-                                    : position.pool.token1.symbol}
-                                )
-                            </div>
-                            <div
-                                className={`text-lg font-semibold ${pnlDisplayValues.pnlColor}`}
-                            >
-                                <div className="flex items-center justify-end gap-1">
-                                    {pnlDisplayValues.isPositive ? (
-                                        <TrendingUp className="w-4 h-4" />
-                                    ) : pnlDisplayValues.isNegative ? (
-                                        <TrendingDown className="w-4 h-4" />
-                                    ) : null}
-                                    <span>
-                                        {formatCompactValue(
-                                            pnlDisplayValues.totalPnL,
-                                            quoteTokenDecimals
-                                        )}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    ) : pnlLoading ? (
-                        <div className="text-right">
-                            <div className="text-xs text-slate-400 mb-0.5">
-                                Loading PnL...
-                            </div>
-                            <div className="text-lg font-semibold text-slate-400">
-                                --
-                            </div>
-                        </div>
-                    ) : pnlFailed ? (
-                        <div className="text-right">
-                            <div className="text-xs text-slate-400 mb-0.5">
-                                PnL Unavailable
-                            </div>
-                            <div className="text-lg font-semibold text-slate-400">
-                                --
-                            </div>
-                        </div>
-                    ) : null}
-
-                    {/* Unclaimed Fees */}
-                    <div className="text-right">
-                        <div className="text-xs text-slate-400 mb-0.5">
-                            {t("dashboard.positions.unclaimedFees")} (
-                            {position.token0IsQuote
-                                ? position.pool.token0.symbol
-                                : position.pool.token1.symbol}
-                            )
-                        </div>
-                        <div
-                            className={`text-lg font-semibold ${
-                                pnlDisplayValues.unclaimedFees
-                                    ? "text-amber-400"
-                                    : "text-white"
-                            }`}
+                        {/* Refresh Button */}
+                        <button
+                            onClick={handleRefresh}
+                            disabled={refreshMutation.isPending || isRefreshing}
+                            className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors disabled:opacity-50"
+                            title={t("dashboard.positions.refresh")}
                         >
-                            {pnlDisplayValues.unclaimedFees
-                                ? formatCompactValue(
-                                      pnlDisplayValues.unclaimedFees,
-                                      quoteTokenDecimals
-                                  )
-                                : "0"}
-                        </div>
+                            <RefreshCw
+                                className={`w-4 h-4 text-slate-400 ${
+                                    refreshMutation.isPending || isRefreshing
+                                        ? "animate-spin"
+                                        : ""
+                                }`}
+                            />
+                        </button>
+
+                        {/* Actions Menu */}
+                        <PositionActionsMenu
+                            position={position}
+                            onDelete={() => setShowDeleteModal(true)}
+                            isDeleting={isDeleting}
+                        />
                     </div>
                 </div>
             </div>
@@ -331,6 +439,7 @@ export function PositionCard({ position, onRefresh, isRefreshing }: PositionCard
                 isOpen={showDeleteModal}
                 onClose={() => setShowDeleteModal(false)}
                 position={position}
+                onDeleteSuccess={handleDeleteSuccess}
             />
         </>
     );

@@ -33,15 +33,17 @@ export function usePositionRefresh() {
 
       // ✅ UPDATE caches with fresh data instead of invalidating
 
-      // Update main position cache
+      // Update main position cache - format to match API response structure
       queryClient.setQueryData(
         ['position', userId, chain, protocol, nftId],
         {
-          basicData: position,
-          pnlBreakdown,
-          aprBreakdown,
-          curveData,
-          lastUpdated: new Date().toISOString()
+          data: {
+            basicData: position,
+            pnlBreakdown,
+            aprBreakdown,
+            curveData,
+            lastUpdated: new Date().toISOString()
+          }
         }
       );
 
