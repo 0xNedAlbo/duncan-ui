@@ -21,7 +21,6 @@ export function EventsTab({ chainSlug, nftId }: EventsTabProps) {
     // Get position data using ReactQuery
     const {
         data: positionDetails,
-        isLoading: positionLoading,
         error: positionError,
     } = usePosition(userId, chainSlug, protocol, nftId, {
         enabled: Boolean(nftId && chainSlug),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { Suspense } from "react";
 import { UserDropdown } from "@/components/auth/user-dropdown";
 import { SettingsModal } from "@/components/settings-modal";
 import { CreatePositionDropdown } from "@/components/positions/create-position-dropdown";
@@ -14,15 +14,13 @@ function DashboardContent() {
     const t = useTranslations();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     // Check if import modal should be open based on URL parameter
     const showImportModal = searchParams.get('import') === 'wallet';
 
     // Handle successful position import
     const handleImportSuccess = (/* _position: any */) => {
-        // Trigger refresh of position list
-        setRefreshTrigger((prev) => prev + 1);
+        // Position list will automatically refresh via ReactQuery cache invalidation
     };
 
     // Handle modal state changes and URL updates
@@ -78,7 +76,7 @@ function DashboardContent() {
                     </div>
 
                     {/* Position List */}
-                    <PositionList refreshTrigger={refreshTrigger} />
+                    <PositionList />
                 </div>
             </div>
         </div>

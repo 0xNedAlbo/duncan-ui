@@ -26,7 +26,7 @@ export function useImportPositionByNftId(
     mutationFn: (data: ImportNFTRequest) =>
       apiClient.post<ImportNFTResponse>('/api/positions/uniswapv3/import-nft', data),
 
-    onSuccess: (response) => {
+    onSuccess: () => {
       // Invalidate positions list to show the new position
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.positions,

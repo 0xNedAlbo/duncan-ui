@@ -6,7 +6,6 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/app/apiClient';
-import { ApiError } from '@/lib/app/apiError';
 import type { PositionRefreshResponse } from '@/types/api';
 
 /**
@@ -16,7 +15,7 @@ export function usePositionRefresh() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ userId, chain, protocol, nftId }: {
+    mutationFn: ({ chain, nftId }: {
       userId: string;
       chain: string;
       protocol: string;

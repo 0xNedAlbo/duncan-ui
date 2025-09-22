@@ -21,6 +21,7 @@ interface PnLDisplayValues {
  */
 export function usePnLDisplayValues(
   pnlData: PnlBreakdown | undefined,
+  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
   quoteTokenDecimals: number
 ): PnLDisplayValues {
   return useMemo(() => {
@@ -58,5 +59,5 @@ export function usePnLDisplayValues(
       isPositive,
       isNegative,
     };
-  }, [pnlData, quoteTokenDecimals]);
+  }, [pnlData]);
 }

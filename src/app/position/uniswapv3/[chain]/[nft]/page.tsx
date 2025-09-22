@@ -33,7 +33,6 @@ export default function UniswapV3PositionPage() {
         data: position,
         isLoading,
         error,
-        refetch,
     } = usePosition(userId, chainSlug, protocol, nftId, {
         enabled: Boolean(nftId && chainSlug),
     });

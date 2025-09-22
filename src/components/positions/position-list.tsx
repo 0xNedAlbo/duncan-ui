@@ -14,10 +14,9 @@ import { CreatePositionDropdown } from "./create-position-dropdown";
 
 interface PositionListProps {
   className?: string;
-  refreshTrigger?: number;
 }
 
-export function PositionList({ className, refreshTrigger }: PositionListProps) {
+export function PositionList({ className }: PositionListProps) {
   const t = useTranslations();
 
   // UI state (not stored globally anymore)
