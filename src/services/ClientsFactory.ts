@@ -3,6 +3,7 @@ import { BackendRpcClients } from "./evm/rpcClients";
 import type { PublicClient } from "viem";
 import type { SupportedChainsType } from "@/config/chains";
 import { EtherscanClient } from "./etherscan/etherscanClient";
+import { addressChecksumExtension } from "@/lib/validation/addressChecksum";
 
 export interface Clients {
     prisma: PrismaClient;
@@ -19,12 +20,12 @@ export class DefaultClientsFactory implements ClientsFactory {
     private clients: Clients;
 
     private constructor() {
-        const prisma = new PrismaClient();
+        const prisma = new PrismaClient().$extends(addressChecksumExtension);
         const rpcClients = new BackendRpcClients().getClients();
         const etherscanClient = new EtherscanClient();
 
         this.clients = {
-            prisma,
+            prisma: prisma as any, // Cast to maintain interface compatibility
             rpcClients,
             etherscanClient,
         };

@@ -39,8 +39,8 @@ loadEnvFile();
 
 const DEFAULT_BASE_URL = process.env.NEXTAUTH_URL || 'http://localhost:3000';
 
-// Hardcoded API key for test@testmann.kk user
-const API_KEY = 'ak_live_zIdCcBStkntsCI_mVXqYUuNz5-VMSeGI-W8XWHn_C4A';
+// Hardcoded API key for test user (0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266)
+const API_KEY = 'ak_dev_duncan_test_f39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 
 interface ApiResponse<T = any> {
   success: boolean;

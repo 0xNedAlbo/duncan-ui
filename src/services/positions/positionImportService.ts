@@ -22,6 +22,7 @@ import { QuoteTokenService } from "./quoteTokenService";
 import type { Services } from "../ServiceFactory";
 import type { Clients } from "../ClientsFactory";
 import { createServiceLogger, type ServiceLogger } from "@/lib/logging/loggerFactory";
+import { normalizeAddress } from "@/lib/utils/evm";
 
 
 // Imported position data structure
@@ -146,16 +147,16 @@ export class PositionImportService {
             // Step 5: Create imported position data structure
             const importedData: ImportedPositionData = {
                 nftId: nftId,
-                poolAddress: poolAddress.toLowerCase(),
+                poolAddress: normalizeAddress(poolAddress),
                 tickLower: positionData.tickLower,
                 tickUpper: positionData.tickUpper,
                 // Use current liquidity (0 for closed positions) instead of historical liquidity
                 liquidity: positionStatus.currentLiquidity.toString(),
-                token0Address: positionData.token0.toLowerCase(),
-                token1Address: positionData.token1.toLowerCase(),
+                token0Address: normalizeAddress(positionData.token0),
+                token1Address: normalizeAddress(positionData.token1),
                 fee: positionData.fee,
                 chain,
-                owner: positionData.owner.toLowerCase(),
+                owner: normalizeAddress(positionData.owner),
             };
 
             // Step 6: Create/get pool information

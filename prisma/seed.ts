@@ -21,7 +21,7 @@ async function main() {
   console.log('🌱 Seeding development database...');
 
   // Create test user if it doesn't exist
-  const testAddress = '0x742d35Cc6635C0532925a3b8D85162c6bF8d9d0c';
+  const testAddress = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 
   let testUser = await prisma.user.findUnique({
     where: { address: testAddress }
@@ -52,8 +52,8 @@ async function main() {
     console.log('✅ Test API key already exists:', existingApiKey.id);
   } else {
     // Create the exact same API key used in debug script
-    const apiKeyPlaintext = 'ak_live_zIdCcBStkntsCI_mVXqYUuNz5-VMSeGI-W8XWHn_C4A';
-    const prefix = apiKeyPlaintext.substring(0, 8); // 'ak_live_'
+    const apiKeyPlaintext = 'ak_dev_duncan_test_f39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
+    const prefix = apiKeyPlaintext.substring(0, 6); // 'ak_dev'
 
     const hashedApiKey = await hash(apiKeyPlaintext, {
       memoryCost: 19456,
