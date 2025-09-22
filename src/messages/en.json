@@ -208,6 +208,13 @@
         "deleting": "Deleting...",
         "success": "Position deleted successfully",
         "error": "Failed to delete position"
+      },
+      "actions": {
+        "menu": "Position actions",
+        "delete": "Delete Position",
+        "increaseDeposit": "Increase Position",
+        "withdraw": "Withdraw",
+        "collectFees": "Collect Fees"
       }
     }
   },

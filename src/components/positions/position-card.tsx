@@ -9,7 +9,11 @@ import {
     Search,
     TrendingUp,
     TrendingDown,
+    Plus,
+    Minus,
+    DollarSign,
 } from "lucide-react";
+import { useAccount } from "wagmi";
 import { useTranslations } from "@/i18n/client";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import type { BasicPosition } from "@/services/positions/positionService";
@@ -19,6 +23,7 @@ import {
     NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
     getChainId,
 } from "@/lib/contracts/nonfungiblePositionManager";
+import { normalizeAddress } from "@/lib/utils/evm";
 
 // New ReactQuery hooks
 import { usePosition } from "@/hooks/api/usePosition";
@@ -50,6 +55,23 @@ export function PositionCard({
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [copied, setCopied] = useState(false);
     const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+    // Wallet connection hook
+    const { address: connectedAddress, isConnected } = useAccount();
+
+    // Check if user can perform actions (wallet matches position owner)
+    const canPerformActions = () => {
+        if (!isConnected || !connectedAddress || !position.owner) {
+            return false;
+        }
+        try {
+            const normalizedConnected = normalizeAddress(connectedAddress);
+            const normalizedOwner = normalizeAddress(position.owner);
+            return normalizedConnected === normalizedOwner;
+        } catch {
+            return false;
+        }
+    };
 
     // Helper function to build block explorer URL
     const getBlockExplorerUrl = (chain: string, nftId: string) => {
@@ -522,6 +544,45 @@ export function PositionCard({
                         />
                     </div>
                 </div>
+
+                {/* Action Buttons Row */}
+                {canPerformActions() && (
+                    <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-700/50">
+                        <button
+                            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
+                                position.status === "closed"
+                                    ? "text-slate-500 bg-slate-800/30 border-slate-600/30 cursor-not-allowed"
+                                    : "text-green-300 bg-green-900/20 hover:bg-green-800/30 border-green-600/50 cursor-pointer"
+                            }`}
+                            disabled={position.status === "closed"}
+                        >
+                            <Plus className="w-3 h-3" />
+                            {t("dashboard.positions.actions.increaseDeposit")}
+                        </button>
+                        <button
+                            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
+                                position.status === "closed"
+                                    ? "text-slate-500 bg-slate-800/30 border-slate-600/30 cursor-not-allowed"
+                                    : "text-green-300 bg-green-900/20 hover:bg-green-800/30 border-green-600/50 cursor-pointer"
+                            }`}
+                            disabled={position.status === "closed"}
+                        >
+                            <Minus className="w-3 h-3" />
+                            {t("dashboard.positions.actions.withdraw")}
+                        </button>
+                        <button
+                            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
+                                pnlDisplayValues.unclaimedFees && pnlDisplayValues.unclaimedFees > 0n
+                                    ? "text-amber-300 bg-amber-900/20 hover:bg-amber-800/30 border-amber-600/50 cursor-pointer"
+                                    : "text-slate-500 bg-slate-800/30 border-slate-600/30 cursor-not-allowed"
+                            }`}
+                            disabled={!pnlDisplayValues.unclaimedFees || pnlDisplayValues.unclaimedFees <= 0n}
+                        >
+                            <DollarSign className="w-3 h-3" />
+                            {t("dashboard.positions.actions.collectFees")}
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Delete Modal */}

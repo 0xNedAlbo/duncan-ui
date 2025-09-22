@@ -211,6 +211,13 @@
         "deleting": "Lösche...",
         "success": "Position erfolgreich gelöscht",
         "error": "Position konnte nicht gelöscht werden"
+      },
+      "actions": {
+        "menu": "Positionsaktionen",
+        "delete": "Position löschen",
+        "increaseDeposit": "Position erhöhen",
+        "withdraw": "Abheben",
+        "collectFees": "Gebühren einsammeln"
       }
     }
   },
