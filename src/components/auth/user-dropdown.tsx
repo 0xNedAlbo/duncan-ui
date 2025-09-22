@@ -43,22 +43,15 @@ export function UserDropdown() {
       <div className="flex items-center gap-3 text-sm">
         <Link
           href="/auth/signin"
-          className="text-slate-300 hover:text-white transition-colors"
-        >
-          {t("userDropdown.signIn")}
-        </Link>
-        <span className="text-slate-600">|</span>
-        <Link
-          href="/auth/signup"
           className="text-blue-400 hover:text-blue-300 transition-colors font-medium"
         >
-          {t("userDropdown.register")}
+          Connect Wallet
         </Link>
       </div>
     )
   }
 
-  const displayName = session.user?.name || session.user?.email?.split("@")[0] || "User"
+  const displayName = session.user?.name || (session.user?.address ? `${session.user.address.slice(0, 6)}...${session.user.address.slice(-4)}` : "")
   const userInitial = displayName.charAt(0).toUpperCase()
 
   return (
@@ -90,7 +83,7 @@ export function UserDropdown() {
         <div className="absolute right-0 mt-2 w-48 bg-slate-800/90 backdrop-blur-md rounded-lg border border-slate-700/50 shadow-xl shadow-black/20 z-50">
           <div className="p-3 border-b border-slate-700/50">
             <p className="text-sm text-slate-200 font-medium">{displayName}</p>
-            <p className="text-xs text-slate-400 truncate">{session.user?.email}</p>
+            <p className="text-xs text-slate-400 truncate">{session.user?.address}</p>
           </div>
           
           <div className="py-1">

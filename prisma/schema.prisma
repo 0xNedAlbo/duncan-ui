@@ -47,9 +47,8 @@ model Session {
 model User {
   id            String     @id @default(cuid())
   name          String?
-  email         String     @unique
-  password      String // Hashed password
-  emailVerified DateTime?
+  address       String     @unique // Ethereum address for SIWE authentication
+  nonce         String?    // SIWE nonce for authentication challenges
   image         String?
   accounts      Account[]
   sessions      Session[]

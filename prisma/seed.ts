@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 import { hash } from '@node-rs/argon2';
 
 const prisma = new PrismaClient();
@@ -22,22 +21,19 @@ async function main() {
   console.log('🌱 Seeding development database...');
 
   // Create test user if it doesn't exist
-  const testEmail = 'test@testmann.kk';
+  const testAddress = '0x742d35Cc6635C0532925a3b8D85162c6bF8d9d0c';
 
   let testUser = await prisma.user.findUnique({
-    where: { email: testEmail }
+    where: { address: testAddress }
   });
 
   if (testUser) {
     console.log('✅ Test user already exists:', testUser.id);
   } else {
-    const hashedPassword = await bcrypt.hash('test123456', 10);
-
     testUser = await prisma.user.create({
       data: {
         name: 'Test Testmann',
-        email: testEmail,
-        password: hashedPassword,
+        address: testAddress,
       },
     });
 

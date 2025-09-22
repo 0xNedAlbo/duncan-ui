@@ -79,9 +79,8 @@
   "userDropdown": {
     "profile": "Profile",
     "settings": "Settings",
-    "signOut": "Sign Out",
-    "signIn": "Sign In",
-    "register": "Register"
+    "signOut": "Disconnect Wallet",
+    "connectWallet": "Connect Wallet"
   },
   "dashboard": {
     "title": "Your Positions",
@@ -211,24 +210,12 @@
   "auth": {
     "signIn": {
       "title": "Sign In",
-      "orText": "Or",
-      "registerLink": "register here",
-      "emailPlaceholder": "Email address",
-      "passwordPlaceholder": "Password",
-      "submitButton": "Sign In",
-      "loading": "Loading...",
-      "errorInvalidCredentials": "Email or password is incorrect",
-      "errorGeneral": "An error occurred"
-    },
-    "signUp": {
-      "title": "Register",
-      "orText": "Or",
-      "signInLink": "sign in here",
-      "namePlaceholder": "Name (optional)",
-      "emailPlaceholder": "Email address", 
-      "passwordPlaceholder": "Password (at least 6 characters)",
-      "submitButton": "Register",
-      "loading": "Loading..."
+      "connectWallet": "Connect your wallet to access DUNCAN",
+      "walletConnected": "Wallet Connected",
+      "signMessage": "Sign Message to Continue",
+      "loading": "Signing...",
+      "errorInvalidCredentials": "Invalid signature or wallet connection",
+      "errorGeneral": "An error occurred during wallet authentication"
     }
   },
   "positionDetails": {

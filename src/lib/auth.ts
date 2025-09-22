@@ -1,13 +1,14 @@
 import { getServerSession, type NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
-import bcrypt from "bcryptjs"
+import { SiweMessage } from "siwe"
 import { prisma } from "@/lib/prisma"
+import { normalizeAddress } from "@/lib/utils/evm"
 
 declare module "next-auth" {
   interface Session {
     user: {
       id: string
-      email: string
+      address: string
       name?: string
     }
   }
@@ -19,39 +20,54 @@ export const authOptions: NextAuthOptions = {
   },
   providers: [
     CredentialsProvider({
-      name: "credentials",
+      name: "Ethereum",
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        message: { label: "Message", type: "text" },
+        signature: { label: "Signature", type: "text" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null
-        }
-
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
+        try {
+          if (!credentials?.message || !credentials?.signature) {
+            return null
           }
-        })
 
-        if (!user) {
+          const siwe = new SiweMessage(credentials.message)
+
+          // Use the domain from the SIWE message itself for verification
+          const result = await siwe.verify({
+            signature: credentials.signature,
+            domain: siwe.domain,
+          })
+
+          if (!result.success) {
+            return null
+          }
+
+          const address = normalizeAddress(siwe.address)
+
+          // Find or create user
+          let user = await prisma.user.findUnique({
+            where: { address }
+          })
+
+          if (!user) {
+            // Auto-create user on first SIWE login
+            user = await prisma.user.create({
+              data: {
+                address,
+                name: null,
+              }
+            })
+          }
+
+          return {
+            id: user.id,
+            address: user.address,
+            name: user.name,
+          }
+        } catch (error) {
+          console.error('SIWE authentication error:', error)
           return null
-        }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password as string,
-          user.password
-        )
-
-        if (!isPasswordValid) {
-          return null
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
         }
       }
     })
@@ -60,13 +76,16 @@ export const authOptions: NextAuthOptions = {
     session: ({ session, token }) => ({
       ...session,
       user: {
-        ...session.user,
         id: token.uid as string,
+        address: token.address as string,
+        name: token.name as string,
       },
     }),
     jwt: ({ user, token }) => {
       if (user) {
         token.uid = user.id
+        token.address = (user as any).address
+        token.name = user.name
       }
       return token
     },

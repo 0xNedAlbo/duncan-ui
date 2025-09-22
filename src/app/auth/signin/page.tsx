@@ -3,26 +3,52 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useAccount, useSignMessage } from "wagmi";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { SiweMessage } from "siwe";
 import { useAuthTranslations } from "@/lib/auth-translations";
 
 export default function SignInPage() {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
     const { t } = useAuthTranslations();
+    const { address, isConnected } = useAccount();
+    const { signMessageAsync } = useSignMessage();
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSiweSignIn = async () => {
+        if (!address || !isConnected) return;
+
         setIsLoading(true);
         setError("");
 
         try {
+            // Create SIWE message
+            const domain = window.location.host;
+            const origin = window.location.origin;
+            const statement = "Sign in to DUNCAN to manage your DeFi positions";
+
+            const message = new SiweMessage({
+                domain,
+                address,
+                statement,
+                uri: origin,
+                version: "1",
+                chainId: 1, // Ethereum mainnet for now
+                nonce: Math.random().toString(36).substring(2),
+            });
+
+            const messageBody = message.prepareMessage();
+
+            // Sign the message
+            const signature = await signMessageAsync({
+                message: messageBody,
+            });
+
+            // Submit to NextAuth
             const result = await signIn("credentials", {
-                email,
-                password,
+                message: messageBody,
+                signature,
                 redirect: false,
             });
 
@@ -32,8 +58,8 @@ export default function SignInPage() {
                 router.push("/");
                 router.refresh();
             }
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (error) {
+            console.error("SIWE sign-in error:", error);
             setError(t("auth.signIn.errorGeneral"));
         } finally {
             setIsLoading(false);
@@ -48,71 +74,41 @@ export default function SignInPage() {
                         {t("auth.signIn.title")}
                     </h2>
                     <p className="mt-2 text-center text-sm text-slate-400">
-                        {t("auth.signIn.orText")}{" "}
-                        <Link
-                            href="/auth/signup"
-                            className="font-medium text-blue-500 hover:text-blue-400"
-                        >
-                            {t("auth.signIn.registerLink")}
-                        </Link>
+                        Connect your wallet to access DUNCAN
                     </p>
                 </div>
-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-                    <div className="rounded-md shadow-sm -space-y-px">
-                        <div>
-                            <label htmlFor="email" className="sr-only">
-                                {t("auth.signIn.emailPlaceholder")}
-                            </label>
-                            <input
-                                id="email"
-                                name="email"
-                                type="email"
-                                autoComplete="email"
-                                required
-                                className="relative block w-full rounded-t-md border-0 py-1.5 px-3 text-white placeholder-slate-400 bg-slate-800 ring-1 ring-inset ring-slate-700 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-blue-500 sm:text-sm"
-                                placeholder={t("auth.signIn.emailPlaceholder")}
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="password" className="sr-only">
-                                {t("auth.signIn.passwordPlaceholder")}
-                            </label>
-                            <input
-                                id="password"
-                                name="password"
-                                type="password"
-                                autoComplete="current-password"
-                                required
-                                className="relative block w-full rounded-b-md border-0 py-1.5 px-3 text-white placeholder-slate-400 bg-slate-800 ring-1 ring-inset ring-slate-700 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-blue-500 sm:text-sm"
-                                placeholder={t(
-                                    "auth.signIn.passwordPlaceholder"
-                                )}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                            />
-                        </div>
+
+                <div className="mt-8 space-y-6">
+                    <div className="flex justify-center">
+                        <ConnectButton />
                     </div>
+
+                    {isConnected && address && (
+                        <div className="space-y-4">
+                            <div className="text-center">
+                                <p className="text-sm text-slate-400">
+                                    Connected: {address.slice(0, 6)}...{address.slice(-4)}
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={handleSiweSignIn}
+                                disabled={isLoading}
+                                className="group relative flex w-full justify-center rounded-md bg-blue-600 py-2 px-3 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isLoading
+                                    ? t("auth.signIn.loading")
+                                    : "Sign Message to Continue"}
+                            </button>
+                        </div>
+                    )}
 
                     {error && (
                         <div className="rounded-md bg-red-900/20 border border-red-500/20 p-3">
                             <p className="text-sm text-red-400">{error}</p>
                         </div>
                     )}
-
-                    <div>
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="group relative flex w-full justify-center rounded-md bg-blue-600 py-2 px-3 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isLoading
-                                ? t("auth.signIn.loading")
-                                : t("auth.signIn.submitButton")}
-                        </button>
-                    </div>
-                </form>
+                </div>
             </div>
         </div>
     );
