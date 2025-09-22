@@ -358,6 +358,26 @@
         "onchain": "On-Chain",
         "manual": "Manual"
       }
+    },
+    "technical": {
+      "basicInfo": "Basic Information",
+      "positionData": "Position Data",
+      "nftId": "NFT ID",
+      "nfPositionManager": "NFPositionManager Contract",
+      "poolContract": "Pool Contract",
+      "owner": "Owner",
+      "liquidity": "Liquidity L",
+      "tickLower": "Tick Lower",
+      "tickUpper": "Tick Upper",
+      "token0": "Token0 Address",
+      "token1": "Token1 Address",
+      "fee": "Pool Fee",
+      "sqrtRatioX96": "SqrtRatioX96",
+      "currentPrice": "Current Price",
+      "currentTick": "Current Tick",
+      "tickSpacing": "Tick Spacing",
+      "token0Role": "Token 0",
+      "token1Role": "Token 1"
     }
   },
   "homepage": {
