@@ -123,7 +123,7 @@ export const GET = withAuthAndLogging<TokenSearchResponse | TokenSearchError>(
                 // 2. Try database
                 if (results.length === 0) {
                     try {
-                        const dbToken = await tokenService.findOrCreateToken(chain, query);
+                        const dbToken = await tokenService.findToken(chain, query);
                         if (dbToken) {
                             results.push({
                                 address: dbToken.address,

@@ -66,6 +66,7 @@ export class TokenEnrichmentService {
                 },
             });
 
+
             // Skip if recently enriched
             if (existingToken?.lastEnrichedAt && this.isRecentlyEnriched(existingToken.lastEnrichedAt)) {
                 return {
@@ -136,7 +137,7 @@ export class TokenEnrichmentService {
                         symbol: onChainMetadata?.symbol || existingToken.symbol,
                         name: onChainMetadata?.name || existingToken.name,
                         decimals: onChainMetadata?.decimals || existingToken.decimals,
-                        logoUrl: enrichmentData?.logoUrl || existingToken.logoUrl,
+                        logoUrl: enrichmentData?.logoUrl || existingToken.logoUrl || undefined,
                         marketCap: enrichmentData?.marketCap,
                         coinGeckoId: updateData.coinGeckoId,
                     },
@@ -176,7 +177,7 @@ export class TokenEnrichmentService {
                         symbol: onChainMetadata.symbol,
                         name: onChainMetadata.name,
                         decimals: onChainMetadata.decimals,
-                        logoUrl: enrichmentData?.logoUrl || undefined,
+                        logoUrl: enrichmentData?.logoUrl ?? undefined,
                         marketCap: enrichmentData?.marketCap,
                         coinGeckoId,
                     },

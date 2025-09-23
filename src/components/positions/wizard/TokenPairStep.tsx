@@ -258,6 +258,7 @@ export function TokenPairStep({
             decimals: selectedPair.baseToken.decimals,
             verified: true,
             source: 'database' as const,
+            logoUrl: (selectedPair.baseToken as any).logoUrl,
         } : null,
         isSearching: false,
         showDropdown: false,
@@ -271,6 +272,7 @@ export function TokenPairStep({
             decimals: selectedPair.quoteToken.decimals,
             verified: true,
             source: 'database' as const,
+            logoUrl: (selectedPair.quoteToken as any).logoUrl,
         } : null,
         isSearching: false,
         showDropdown: false,
@@ -320,84 +322,50 @@ export function TokenPairStep({
         }));
     }, [quoteTokenSearch]);
 
-    // Trigger token enrichment for individual tokens
-    const triggerTokenEnrichment = useCallback(async (baseToken: TokenSearchResult | null, quoteToken: TokenSearchResult | null) => {
-        const tokensToEnrich: Array<{ chain: string; address: string }> = [];
-
-        if (baseToken?.address) {
-            tokensToEnrich.push({ chain, address: baseToken.address });
-        }
-        if (quoteToken?.address) {
-            tokensToEnrich.push({ chain, address: quoteToken.address });
-        }
-
-        if (tokensToEnrich.length === 0) return;
-
+    // Create and enrich individual tokens
+    const createToken = useCallback(async (tokenAddress: string): Promise<TokenSearchResult | null> => {
         try {
-            const response = await fetch('/api/tokens/enrich', {
+            const response = await fetch('/api/tokens', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    tokens: tokensToEnrich,
+                    chain,
+                    address: tokenAddress,
                 }),
             });
 
             if (!response.ok) {
-                // Enrichment failed but don't block user flow
-                console.warn('Token enrichment failed:', response.statusText);
-                return;
+                // Token creation failed but don't block user flow
+                console.warn('Token creation failed:', response.statusText);
+                return null;
             }
 
-            const enrichmentResult = await response.json();
+            const tokenResult = await response.json();
 
-            if (enrichmentResult.success && enrichmentResult.results) {
-                // Update token data with enriched information
-                enrichmentResult.results.forEach((result: any, index: number) => {
-                    if (result.success && result.enriched && result.data) {
-                        const enrichedData = result.data;
-                        const originalToken = tokensToEnrich[index];
-
-                        // Update base token if it matches
-                        if (baseToken?.address?.toLowerCase() === originalToken.address.toLowerCase()) {
-                            setBaseSelection(prev => ({
-                                ...prev,
-                                token: prev.token ? {
-                                    ...prev.token,
-                                    symbol: enrichedData.symbol || prev.token.symbol,
-                                    name: enrichedData.name || prev.token.name,
-                                    decimals: enrichedData.decimals || prev.token.decimals,
-                                    logoUrl: enrichedData.logoUrl || prev.token.logoUrl,
-                                } : prev.token
-                            }));
-                        }
-
-                        // Update quote token if it matches
-                        if (quoteToken?.address?.toLowerCase() === originalToken.address.toLowerCase()) {
-                            setQuoteSelection(prev => ({
-                                ...prev,
-                                token: prev.token ? {
-                                    ...prev.token,
-                                    symbol: enrichedData.symbol || prev.token.symbol,
-                                    name: enrichedData.name || prev.token.name,
-                                    decimals: enrichedData.decimals || prev.token.decimals,
-                                    logoUrl: enrichedData.logoUrl || prev.token.logoUrl,
-                                } : prev.token
-                            }));
-                        }
-                    }
-                });
-
-                console.debug('Token enrichment completed and UI updated');
+            if (tokenResult.success && tokenResult.token) {
+                const token = tokenResult.token;
+                return {
+                    address: token.address,
+                    symbol: token.symbol,
+                    name: token.name,
+                    decimals: token.decimals,
+                    verified: token.verified,
+                    logoUrl: token.logoUrl,
+                    source: 'database' as const,
+                };
             }
+
+            return null;
         } catch (error) {
-            // Enrichment failed but don't block user flow
-            console.warn('Token enrichment error:', error);
+            // Token creation failed but don't block user flow
+            console.warn('Token creation error:', error);
+            return null;
         }
     }, [chain]);
 
-    // Select base token and trigger enrichment
+    // Select base token and create/enrich it
     const selectBaseToken = useCallback(async (token: TokenSearchResult) => {
         setBaseSelection({
             token,
@@ -407,13 +375,19 @@ export function TokenPairStep({
         baseTokenSearch.setQuery(token.symbol);
         baseTokenSearch.clearResults();
 
-        // Enrich token immediately on selection
+        // Create/enrich token immediately on selection
         if (token.address) {
-            await triggerTokenEnrichment(token, null);
+            const enrichedToken = await createToken(token.address);
+            if (enrichedToken) {
+                setBaseSelection(prev => ({
+                    ...prev,
+                    token: enrichedToken
+                }));
+            }
         }
-    }, [baseTokenSearch, triggerTokenEnrichment]);
+    }, [baseTokenSearch, createToken]);
 
-    // Select quote token and trigger enrichment
+    // Select quote token and create/enrich it
     const selectQuoteToken = useCallback(async (token: TokenSearchResult) => {
         setQuoteSelection({
             token,
@@ -423,11 +397,17 @@ export function TokenPairStep({
         quoteTokenSearch.setQuery(token.symbol);
         quoteTokenSearch.clearResults();
 
-        // Enrich token immediately on selection
+        // Create/enrich token immediately on selection
         if (token.address) {
-            await triggerTokenEnrichment(null, token);
+            const enrichedToken = await createToken(token.address);
+            if (enrichedToken) {
+                setQuoteSelection(prev => ({
+                    ...prev,
+                    token: enrichedToken
+                }));
+            }
         }
-    }, [quoteTokenSearch, triggerTokenEnrichment]);
+    }, [quoteTokenSearch, createToken]);
 
     // Update parent when both tokens are selected and valid
     useEffect(() => {

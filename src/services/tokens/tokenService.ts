@@ -3,6 +3,7 @@ import { AlchemyTokenService } from "../alchemy/tokenMetadata";
 import { normalizeAddress } from "@/lib/utils/evm";
 import type { Services } from "../ServiceFactory";
 import type { Clients } from "../ClientsFactory";
+import { TokenEnrichmentService } from "./tokenEnrichmentService";
 
 export interface TokenSearchOptions {
     chain?: string;
@@ -25,13 +26,40 @@ export interface TokenCreateInput {
 export class TokenService {
     private prisma: PrismaClient;
     private alchemyService: AlchemyTokenService;
+    private enrichmentService: TokenEnrichmentService;
 
     constructor(
-        requiredClients: Pick<Clients, 'prisma'>,
-        requiredServices: Pick<Services, 'alchemyTokenService'>
+        requiredClients: Pick<Clients, 'prisma' | 'rpcClients'>,
+        requiredServices: Pick<Services, 'alchemyTokenService' | 'coinGeckoService'>
     ) {
         this.prisma = requiredClients.prisma;
         this.alchemyService = requiredServices.alchemyTokenService;
+        this.enrichmentService = new TokenEnrichmentService(
+            { prisma: requiredClients.prisma, rpcClients: requiredClients.rpcClients },
+            { coinGeckoService: requiredServices.coinGeckoService }
+        );
+    }
+
+    /**
+     * Find a token by chain and address (read-only, no creation)
+     */
+    async findToken(chain: string, address: string): Promise<Token | null> {
+        this.validateInput(chain, address);
+
+        // Normalize address to EIP-55 checksum format
+        const normalizedAddress = normalizeAddress(address);
+
+        // Try to find existing token in database
+        const existingToken = await this.prisma.token.findUnique({
+            where: {
+                chain_address: {
+                    chain,
+                    address: normalizedAddress,
+                },
+            },
+        });
+
+        return existingToken;
     }
 
     /**
@@ -57,41 +85,30 @@ export class TokenService {
             return existingToken;
         }
 
-        // Token doesn't exist, fetch from Alchemy and create
-        try {
-            const metadata = await this.alchemyService.getTokenMetadata(
-                chain,
-                normalizedAddress
-            );
+        // Token doesn't exist, create and enrich it directly
+        const enrichmentResult = await this.enrichmentService.enrichToken({
+            chain: chain as any,
+            address: normalizedAddress
+        });
 
-            return await this.prisma.token.create({
-                data: {
-                    chain,
-                    address: normalizedAddress,
-                    symbol: metadata.symbol,
-                    name: metadata.name,
-                    decimals: metadata.decimals,
-                    logoUrl: metadata.logo,
-                    verified: true,
-                    source: "alchemy",
+        if (enrichmentResult.success) {
+            // Enrichment succeeded, return the token from database
+            const createdToken = await this.prisma.token.findUnique({
+                where: {
+                    chain_address: {
+                        chain,
+                        address: normalizedAddress,
+                    },
                 },
             });
-        } catch {
-            // If Alchemy fails, create with minimal data
-            // Alchemy fetch failed - will create with minimal data
 
-            return await this.prisma.token.create({
-                data: {
-                    chain,
-                    address: normalizedAddress,
-                    symbol: "UNKNOWN",
-                    name: "Unknown Token",
-                    decimals: 18, // Default for most ERC-20 tokens
-                    verified: false,
-                    source: "contract",
-                },
-            });
+            if (createdToken) {
+                return createdToken;
+            }
         }
+
+        // Enrichment failed, create token with minimal on-chain data as fallback
+        throw new Error(`Failed to create and enrich token ${normalizedAddress} on ${chain}: ${enrichmentResult.message}`);
     }
 
     /**

@@ -63,8 +63,8 @@ export class DefaultServiceFactory implements ServiceFactory {
         const positionService = new PositionService(prisma, rpcClients);
 
         const tokenService = new TokenService(
-            { prisma },
-            { alchemyTokenService }
+            { prisma, rpcClients },
+            { alchemyTokenService, coinGeckoService }
         );
 
         const poolService = new PoolService(

@@ -74,19 +74,21 @@ export function PositionWizard({
                     fetchTokenMetadata(chain, normalizedQuoteAddress)
                 ]);
 
-                // Create token pair with full metadata
+                // Create token pair with full metadata including logos
                 tokenPair = {
                     baseToken: {
                         address: normalizedBaseAddress,
                         symbol: baseTokenData?.symbol || normalizedBaseAddress.substring(0, 6) + '...',
                         name: baseTokenData?.name || 'Unknown Token',
-                        decimals: baseTokenData?.decimals || 18
+                        decimals: baseTokenData?.decimals || 18,
+                        logoUrl: baseTokenData?.logoUrl
                     } as any,
                     quoteToken: {
                         address: normalizedQuoteAddress,
                         symbol: quoteTokenData?.symbol || normalizedQuoteAddress.substring(0, 6) + '...',
                         name: quoteTokenData?.name || 'Unknown Token',
-                        decimals: quoteTokenData?.decimals || 18
+                        decimals: quoteTokenData?.decimals || 18,
+                        logoUrl: quoteTokenData?.logoUrl
                     } as any,
                     isValidPair: true,
                 };
