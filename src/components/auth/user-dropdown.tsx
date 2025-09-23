@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useSession, signOut } from "next-auth/react"
 import Link from "next/link"
-import { User, LogOut, ChevronDown } from "lucide-react"
+import { User, LogOut, ChevronDown, Key } from "lucide-react"
 import { useTranslations } from "@/i18n/client"
 
 export function UserDropdown() {
@@ -94,9 +94,18 @@ export function UserDropdown() {
               <User className="w-4 h-4" />
               {t("userDropdown.profile")}
             </button>
-            
+
+            <Link
+              href="/api-keys"
+              onClick={() => setIsOpen(false)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors"
+            >
+              <Key className="w-4 h-4" />
+              {t("userDropdown.apiKeys")}
+            </Link>
+
             <hr className="my-1 border-slate-700/50" />
-            
+
             <button
               onClick={handleSignOut}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-900/20 transition-colors"

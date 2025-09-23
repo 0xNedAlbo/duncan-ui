@@ -81,6 +81,7 @@
   "userDropdown": {
     "profile": "Profile",
     "settings": "Settings",
+    "apiKeys": "API Keys",
     "signOut": "Disconnect Wallet",
     "connectWallet": "Connect Wallet"
   },
@@ -489,6 +490,7 @@
       "validPair": "Valid token pair",
       "pairSelected": "selected",
       "validationError": "Token validation failed",
+      "note": "You can search by token symbol or paste a contract address to find any token.",
       "implementationNote": "Token search and validation to be implemented."
     },
     "poolSelection": {
@@ -534,6 +536,53 @@
         "message": "This position has a moderate risk classification. Review the PnL curve for detailed risk scenarios."
       },
       "implementationNote": "Enhanced PnL curve with heatmap and interactive features to be implemented."
+    }
+  },
+  "apiKeys": {
+    "title": "API Key Management",
+    "description": "Create and manage API keys for accessing DUNCAN programmatically",
+    "createKey": "Create API Key",
+    "noKeys": "No API keys yet",
+    "noKeysDescription": "Create your first API key to start using the DUNCAN API",
+    "keyCreated": "API Key Created",
+    "keyCreatedDescription": "Save this key securely - it won't be shown again",
+    "copyKey": "Copy API Key",
+    "keyName": "Key Name",
+    "keyNamePlaceholder": "e.g. Production Bot",
+    "keyNameRequired": "Key name is required",
+    "keyPrefix": "Key Prefix",
+    "createdAt": "Created",
+    "lastUsed": "Last Used",
+    "never": "Never",
+    "usage": "Usage",
+    "monthlyUsage": "This Month",
+    "dailyUsage": "Today",
+    "status": {
+      "active": "Active",
+      "revoked": "Revoked"
+    },
+    "actions": {
+      "revoke": "Revoke Key",
+      "revoking": "Revoking..."
+    },
+    "revoke": {
+      "confirmTitle": "Revoke API Key",
+      "confirmMessage": "Are you sure you want to revoke this API key? This action cannot be undone and will immediately disable all access using this key.",
+      "confirmButton": "Revoke Key",
+      "success": "API key revoked successfully",
+      "error": "Failed to revoke API key"
+    },
+    "create": {
+      "title": "Create New API Key",
+      "description": "Generate a new API key for programmatic access to DUNCAN",
+      "creating": "Creating...",
+      "success": "API key created successfully",
+      "error": "Failed to create API key"
+    },
+    "errors": {
+      "loadFailed": "Failed to load API keys",
+      "unauthorized": "Unauthorized - Please sign in",
+      "sessionRequired": "Session authentication required for API key management"
     }
   }
 }

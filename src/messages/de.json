@@ -83,6 +83,7 @@
   "userDropdown": {
     "profile": "Profil",
     "settings": "Einstellungen",
+    "apiKeys": "API Keys",
     "signOut": "Abmelden",
     "signIn": "Anmelden",
     "register": "Registrieren"
@@ -508,6 +509,7 @@
       "validPair": "Gültiges Token-Paar",
       "pairSelected": "ausgewählt",
       "validationError": "Token-Validierung fehlgeschlagen",
+      "note": "Du kannst nach Token-Symbol suchen oder eine Vertragsadresse eingeben, um beliebige Token zu finden.",
       "implementationNote": "Token-Suche und -Validierung wird implementiert."
     },
     "poolSelection": {
@@ -553,6 +555,53 @@
         "message": "Diese Position hat eine moderate Risikoklassifikation. Überprüfe die PnL-Kurve für detaillierte Risikoszenarien."
       },
       "implementationNote": "Erweiterte PnL-Kurve mit Heatmap und interaktiven Features wird implementiert."
+    }
+  },
+  "apiKeys": {
+    "title": "API Key Management",
+    "description": "Erstelle und verwalte API Keys für den programmatischen Zugang zu DUNCAN",
+    "createKey": "API Key erstellen",
+    "noKeys": "Noch keine API Keys",
+    "noKeysDescription": "Erstelle deinen ersten API Key, um die DUNCAN API zu nutzen",
+    "keyCreated": "API Key erstellt",
+    "keyCreatedDescription": "Speichere diesen Key sicher ab - er wird nicht nochmal angezeigt",
+    "copyKey": "API Key kopieren",
+    "keyName": "Key Name",
+    "keyNamePlaceholder": "z.B. Production Bot",
+    "keyNameRequired": "Key Name ist erforderlich",
+    "keyPrefix": "Key Prefix",
+    "createdAt": "Erstellt",
+    "lastUsed": "Zuletzt verwendet",
+    "never": "Nie",
+    "usage": "Verwendung",
+    "monthlyUsage": "Diesen Monat",
+    "dailyUsage": "Heute",
+    "status": {
+      "active": "Aktiv",
+      "revoked": "Widerrufen"
+    },
+    "actions": {
+      "revoke": "Key widerrufen",
+      "revoking": "Widerrufe..."
+    },
+    "revoke": {
+      "confirmTitle": "API Key widerrufen",
+      "confirmMessage": "Bist du sicher, dass du diesen API Key widerrufen möchtest? Diese Aktion kann nicht rückgängig gemacht werden und deaktiviert sofort jeglichen Zugang mit diesem Key.",
+      "confirmButton": "Key widerrufen",
+      "success": "API Key erfolgreich widerrufen",
+      "error": "API Key konnte nicht widerrufen werden"
+    },
+    "create": {
+      "title": "Neuen API Key erstellen",
+      "description": "Erstelle einen neuen API Key für programmatischen Zugang zu DUNCAN",
+      "creating": "Erstelle...",
+      "success": "API Key erfolgreich erstellt",
+      "error": "API Key konnte nicht erstellt werden"
+    },
+    "errors": {
+      "loadFailed": "Laden der API Keys fehlgeschlagen",
+      "unauthorized": "Nicht autorisiert - Bitte melde dich an",
+      "sessionRequired": "Session-Authentifizierung für API Key Management erforderlich"
     }
   }
 }
