@@ -104,6 +104,11 @@ model Token {
   decimals Int
   logoUrl  String?
 
+  // Market data for internal ranking (not exposed to users)
+  marketCap       String?   // BigInt as string for internal ranking
+  coinGeckoId     String?   // Link to CoinGecko record
+  lastEnrichedAt  DateTime? // Cache management for market data
+
   // Source and verification
   source   String // "alchemy", "contract"
   verified Boolean @default(false)
@@ -120,6 +125,7 @@ model Token {
   @@id([chain, address]) // Composite primary key
   @@index([chain, symbol])
   @@index([verified, source]) // Global verified tokens
+  @@index([chain, marketCap(sort: Desc)]) // Market cap ranking for search
   @@map("tokens")
 }
 

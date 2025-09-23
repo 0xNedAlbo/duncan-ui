@@ -206,8 +206,9 @@ export class TokenService {
             take: limit,
             skip: offset,
             orderBy: [
-                { verified: "desc" }, // Verified tokens first
-                { symbol: "asc" }, // Then by symbol alphabetically
+                // Priority order: market cap DESC (nulls last), then alphabetical by symbol
+                { marketCap: { sort: "desc", nulls: "last" } },
+                { symbol: "asc" },
             ],
         });
     }
@@ -428,6 +429,75 @@ export class TokenService {
                     .join(", ")}`
             );
         }
+    }
+
+    /**
+     * Update token market data from enrichment
+     */
+    async updateTokenMarketData(
+        chain: string,
+        address: string,
+        marketCap: string,
+        logoUrl?: string,
+        coinGeckoId?: string
+    ): Promise<void> {
+        this.validateInput(chain, address);
+
+        const normalizedAddress = normalizeAddress(address);
+
+        const updateData: any = {
+            marketCap,
+            lastEnrichedAt: new Date(),
+        };
+
+        if (logoUrl) {
+            updateData.logoUrl = logoUrl;
+        }
+
+        if (coinGeckoId) {
+            updateData.coinGeckoId = coinGeckoId;
+        }
+
+        await this.prisma.token.update({
+            where: {
+                chain_address: {
+                    chain,
+                    address: normalizedAddress,
+                },
+            },
+            data: updateData,
+        });
+    }
+
+    /**
+     * Get tokens that need market cap enrichment
+     */
+    async getTokensNeedingEnrichment(
+        chain?: string,
+        limit: number = 50
+    ): Promise<{ chain: string; address: string }[]> {
+        const where: any = {
+            marketCap: null, // No market cap data
+            verified: true, // Only enrich verified tokens
+        };
+
+        if (chain) {
+            where.chain = chain;
+        }
+
+        const tokens = await this.prisma.token.findMany({
+            where,
+            select: {
+                chain: true,
+                address: true,
+            },
+            take: limit,
+            orderBy: {
+                updatedAt: "asc", // Oldest first
+            },
+        });
+
+        return tokens;
     }
 
     /**

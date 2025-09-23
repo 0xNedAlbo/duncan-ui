@@ -15,6 +15,30 @@ export interface TokenSearchResult {
   source: 'coingecko';
 }
 
+export interface CoinGeckoDetailedCoin {
+  id: string;
+  symbol: string;
+  name: string;
+  image: {
+    thumb: string;
+    small: string;
+    large: string;
+  };
+  market_data: {
+    market_cap: {
+      usd: number;
+    };
+  };
+  platforms: Record<string, string>;
+}
+
+export interface EnrichmentData {
+  marketCap: string; // BigInt as string
+  logoUrl: string;
+  symbol: string;
+  name: string;
+}
+
 export class CoinGeckoService {
   private readonly baseUrl = 'https://api.coingecko.com/api/v3';
   private tokensCache: CoinGeckoToken[] | null = null;
@@ -129,6 +153,76 @@ export class CoinGeckoService {
       }
 
       throw new Error(`Failed to fetch tokens from CoinGecko: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get detailed coin information including market cap and logo
+   */
+  async getCoinDetails(coinId: string): Promise<CoinGeckoDetailedCoin> {
+    try {
+      const response = await fetch(`${this.baseUrl}/coins/${coinId}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`);
+
+      if (!response.ok) {
+        throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
+      }
+
+      const coin: CoinGeckoDetailedCoin = await response.json();
+      return coin;
+    } catch (error) {
+      throw new Error(`Failed to fetch coin details for ${coinId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Find CoinGecko coin ID by contract address on a specific chain
+   */
+  async findCoinByAddress(chain: string, address: string): Promise<string | null> {
+    const tokens = await this.getAllTokens();
+    const platformId = this.chainToPlatformId[chain];
+
+    if (!platformId) {
+      return null;
+    }
+
+    const normalizedAddress = address.toLowerCase();
+    const token = tokens.find(token =>
+      token.platforms[platformId] &&
+      token.platforms[platformId].toLowerCase() === normalizedAddress
+    );
+
+    return token ? token.id : null;
+  }
+
+  /**
+   * Get enrichment data for a token by address
+   */
+  async getTokenEnrichmentData(chain: string, address: string): Promise<EnrichmentData | null> {
+    try {
+      const coinId = await this.findCoinByAddress(chain, address);
+      if (!coinId) {
+        return null;
+      }
+
+      const coinDetails = await this.getCoinDetails(coinId);
+
+      // Convert market cap to BigInt string (USD value in smallest unit)
+      const marketCapUsd = coinDetails.market_data?.market_cap?.usd;
+      if (!marketCapUsd || marketCapUsd <= 0) {
+        return null;
+      }
+
+      // Convert to BigInt string (multiply by 1e6 for USDC-like precision)
+      const marketCapString = Math.floor(marketCapUsd * 1e6).toString();
+
+      return {
+        marketCap: marketCapString,
+        logoUrl: coinDetails.image.small,
+        symbol: coinDetails.symbol.toUpperCase(),
+        name: coinDetails.name,
+      };
+    } catch (error) {
+      throw new Error(`Failed to get enrichment data for ${chain}:${address}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

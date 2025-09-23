@@ -13,41 +13,47 @@ export interface PopularTokensByChain {
     quote: PopularToken[];
 }
 
-// Popular tokens configuration per chain
+// Popular tokens configuration per chain with actual CoinGecko logos
 export const POPULAR_TOKENS: Record<SupportedChainsType, PopularTokensByChain> = {
     ethereum: {
         base: [
             {
                 symbol: "WETH",
                 address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-                name: "Wrapped Ether"
+                name: "Wrapped Ether",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/2518/small/weth.png?1696503332"
             },
             {
                 symbol: "WBTC",
                 address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
-                name: "Wrapped BTC"
+                name: "Wrapped BTC",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/7598/small/wrapped_bitcoin_wbtc.png?1696507857"
             },
             {
                 symbol: "cbBTC",
                 address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
-                name: "Coinbase Wrapped BTC"
+                name: "Coinbase Wrapped BTC",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/40143/small/cbbtc.webp?1726136727"
             }
         ],
         quote: [
             {
                 symbol: "WETH",
                 address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-                name: "Wrapped Ether"
+                name: "Wrapped Ether",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/2518/small/weth.png?1696503332"
             },
             {
                 symbol: "USDC",
                 address: "0xA0b86a33E74113e56D24A2Ecc6024C435378FFD3",
-                name: "USD Coin"
+                name: "USD Coin",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/6319/small/usdc.png?1696506694"
             },
             {
                 symbol: "USDT",
                 address: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-                name: "Tether USD"
+                name: "Tether USD",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/325/small/Tether.png?1696501661"
             }
         ]
     },
@@ -56,39 +62,46 @@ export const POPULAR_TOKENS: Record<SupportedChainsType, PopularTokensByChain> =
             {
                 symbol: "WETH",
                 address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBAb1",
-                name: "Wrapped Ether"
+                name: "Wrapped Ether",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/2518/small/weth.png?1696503332"
             },
             {
                 symbol: "WBTC",
                 address: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
-                name: "Wrapped BTC"
+                name: "Wrapped BTC",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/7598/small/wrapped_bitcoin_wbtc.png?1696507857"
             },
             {
                 symbol: "ARB",
                 address: "0x912CE59144191C1204E64559FE8253a0e49E6548",
-                name: "Arbitrum"
+                name: "Arbitrum",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/16547/small/arb.jpg?1721358242"
             },
             {
                 symbol: "GMX",
                 address: "0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a",
-                name: "GMX"
+                name: "GMX",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/18323/small/arbit.png?1696517814"
             }
         ],
         quote: [
             {
                 symbol: "WETH",
                 address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBAb1",
-                name: "Wrapped Ether"
+                name: "Wrapped Ether",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/2518/small/weth.png?1696503332"
             },
             {
                 symbol: "USDC",
                 address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
-                name: "USD Coin"
+                name: "USD Coin",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/6319/small/usdc.png?1696506694"
             },
             {
                 symbol: "USDC.e",
                 address: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
-                name: "USD Coin (Arb1)"
+                name: "USD Coin (Arb1)",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/6319/small/usdc.png?1696506694"
             }
         ]
     },
@@ -97,24 +110,28 @@ export const POPULAR_TOKENS: Record<SupportedChainsType, PopularTokensByChain> =
             {
                 symbol: "WETH",
                 address: "0x4200000000000000000000000000000000000006",
-                name: "Wrapped Ether"
+                name: "Wrapped Ether",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/2518/small/weth.png?1696503332"
             },
             {
                 symbol: "cbBTC",
                 address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
-                name: "Coinbase Wrapped BTC"
+                name: "Coinbase Wrapped BTC",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/40143/small/cbbtc.webp?1726136727"
             }
         ],
         quote: [
             {
                 symbol: "WETH",
                 address: "0x4200000000000000000000000000000000000006",
-                name: "Wrapped Ether"
+                name: "Wrapped Ether",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/2518/small/weth.png?1696503332"
             },
             {
                 symbol: "USDC",
                 address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-                name: "USD Coin"
+                name: "USD Coin",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/6319/small/usdc.png?1696506694"
             }
         ]
     }

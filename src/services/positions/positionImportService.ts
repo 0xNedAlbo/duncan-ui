@@ -19,6 +19,7 @@ import { PositionPnLService } from "./positionPnLService";
 import { PositionLedgerService } from "./positionLedgerService";
 import { EtherscanEventService } from "../etherscan/etherscanEventService";
 import { QuoteTokenService } from "./quoteTokenService";
+import { TokenEnrichmentService } from "../tokens/tokenEnrichmentService";
 import type { Services } from "../ServiceFactory";
 import type { Clients } from "../ClientsFactory";
 import { createServiceLogger, type ServiceLogger } from "@/lib/logging/loggerFactory";
@@ -60,6 +61,7 @@ export class PositionImportService {
     private positionLedgerService: PositionLedgerService;
     private etherscanEventService: EtherscanEventService;
     private quoteTokenService: QuoteTokenService;
+    private tokenEnrichmentService: TokenEnrichmentService;
     private logger: ServiceLogger;
 
     constructor(
@@ -67,7 +69,7 @@ export class PositionImportService {
             Clients,
             "prisma" | "rpcClients" | "etherscanClient"
         >,
-        requiredServices: Pick<Services, "positionService" | "poolService" | "positionPnLService" | "positionLedgerService">
+        requiredServices: Pick<Services, "positionService" | "poolService" | "positionPnLService" | "positionLedgerService" | "coinGeckoService">
     ) {
         this.prisma = requiredClients.prisma;
         this.rpcClients = requiredClients.rpcClients;
@@ -79,6 +81,10 @@ export class PositionImportService {
             etherscanClient: requiredClients.etherscanClient,
         });
         this.quoteTokenService = new QuoteTokenService();
+        this.tokenEnrichmentService = new TokenEnrichmentService(
+            { prisma: requiredClients.prisma, rpcClients: requiredClients.rpcClients },
+            { coinGeckoService: requiredServices.coinGeckoService }
+        );
         this.logger = createServiceLogger('PositionImportService');
     }
 
@@ -232,6 +238,15 @@ export class PositionImportService {
             };
             await this.positionPnLService.getPnlBreakdown(positionId);
 
+            // Step 12: Trigger token enrichment in background (don't await to avoid blocking)
+            this.triggerTokenEnrichment(chain, [
+                importedData.token0Address,
+                importedData.token1Address
+            ]).catch(error => {
+                // Log but don't fail import if enrichment fails
+                this.logger.debug({ error }, 'Token enrichment failed during position import');
+            });
+
             return {
                 success: true,
                 position: {
@@ -277,6 +292,20 @@ export class PositionImportService {
             status: netLiquidity === 0n ? "closed" : "open",
             currentLiquidity: netLiquidity,
         };
+    }
+
+    /**
+     * Trigger token enrichment for discovered tokens (background operation)
+     */
+    private async triggerTokenEnrichment(chain: SupportedChainsType, addresses: string[]): Promise<void> {
+        try {
+            // Use TokenEnrichmentService directly
+            const enrichmentInputs = addresses.map(address => ({ chain, address }));
+            await this.tokenEnrichmentService.enrichTokens(enrichmentInputs);
+        } catch (error) {
+            // Don't throw - enrichment failure shouldn't block imports
+            this.logger.debug({ error, chain, addresses }, 'Token enrichment failed');
+        }
     }
 
     /**

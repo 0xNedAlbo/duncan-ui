@@ -93,7 +93,7 @@ function TokenInput({
                                 <>
                                     <span className="text-slate-500 font-mono">{truncateAddress(selection.token.address)}</span>
                                     <div className="flex items-center gap-1">
-                                        <button
+                                        <div
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (selection.token?.address) {
@@ -104,8 +104,8 @@ function TokenInput({
                                             title="Copy address"
                                         >
                                             <Copy className="w-3 h-3" />
-                                        </button>
-                                        <button
+                                        </div>
+                                        <div
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (selection.token?.address) {
@@ -116,7 +116,7 @@ function TokenInput({
                                             title="View on explorer"
                                         >
                                             <ExternalLink className="w-3 h-3" />
-                                        </button>
+                                        </div>
                                     </div>
                                 </>
                             )}
@@ -187,7 +187,7 @@ function TokenInput({
                                             <>
                                                 <span className="text-slate-500 font-mono text-xs">{truncateAddress(token.address)}</span>
                                                 <div className="flex items-center gap-1">
-                                                    <button
+                                                    <div
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             navigator.clipboard.writeText(token.address!);
@@ -196,8 +196,8 @@ function TokenInput({
                                                         title="Copy address"
                                                     >
                                                         <Copy className="w-3 h-3" />
-                                                    </button>
-                                                    <button
+                                                    </div>
+                                                    <div
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             window.open(getExplorerAddressUrl(token.address!, chain), '_blank');
@@ -206,7 +206,7 @@ function TokenInput({
                                                         title="View on explorer"
                                                     >
                                                         <ExternalLink className="w-3 h-3" />
-                                                    </button>
+                                                    </div>
                                                 </div>
                                             </>
                                         )}
@@ -320,8 +320,85 @@ export function TokenPairStep({
         }));
     }, [quoteTokenSearch]);
 
-    // Select base token
-    const selectBaseToken = useCallback((token: TokenSearchResult) => {
+    // Trigger token enrichment for individual tokens
+    const triggerTokenEnrichment = useCallback(async (baseToken: TokenSearchResult | null, quoteToken: TokenSearchResult | null) => {
+        const tokensToEnrich: Array<{ chain: string; address: string }> = [];
+
+        if (baseToken?.address) {
+            tokensToEnrich.push({ chain, address: baseToken.address });
+        }
+        if (quoteToken?.address) {
+            tokensToEnrich.push({ chain, address: quoteToken.address });
+        }
+
+        if (tokensToEnrich.length === 0) return;
+
+        try {
+            const response = await fetch('/api/tokens/enrich', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    tokens: tokensToEnrich,
+                }),
+            });
+
+            if (!response.ok) {
+                // Enrichment failed but don't block user flow
+                console.warn('Token enrichment failed:', response.statusText);
+                return;
+            }
+
+            const enrichmentResult = await response.json();
+
+            if (enrichmentResult.success && enrichmentResult.results) {
+                // Update token data with enriched information
+                enrichmentResult.results.forEach((result: any, index: number) => {
+                    if (result.success && result.enriched && result.data) {
+                        const enrichedData = result.data;
+                        const originalToken = tokensToEnrich[index];
+
+                        // Update base token if it matches
+                        if (baseToken?.address?.toLowerCase() === originalToken.address.toLowerCase()) {
+                            setBaseSelection(prev => ({
+                                ...prev,
+                                token: prev.token ? {
+                                    ...prev.token,
+                                    symbol: enrichedData.symbol || prev.token.symbol,
+                                    name: enrichedData.name || prev.token.name,
+                                    decimals: enrichedData.decimals || prev.token.decimals,
+                                    logoUrl: enrichedData.logoUrl || prev.token.logoUrl,
+                                } : prev.token
+                            }));
+                        }
+
+                        // Update quote token if it matches
+                        if (quoteToken?.address?.toLowerCase() === originalToken.address.toLowerCase()) {
+                            setQuoteSelection(prev => ({
+                                ...prev,
+                                token: prev.token ? {
+                                    ...prev.token,
+                                    symbol: enrichedData.symbol || prev.token.symbol,
+                                    name: enrichedData.name || prev.token.name,
+                                    decimals: enrichedData.decimals || prev.token.decimals,
+                                    logoUrl: enrichedData.logoUrl || prev.token.logoUrl,
+                                } : prev.token
+                            }));
+                        }
+                    }
+                });
+
+                console.debug('Token enrichment completed and UI updated');
+            }
+        } catch (error) {
+            // Enrichment failed but don't block user flow
+            console.warn('Token enrichment error:', error);
+        }
+    }, [chain]);
+
+    // Select base token and trigger enrichment
+    const selectBaseToken = useCallback(async (token: TokenSearchResult) => {
         setBaseSelection({
             token,
             isSearching: false,
@@ -329,10 +406,15 @@ export function TokenPairStep({
         });
         baseTokenSearch.setQuery(token.symbol);
         baseTokenSearch.clearResults();
-    }, [baseTokenSearch]);
 
-    // Select quote token
-    const selectQuoteToken = useCallback((token: TokenSearchResult) => {
+        // Enrich token immediately on selection
+        if (token.address) {
+            await triggerTokenEnrichment(token, null);
+        }
+    }, [baseTokenSearch, triggerTokenEnrichment]);
+
+    // Select quote token and trigger enrichment
+    const selectQuoteToken = useCallback(async (token: TokenSearchResult) => {
         setQuoteSelection({
             token,
             isSearching: false,
@@ -340,7 +422,12 @@ export function TokenPairStep({
         });
         quoteTokenSearch.setQuery(token.symbol);
         quoteTokenSearch.clearResults();
-    }, [quoteTokenSearch]);
+
+        // Enrich token immediately on selection
+        if (token.address) {
+            await triggerTokenEnrichment(null, token);
+        }
+    }, [quoteTokenSearch, triggerTokenEnrichment]);
 
     // Update parent when both tokens are selected and valid
     useEffect(() => {

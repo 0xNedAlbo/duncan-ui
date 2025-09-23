@@ -70,35 +70,18 @@ export const GET = withAuthAndLogging<TokenSearchResponse | TokenSearchError>(
             if (!query) {
                 const popularTokens = type ? getPopularTokens(chain, type) : [];
 
-                // Fetch logos from Alchemy for popular tokens
-                const popularTokensWithLogos = await Promise.all(
-                    popularTokens.map(async (token) => {
-                        try {
-                            const alchemyToken = await alchemyTokenService.getTokenMetadata(chain, token.address);
-                            return {
-                                address: token.address,
-                                symbol: token.symbol,
-                                name: token.name,
-                                decimals: alchemyToken.decimals || 18,
-                                verified: true,
-                                logoUrl: alchemyToken.logo || undefined,
-                                source: 'popular' as const,
-                            };
-                        } catch {
-                            // Fallback to basic token info if Alchemy fails
-                            return {
-                                address: token.address,
-                                symbol: token.symbol,
-                                name: token.name,
-                                decimals: 18,
-                                verified: true,
-                                source: 'popular' as const,
-                            };
-                        }
-                    })
-                );
+                // Use hardcoded popular token data (no Alchemy calls needed)
+                const popularTokensFormatted = popularTokens.map((token) => ({
+                    address: token.address,
+                    symbol: token.symbol,
+                    name: token.name,
+                    decimals: 18, // Default decimals, can be enriched later
+                    verified: true,
+                    logoUrl: token.logoUrl,
+                    source: 'popular' as const,
+                }));
 
-                results.push(...popularTokensWithLogos);
+                results.push(...popularTokensFormatted);
 
                 log.debug(
                     { userId: user.userId, popularTokensCount: results.length },
@@ -125,29 +108,16 @@ export const GET = withAuthAndLogging<TokenSearchResponse | TokenSearchError>(
                     .find(token => token.address.toLowerCase() === query.toLowerCase());
 
                 if (popularToken) {
-                    try {
-                        // Fetch logo from Alchemy for popular token
-                        const alchemyToken = await alchemyTokenService.getTokenMetadata(chain, popularToken.address);
-                        results.push({
-                            address: popularToken.address,
-                            symbol: popularToken.symbol,
-                            name: popularToken.name,
-                            decimals: alchemyToken.decimals || 18,
-                            verified: true,
-                            logoUrl: alchemyToken.logo || undefined,
-                            source: 'popular',
-                        });
-                    } catch {
-                        // Fallback to basic token info if Alchemy fails
-                        results.push({
-                            address: popularToken.address,
-                            symbol: popularToken.symbol,
-                            name: popularToken.name,
-                            decimals: 18,
-                            verified: true,
-                            source: 'popular',
-                        });
-                    }
+                    // Use hardcoded popular token data (no Alchemy calls needed)
+                    results.push({
+                        address: popularToken.address,
+                        symbol: popularToken.symbol,
+                        name: popularToken.name,
+                        decimals: 18, // Default decimals, can be enriched later
+                        verified: true,
+                        logoUrl: popularToken.logoUrl,
+                        source: 'popular',
+                    });
                 }
 
                 // 2. Try database
@@ -219,29 +189,16 @@ export const GET = withAuthAndLogging<TokenSearchResponse | TokenSearchError>(
                 // 1. Check popular tokens first
                 const popularToken = findPopularToken(chain, query);
                 if (popularToken) {
-                    try {
-                        // Fetch logo from Alchemy for popular token
-                        const alchemyToken = await alchemyTokenService.getTokenMetadata(chain, popularToken.address);
-                        results.push({
-                            address: popularToken.address,
-                            symbol: popularToken.symbol,
-                            name: popularToken.name,
-                            decimals: alchemyToken.decimals || 18,
-                            verified: true,
-                            logoUrl: alchemyToken.logo || undefined,
-                            source: 'popular',
-                        });
-                    } catch {
-                        // Fallback to basic token info if Alchemy fails
-                        results.push({
-                            address: popularToken.address,
-                            symbol: popularToken.symbol,
-                            name: popularToken.name,
-                            decimals: 18,
-                            verified: true,
-                            source: 'popular',
-                        });
-                    }
+                    // Use hardcoded popular token data (no Alchemy calls needed)
+                    results.push({
+                        address: popularToken.address,
+                        symbol: popularToken.symbol,
+                        name: popularToken.name,
+                        decimals: 18, // Default decimals, can be enriched later
+                        verified: true,
+                        logoUrl: popularToken.logoUrl,
+                        source: 'popular',
+                    });
                 }
 
                 // 2. Search database
