@@ -9,13 +9,13 @@ import type { SupportedChainsType } from "@/config/chains";
 
 interface TokenSearchResponse {
     results: Array<{
-        address: string;
+        address?: string;
         symbol: string;
         name: string;
         decimals: number;
         verified: boolean;
         logoUrl?: string;
-        source: 'popular' | 'database' | 'alchemy' | 'onchain';
+        source: 'popular' | 'database' | 'alchemy' | 'onchain' | 'coingecko';
     }>;
     query: string;
     chain: string;
@@ -60,7 +60,7 @@ export const GET = withAuthAndLogging<TokenSearchResponse | TokenSearchError>(
             const servicesFactory = DefaultServiceFactory.getInstance();
 
             const { rpcClients } = clientsFactory.getClients();
-            const { tokenService, alchemyTokenService } = servicesFactory.getServices();
+            const { tokenService, alchemyTokenService, coinGeckoService } = servicesFactory.getServices();
 
             const onChainService = new OnChainTokenService(rpcClients);
 
@@ -265,11 +265,31 @@ export const GET = withAuthAndLogging<TokenSearchResponse | TokenSearchError>(
                 } catch (error) {
                     log.debug({ error }, 'Database token search failed');
                 }
+
+                // 3. Search CoinGecko for additional token matches
+                try {
+                    const coinGeckoTokens = await coinGeckoService.searchTokens(query, chain, Math.max(5, limit - results.length));
+
+                    results.push(...coinGeckoTokens.map(token => ({
+                        address: token.address, // Contract address for the specific chain
+                        symbol: token.symbol,
+                        name: token.name,
+                        decimals: 18, // Default to 18 decimals for CoinGecko tokens
+                        verified: token.verified,
+                        logoUrl: token.logoUrl,
+                        source: token.source,
+                    })));
+                } catch (error) {
+                    log.debug({ error }, 'CoinGecko token search failed');
+                }
             }
 
             // Remove duplicates by address (case-insensitive)
             const uniqueResults = results.filter((token, index, array) =>
-                array.findIndex(t => t.address.toLowerCase() === token.address.toLowerCase()) === index
+                array.findIndex(t =>
+                    t.address && token.address &&
+                    t.address.toLowerCase() === token.address.toLowerCase()
+                ) === index
             );
 
             log.debug(

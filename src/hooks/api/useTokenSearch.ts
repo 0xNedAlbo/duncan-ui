@@ -3,13 +3,13 @@ import { useDebounce } from "use-debounce";
 import type { SupportedChainsType } from "@/config/chains";
 
 export interface TokenSearchResult {
-    address: string;
+    address?: string;
     symbol: string;
     name: string;
     decimals: number;
     verified: boolean;
     logoUrl?: string;
-    source: 'popular' | 'database' | 'alchemy' | 'onchain';
+    source: 'popular' | 'database' | 'alchemy' | 'onchain' | 'coingecko';
 }
 
 export interface TokenSearchResponse {

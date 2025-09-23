@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Check, AlertCircle, Loader2 } from "lucide-react";
+import { Search, Check, AlertCircle, Loader2, Copy, ExternalLink } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import type { SupportedChainsType } from "@/config/chains";
 import type { TokenPair } from "./types";
 import { useTokenSearch, type TokenSearchResult } from "@/hooks/api/useTokenSearch";
 import { useTokenPairValidation } from "@/hooks/useTokenPairValidation";
 import { getPopularTokens } from "@/lib/config/popularTokens";
-import { isValidAddress } from "@/lib/utils/evm";
+import { truncateAddress, truncateText, getExplorerAddressUrl } from "@/lib/utils/evm";
 
 interface TokenSelection {
     token: TokenSearchResult | null;
@@ -20,6 +20,7 @@ interface TokenInputProps {
     type: 'base' | 'quote';
     selection: TokenSelection;
     query: string;
+    chain: SupportedChainsType;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     onQueryChange: (query: string) => void;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -36,6 +37,7 @@ function TokenInput({
     type: _type,
     selection,
     query,
+    chain,
     onQueryChange,
     onTokenSelect,
     searchHook,
@@ -85,7 +87,40 @@ function TokenInput({
                                 <Check className="w-4 h-4 text-green-400" />
                             )}
                         </div>
-                        <div className="text-xs text-slate-400">{selection.token.name}</div>
+                        <div className="flex items-center gap-2 text-xs">
+                            <span className="text-slate-400">{truncateText(selection.token.name, 16)}</span>
+                            {selection.token.address && (
+                                <>
+                                    <span className="text-slate-500 font-mono">{truncateAddress(selection.token.address)}</span>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (selection.token?.address) {
+                                                    navigator.clipboard.writeText(selection.token.address);
+                                                }
+                                            }}
+                                            className="text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                                            title="Copy address"
+                                        >
+                                            <Copy className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (selection.token?.address) {
+                                                    window.open(getExplorerAddressUrl(selection.token.address, chain), '_blank');
+                                                }
+                                            }}
+                                            className="text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                                            title="View on explorer"
+                                        >
+                                            <ExternalLink className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                     <button
                         onClick={onClearToken}
@@ -130,26 +165,52 @@ function TokenInput({
                         <button
                             key={token.address}
                             onClick={() => onTokenSelect(token)}
-                            className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors border-b border-slate-700 last:border-b-0"
+                            className="w-full px-4 py-2 text-left hover:bg-slate-700 transition-colors border-b border-slate-700 last:border-b-0"
                         >
                             <div className="flex items-center gap-3">
                                 {token.logoUrl && (
                                     <img
                                         src={token.logoUrl}
                                         alt={token.symbol}
-                                        className="w-8 h-8 rounded-full"
+                                        className="w-6 h-6 rounded-full flex-shrink-0"
                                     />
                                 )}
-                                <div className="flex-1">
+                                <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
                                         <span className="font-semibold text-white">{token.symbol}</span>
-                                        {token.verified && <Check className="w-4 h-4 text-green-400" />}
+                                        {token.verified && <Check className="w-3 h-3 text-green-400" />}
                                         <span className="text-xs text-slate-400">{token.source}</span>
                                     </div>
-                                    <div className="text-sm text-slate-300">{token.name}</div>
-                                    {isValidAddress(query) && (
-                                        <div className="text-xs text-slate-500 font-mono">{token.address}</div>
-                                    )}
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <span className="text-slate-300">{truncateText(token.name, 16)}</span>
+                                        {token.address && (
+                                            <>
+                                                <span className="text-slate-500 font-mono text-xs">{truncateAddress(token.address)}</span>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigator.clipboard.writeText(token.address!);
+                                                        }}
+                                                        className="text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                                                        title="Copy address"
+                                                    >
+                                                        <Copy className="w-3 h-3" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            window.open(getExplorerAddressUrl(token.address!, chain), '_blank');
+                                                        }}
+                                                        className="text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                                                        title="View on explorer"
+                                                    >
+                                                        <ExternalLink className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </button>
@@ -229,8 +290,11 @@ export function TokenPairStep({
         enabled: quoteSelection.isSearching,
     });
 
-    // Token pair validation
-    const validation = useTokenPairValidation(baseSelection.token, quoteSelection.token);
+    // Token pair validation - only validate if both tokens have addresses
+    const validation = useTokenPairValidation(
+        baseSelection.token?.address ? baseSelection.token as any : null,
+        quoteSelection.token?.address ? quoteSelection.token as any : null
+    );
 
     // Popular tokens
     const popularBaseTokens = getPopularTokens(chain, 'base');
@@ -313,15 +377,9 @@ export function TokenPairStep({
 
     return (
         <div className="space-y-6">
-            <div className="text-center">
-                <p className="text-slate-300 mb-4">
-                    {t("positionWizard.tokenPair.description")}
-                </p>
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-sm text-blue-400">
-                    {t("positionWizard.tokenPair.selectedChain")}:{" "}
-                    <span className="font-semibold capitalize">{chain}</span>
-                </div>
-            </div>
+            <p className="text-slate-300">
+                {t("positionWizard.tokenPair.description")}
+            </p>
 
             {/* Base/Quote Explanation */}
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
@@ -350,6 +408,7 @@ export function TokenPairStep({
                     type="base"
                     selection={baseSelection}
                     query={baseTokenSearch.query}
+                    chain={chain}
                     onQueryChange={handleBaseTokenSearch}
                     onTokenSelect={selectBaseToken}
                     searchHook={baseTokenSearch}
@@ -367,6 +426,7 @@ export function TokenPairStep({
                     type="quote"
                     selection={quoteSelection}
                     query={quoteTokenSearch.query}
+                    chain={chain}
                     onQueryChange={handleQuoteTokenSearch}
                     onTokenSelect={selectQuoteToken}
                     searchHook={quoteTokenSearch}
@@ -397,6 +457,13 @@ export function TokenPairStep({
                     </div>
                 </div>
             )}
+
+            {/* Bottom Note - matches chain selection step height */}
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+                <p className="text-slate-400 text-sm">
+                    {t("positionWizard.tokenPair.note")}
+                </p>
+            </div>
 
         </div>
     );

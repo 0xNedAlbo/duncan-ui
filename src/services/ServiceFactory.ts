@@ -1,4 +1,5 @@
 import { AlchemyTokenService } from "./alchemy/tokenMetadata";
+import { CoinGeckoService } from "./coingecko/coinGeckoService";
 import { EtherscanEventService } from "./etherscan/etherscanEventService";
 import { EtherscanBlockInfoService } from "./etherscan/etherscanBlockInfoService";
 import { EvmBlockInfoService } from "./evm/evmBlockInfoService";
@@ -18,6 +19,7 @@ import { DefaultClientsFactory } from "./ClientsFactory";
 
 export interface Services {
     alchemyTokenService: AlchemyTokenService;
+    coinGeckoService: CoinGeckoService;
     etherscanEventService: EtherscanEventService;
     etherscanBlockInfoService: EtherscanBlockInfoService;
     evmBlockInfoService: EvmBlockInfoService;
@@ -48,6 +50,7 @@ export class DefaultServiceFactory implements ServiceFactory {
         const { prisma, rpcClients, etherscanClient } = clients;
 
         const alchemyTokenService = new AlchemyTokenService();
+        const coinGeckoService = new CoinGeckoService();
         const etherscanEventService = new EtherscanEventService(
             { etherscanClient }
         );
@@ -100,6 +103,7 @@ export class DefaultServiceFactory implements ServiceFactory {
 
         this.services = {
             alchemyTokenService,
+            coinGeckoService,
             etherscanEventService,
             etherscanBlockInfoService,
             evmBlockInfoService,
