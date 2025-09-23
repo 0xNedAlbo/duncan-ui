@@ -105,5 +105,5 @@ export function getExplorerAddressUrl(address: string, chain: string): string {
     throw new Error(`Unsupported chain for explorer: ${chain}`);
   }
 
-  return `${baseUrl}/address/${normalized}`;
+  return `${baseUrl}/token/${normalized}`;
 }

@@ -19,7 +19,7 @@ export class CoinGeckoService {
   private readonly baseUrl = 'https://api.coingecko.com/api/v3';
   private tokensCache: CoinGeckoToken[] | null = null;
   private cacheExpiry: number = 0;
-  private readonly cacheTimeout = 5 * 60 * 1000; // 5 minutes
+  private readonly cacheTimeout = 60 * 60 * 1000; // 1 hour
 
   // Map our chain names to CoinGecko platform IDs
   private readonly chainToPlatformId: Record<string, string> = {
