@@ -37,8 +37,8 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUser | null
     const apiKey = authHeader.substring(7);
 
     try {
-      // Extract prefix for lookup (first 8 characters)
-      const prefix = apiKey.substring(0, 8);
+      // Extract prefix for lookup (first 16 characters to match unique prefixes)
+      const prefix = apiKey.substring(0, 16);
 
       // Find API key record by prefix and active status
       const apiKeyRecord = await prisma.apiKey.findFirst({

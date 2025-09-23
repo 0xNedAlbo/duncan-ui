@@ -40,8 +40,9 @@ export class ApiKeyService {
     scopes: string[] = []
   ): Promise<GeneratedKey> {
     const raw = base32(randomBytes(32));
-    const prefix = raw.slice(0, 8);
     const plaintext = `ak_live_${raw}`;
+    // Use longer prefix to ensure uniqueness - include some random chars
+    const prefix = plaintext.substring(0, 16);
 
     const hashed = await hash(plaintext, {
       memoryCost: 19456,
@@ -75,8 +76,8 @@ export class ApiKeyService {
       return { isValid: false };
     }
 
-    const raw = plaintext.replace("ak_live_", "");
-    const prefix = raw.slice(0, 8);
+    // Use longer prefix to match the creation logic
+    const prefix = plaintext.substring(0, 16);
 
     const apiKey = await this.prisma.apiKey.findFirst({
       where: {
