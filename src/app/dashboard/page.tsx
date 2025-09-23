@@ -15,8 +15,9 @@ function DashboardContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    // Check if import modal should be open based on URL parameter
+    // Check if modals should be open based on URL parameters
     const showImportModal = searchParams.get('import') === 'wallet';
+    const showWizardModal = searchParams.get('wizard') === 'true';
 
     // Handle successful position import
     const handleImportSuccess = (/* _position: any */) => {
@@ -34,6 +35,20 @@ function DashboardContent() {
     const handleImportModalOpen = () => {
         const params = new URLSearchParams(searchParams);
         params.set('import', 'wallet');
+        router.push(`?${params.toString()}`);
+    };
+
+    // Handle wizard modal state changes and URL updates
+    const handleWizardModalClose = () => {
+        const params = new URLSearchParams(searchParams);
+        params.delete('wizard');
+        const newUrl = params.toString() ? `?${params.toString()}` : '/dashboard';
+        router.push(newUrl);
+    };
+
+    const handleWizardModalOpen = () => {
+        const params = new URLSearchParams(searchParams);
+        params.set('wizard', 'true');
         router.push(`?${params.toString()}`);
     };
 
@@ -72,6 +87,9 @@ function DashboardContent() {
                             showImportModal={showImportModal}
                             onImportModalOpen={handleImportModalOpen}
                             onImportModalClose={handleImportModalClose}
+                            showWizardModal={showWizardModal}
+                            onWizardModalOpen={handleWizardModalOpen}
+                            onWizardModalClose={handleWizardModalClose}
                         />
                     </div>
 

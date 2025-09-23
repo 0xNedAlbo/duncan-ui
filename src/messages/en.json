@@ -6,7 +6,9 @@
     "done": "Done",
     "save": "Save",
     "copied": "Copied!",
-    "comingSoon": "Coming Soon"
+    "comingSoon": "Coming Soon",
+    "back": "Back",
+    "next": "Next"
   },
   "header": {
     "title": "DUNCAN",
@@ -91,9 +93,9 @@
     },
     "addPosition": {
       "button": "Add Position",
-      "manual": {
-        "title": "Configure Manually",
-        "description": "Select chain and tokens"
+      "wizard": {
+        "title": "Create New Position",
+        "description": "Step-by-step guidance"
       },
       "wallet": {
         "title": "Import from Wallet",
@@ -403,6 +405,135 @@
       "title": "Ready to optimize your DeFi strategy?",
       "description": "Join DUNCAN and take control of your Uniswap V3 liquidity positions.",
       "createAccount": "Create Account"
+    }
+  },
+  "positionWizard": {
+    "title": "Position Wizard",
+    "createPosition": "Create Position",
+    "stepIndicator": "Step {current} of {total}",
+    "steps": {
+      "openPosition": {
+        "title": "Open New Position"
+      },
+      "chainSelection": {
+        "title": "Select Blockchain"
+      },
+      "tokenPair": {
+        "title": "Choose Token Pair"
+      },
+      "poolSelection": {
+        "title": "Select Pool"
+      },
+      "positionConfig": {
+        "title": "Configure Position"
+      }
+    },
+    "openPosition": {
+      "title": "Start Your New Uniswap V3 Position",
+      "subtitle": "Our wizard guides you through every step of position creation with comprehensive risk analysis and interactive visualizations.",
+      "features": {
+        "planning": {
+          "title": "Smart Planning",
+          "description": "Step-by-step guidance for optimal position parameters"
+        },
+        "visualization": {
+          "title": "PnL Visualization",
+          "description": "Interactive curves with heatmap overlays and zoom functionality"
+        },
+        "risk": {
+          "title": "Risk Analysis",
+          "description": "Understand your position's three-phase risk structure"
+        }
+      },
+      "process": {
+        "title": "How it works",
+        "step1": "Choose chain",
+        "step2": "Token pair",
+        "step3": "Select pool",
+        "step4": "Configure"
+      },
+      "warning": {
+        "title": "Risk Notice",
+        "message": "Uniswap V3 positions carry risks including impermanent loss. Understand the risks before proceeding."
+      },
+      "getStarted": "Get Started"
+    },
+    "chainSelection": {
+      "description": "Choose the blockchain where you want to create your position.",
+      "ethereum": {
+        "description": "Main network with highest liquidity"
+      },
+      "arbitrum": {
+        "description": "Layer-2 with lower fees"
+      },
+      "base": {
+        "description": "Coinbase Layer-2 for cheaper transactions"
+      },
+      "note": "You can create additional positions on other chains later."
+    },
+    "tokenPair": {
+      "description": "Select the token pair for your position.",
+      "selectedChain": "Selected Chain",
+      "explanation": {
+        "title": "Base/Quote Token Explanation",
+        "baseToken": "Base Token",
+        "baseDescription": "The asset whose price movement we track (usually more volatile)",
+        "quoteToken": "Quote Token",
+        "quoteDescription": "The asset in which prices are expressed (reference value)"
+      },
+      "baseToken": "Base Token",
+      "quoteToken": "Quote Token",
+      "searchPlaceholder": "Search for token...",
+      "popular": "Popular tokens",
+      "selectedPair": "Selected pair",
+      "validPair": "Valid token pair",
+      "pairSelected": "selected",
+      "validationError": "Token validation failed",
+      "implementationNote": "Token search and validation to be implemented."
+    },
+    "poolSelection": {
+      "description": "Select the pool with your desired fee tier.",
+      "selectedPair": "Selected pair",
+      "feeTitle": "{fee} Pool",
+      "recommended": "Recommended",
+      "liquidity": "Liquidity",
+      "volume24h": "24h Volume",
+      "tvl": "TVL",
+      "feeExplanation": {
+        "title": "Fee Tier Explanation",
+        "low": "For stable pairs with low volatility",
+        "medium": "Standard fee for most pairs",
+        "high": "For volatile or exotic pairs"
+      },
+      "implementationNote": "Pool discovery and metrics to be implemented."
+    },
+    "positionConfig": {
+      "description": "Configure your position parameters and analyze the risk profile.",
+      "selectedPool": "Selected pool",
+      "priceRange": "Price Range",
+      "lowerPrice": "Lower Price",
+      "upperPrice": "Upper Price",
+      "currentPrice": "Current Price",
+      "liquidityAmount": "Liquidity Amount",
+      "positionSummary": "Position Summary",
+      "summary": {
+        "baseToken": "Base Token",
+        "quoteToken": "Quote Token",
+        "expectedFees": "Expected Fees",
+        "priceRange": "Price Range"
+      },
+      "pnlPreview": "PnL Preview",
+      "pnlPlaceholder": "Interactive PnL curve with heatmap",
+      "enhancedCurveNote": "Zoom, scroll and heatmap features coming",
+      "metrics": {
+        "maxLoss": "Max Loss",
+        "expectedAPR": "Expected APR"
+      },
+      "riskWarning": {
+        "title": "Risk Assessment",
+        "message": "This position has a moderate risk classification. Review the PnL curve for detailed risk scenarios."
+      },
+      "implementationNote": "Enhanced PnL curve with heatmap and interactive features to be implemented."
     }
   }
 }

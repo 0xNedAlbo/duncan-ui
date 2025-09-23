@@ -8,6 +8,7 @@ import { handleApiError } from "@/lib/app/apiError";
 import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/types/api";
 import { ImportWalletModal } from "@/components/positions/import-wallet-modal";
+import { PositionWizard } from "@/components/positions/wizard/PositionWizard";
 import type { BasicPosition } from "@/services/positions/positionService";
 
 interface CreatePositionDropdownProps {
@@ -16,6 +17,9 @@ interface CreatePositionDropdownProps {
     showImportModal?: boolean;
     onImportModalOpen?: () => void;
     onImportModalClose?: () => void;
+    showWizardModal?: boolean;
+    onWizardModalOpen?: () => void;
+    onWizardModalClose?: () => void;
 }
 
 export function CreatePositionDropdown({
@@ -23,6 +27,9 @@ export function CreatePositionDropdown({
     showImportModal = false,
     onImportModalOpen,
     onImportModalClose,
+    showWizardModal = false,
+    onWizardModalOpen,
+    onWizardModalClose,
 }: CreatePositionDropdownProps = {}) {
     const t = useTranslations();
     const queryClient = useQueryClient();
@@ -115,18 +122,16 @@ export function CreatePositionDropdown({
                         <button
                             onClick={() => {
                                 setIsDropdownOpen(false);
-                                // TODO: Open manual config modal
+                                onWizardModalOpen?.();
                             }}
                             className="w-full px-4 py-3 text-sm text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors"
                         >
                             <div className="text-left">
                                 <div className="font-medium">
-                                    {t("dashboard.addPosition.manual.title")}
+                                    {t("dashboard.addPosition.wizard.title")}
                                 </div>
                                 <div className="text-xs text-slate-400">
-                                    {t(
-                                        "dashboard.addPosition.manual.description"
-                                    )}
+                                    {t("dashboard.addPosition.wizard.description")}
                                 </div>
                             </div>
                         </button>
@@ -267,6 +272,20 @@ export function CreatePositionDropdown({
                     </div>
                 </div>
             )}
+
+            {/* Position Creation Wizard */}
+            <PositionWizard
+                isOpen={showWizardModal}
+                onClose={onWizardModalClose || (() => {})}
+                onPositionCreated={(position) => {
+                    // Invalidate positions list to refresh the data
+                    queryClient.invalidateQueries({
+                        queryKey: QUERY_KEYS.positions,
+                    });
+                    // Notify parent
+                    onImportSuccess?.(position);
+                }}
+            />
 
             {/* Import Wallet Modal */}
             <ImportWalletModal
