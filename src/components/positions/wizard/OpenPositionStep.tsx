@@ -1,34 +1,38 @@
 "use client";
 
-import { Target, TrendingUp, Shield, ArrowRight } from "lucide-react";
+import { Target, TrendingUp, Shield } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 
-interface OpenPositionStepProps {
-    onNext: () => void;
-}
-
-export function OpenPositionStep({ onNext }: OpenPositionStepProps) {
+export function OpenPositionStep() {
     const t = useTranslations();
 
     const features = [
         {
             icon: Target,
             title: t("positionWizard.openPosition.features.planning.title"),
-            description: t("positionWizard.openPosition.features.planning.description"),
+            description: t(
+                "positionWizard.openPosition.features.planning.description"
+            ),
             color: "text-blue-400",
             bgColor: "bg-blue-500/10",
         },
         {
             icon: TrendingUp,
-            title: t("positionWizard.openPosition.features.visualization.title"),
-            description: t("positionWizard.openPosition.features.visualization.description"),
+            title: t(
+                "positionWizard.openPosition.features.visualization.title"
+            ),
+            description: t(
+                "positionWizard.openPosition.features.visualization.description"
+            ),
             color: "text-green-400",
             bgColor: "bg-green-500/10",
         },
         {
             icon: Shield,
             title: t("positionWizard.openPosition.features.risk.title"),
-            description: t("positionWizard.openPosition.features.risk.description"),
+            description: t(
+                "positionWizard.openPosition.features.risk.description"
+            ),
             color: "text-amber-400",
             bgColor: "bg-amber-500/10",
         },
@@ -118,17 +122,6 @@ export function OpenPositionStep({ onNext }: OpenPositionStepProps) {
                         </div>
                     );
                 })}
-            </div>
-
-            {/* Get Started Button */}
-            <div className="flex justify-center pt-4">
-                <button
-                    onClick={onNext}
-                    className="flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105"
-                >
-                    {t("positionWizard.openPosition.getStarted")}
-                    <ArrowRight className="w-5 h-5" />
-                </button>
             </div>
         </div>
     );

@@ -40,16 +40,13 @@ function DashboardContent() {
 
     // Handle wizard modal state changes and URL updates
     const handleWizardModalClose = () => {
-        const params = new URLSearchParams(searchParams);
-        params.delete('wizard');
-        const newUrl = params.toString() ? `?${params.toString()}` : '/dashboard';
-        router.push(newUrl);
+        // Clear ALL wizard-related parameters
+        router.push('/dashboard');
     };
 
     const handleWizardModalOpen = () => {
-        const params = new URLSearchParams(searchParams);
-        params.set('wizard', 'true');
-        router.push(`?${params.toString()}`);
+        // Start fresh with just the wizard parameter
+        router.push('?wizard=true');
     };
 
     return (

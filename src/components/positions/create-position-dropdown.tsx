@@ -61,14 +61,17 @@ export function CreatePositionDropdown({
     const importNFT = useImportPositionByNftId({
         onSuccess: (response) => {
             if (response.data?.position) {
-                const importedPosition = response.data.position as unknown as BasicPosition;
+                const importedPosition = response.data
+                    .position as unknown as BasicPosition;
 
                 // Invalidate positions list to refresh the data
                 queryClient.invalidateQueries({
                     queryKey: QUERY_KEYS.positions,
                 });
 
-                console.log(`✓ Imported position: ${importedPosition.pool.chain}/${importedPosition.nftId}`);
+                console.log(
+                    `✓ Imported position: ${importedPosition.pool.chain}/${importedPosition.nftId}`
+                );
 
                 // Create simple display data for success message
                 const displayData = {
@@ -131,7 +134,9 @@ export function CreatePositionDropdown({
                                     {t("dashboard.addPosition.wizard.title")}
                                 </div>
                                 <div className="text-xs text-slate-400">
-                                    {t("dashboard.addPosition.wizard.description")}
+                                    {t(
+                                        "dashboard.addPosition.wizard.description"
+                                    )}
                                 </div>
                             </div>
                         </button>
@@ -276,7 +281,7 @@ export function CreatePositionDropdown({
             {/* Position Creation Wizard */}
             <PositionWizard
                 isOpen={showWizardModal}
-                onClose={onWizardModalClose || (() => {})}
+                onClose={onWizardModalClose}
                 onPositionCreated={(position) => {
                     // Invalidate positions list to refresh the data
                     queryClient.invalidateQueries({
