@@ -494,7 +494,13 @@ apiClient.addResponseInterceptor((response, url, options) => {
                 response.status
             })`,
             {
-                headers: Object.fromEntries(response.headers.entries()),
+                headers: (() => {
+                    const headerObj: Record<string, string> = {};
+                    response.headers.forEach((value, key) => {
+                        headerObj[key] = value;
+                    });
+                    return headerObj;
+                })(),
             }
         );
     }

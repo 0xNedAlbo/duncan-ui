@@ -520,6 +520,7 @@
       "liquidity": "Liquidität",
       "volume24h": "24h Volumen",
       "tvl": "TVL",
+      "fees24h": "24h Gebühren",
       "loading": "Entdecke verfügbare Pools...",
       "error": "Fehler beim Entdecken der Pools",
       "genericError": "Ein Fehler ist beim Entdecken der Pools aufgetreten",

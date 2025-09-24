@@ -10,7 +10,10 @@ import type { AuthUser } from "@/lib/auth/getAuthUser";
 
 export function beginRequestLog(req: Request, authUser?: AuthUser) {
   const url = new URL(req.url);
-  const headers = Object.fromEntries(req.headers.entries());
+  const headers: Record<string, string> = {};
+  req.headers.forEach((value, key) => {
+    headers[key] = value;
+  });
   const reqId = headers["x-request-id"] ?? uuidv4();
   const start = Date.now();
 

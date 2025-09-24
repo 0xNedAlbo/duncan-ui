@@ -501,6 +501,7 @@
       "liquidity": "Liquidity",
       "volume24h": "24h Volume",
       "tvl": "TVL",
+      "fees24h": "24h Fees",
       "loading": "Discovering available pools...",
       "error": "Failed to discover pools",
       "genericError": "An error occurred while discovering pools",

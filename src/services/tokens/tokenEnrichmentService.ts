@@ -179,7 +179,7 @@ export class TokenEnrichmentService {
                         decimals: onChainMetadata.decimals,
                         logoUrl: enrichmentData?.logoUrl ?? undefined,
                         marketCap: enrichmentData?.marketCap,
-                        coinGeckoId,
+                        coinGeckoId: coinGeckoId ?? undefined,
                     },
                 };
             }

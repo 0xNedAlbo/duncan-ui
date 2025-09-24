@@ -42,6 +42,13 @@ export class ApiServiceFactory {
         return this.serviceInstances.alchemyTokenService;
     }
 
+    public get coinGeckoService(): CoinGeckoService {
+        if (!this.serviceInstances.coinGeckoService) {
+            this.serviceInstances.coinGeckoService = new CoinGeckoService();
+        }
+        return this.serviceInstances.coinGeckoService;
+    }
+
     public get etherscanEventService(): EtherscanEventService {
         if (!this.serviceInstances.etherscanEventService) {
             const { etherscanClient } = this.clients;
@@ -95,10 +102,10 @@ export class ApiServiceFactory {
 
     public get tokenService(): TokenService {
         if (!this.serviceInstances.tokenService) {
-            const { prisma } = this.clients;
+            const { prisma, rpcClients } = this.clients;
             this.serviceInstances.tokenService = new TokenService(
-                { prisma },
-                { alchemyTokenService: this.alchemyTokenService }
+                { prisma, rpcClients },
+                { alchemyTokenService: this.alchemyTokenService, coinGeckoService: this.coinGeckoService }
             );
         }
         return this.serviceInstances.tokenService;
@@ -212,7 +219,7 @@ export class ApiServiceFactory {
     public getServices(): Services {
         return {
             alchemyTokenService: this.alchemyTokenService,
-            coinGeckoService: new CoinGeckoService(),
+            coinGeckoService: this.coinGeckoService,
             etherscanEventService: this.etherscanEventService,
             etherscanBlockInfoService: this.etherscanBlockInfoService,
             evmBlockInfoService: this.evmBlockInfoService,
