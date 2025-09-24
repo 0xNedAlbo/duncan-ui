@@ -1,23 +1,17 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X, ArrowLeft, ArrowRight } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
-import type { WizardState, TokenPair, PoolOption, PositionConfig } from "./types";
-import type { SupportedChainsType } from "@/config/chains";
-import { normalizeAddress, isValidAddress } from "@/lib/utils/evm";
-import { TOTAL_STEPS } from "./types";
-import { searchTokens } from "@/hooks/api/useTokenSearch";
+
 import { OpenPositionStep } from "./OpenPositionStep";
 import { ChainSelectionStep } from "./ChainSelectionStep";
 import { TokenPairStep } from "./TokenPairStep";
-import { PoolSelectionStep } from "./PoolSelectionStep";
-import { PositionConfigStep } from "./PositionConfigStep";
 
 interface PositionWizardProps {
     isOpen: boolean;
-    onClose: () => void;
+    onClose?: () => void;
     // eslint-disable-next-line no-unused-vars
     onPositionCreated?: (position: any) => void;
 }
@@ -27,222 +21,57 @@ export function PositionWizard({
     onClose,
     onPositionCreated,
 }: PositionWizardProps) {
+    const TOTAL_STEPS = 6;
     const t = useTranslations();
     const router = useRouter();
+    const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    const [wizardState, setWizardState] = useState<WizardState>({
-        currentStep: 0,
-        selectedChain: null,
-        selectedTokenPair: null,
-        selectedPool: null,
-        positionConfig: null,
-    });
+    const [currentStep, setCurrentStep] = useState<number>(0);
+    const [isChainSelected, setChainSelected] = useState<boolean>(false);
+    const [isTokenPairSelected, setTokenPairSelected] =
+        useState<boolean>(false);
+    const [isPoolSelected, setPoolSelected] = useState<boolean>(false);
+    const [isPoisitionConfigured, setPositionConfigured] =
+        useState<boolean>(false);
+    const [isPositionCreated, setPositionCreated] = useState<boolean>(false);
 
-    // Helper function to fetch token metadata from address
-    const fetchTokenMetadata = async (chain: SupportedChainsType, address: string) => {
-        try {
-            const results = await searchTokens(chain, address);
-            return results.length > 0 ? results[0] : null;
-        } catch (error) {
-            console.warn(`Failed to fetch token metadata for ${address}:`, error);
-            return null;
-        }
-    };
-
-    // Read state from URL parameters
-    useEffect(() => {
-        if (!isOpen) return;
-
-        const loadStateFromUrl = async () => {
-            const chain = searchParams.get('chain') as SupportedChainsType | null;
-            const step = parseInt(searchParams.get('step') || '0');
-
-            // Parse token pair if present
-            let tokenPair: TokenPair | null = null;
-            const baseToken = searchParams.get('baseToken');
-            const quoteToken = searchParams.get('quoteToken');
-
-            if (baseToken && quoteToken && chain && isValidAddress(baseToken) && isValidAddress(quoteToken)) {
-                // Normalize the addresses from URL params
-                const normalizedBaseAddress = normalizeAddress(baseToken);
-                const normalizedQuoteAddress = normalizeAddress(quoteToken);
-
-                // Fetch token metadata for both tokens
-                const [baseTokenData, quoteTokenData] = await Promise.all([
-                    fetchTokenMetadata(chain, normalizedBaseAddress),
-                    fetchTokenMetadata(chain, normalizedQuoteAddress)
-                ]);
-
-                // Create token pair with full metadata including logos
-                tokenPair = {
-                    baseToken: {
-                        address: normalizedBaseAddress,
-                        symbol: baseTokenData?.symbol || normalizedBaseAddress.substring(0, 6) + '...',
-                        name: baseTokenData?.name || 'Unknown Token',
-                        decimals: baseTokenData?.decimals || 18,
-                        logoUrl: baseTokenData?.logoUrl
-                    } as any,
-                    quoteToken: {
-                        address: normalizedQuoteAddress,
-                        symbol: quoteTokenData?.symbol || normalizedQuoteAddress.substring(0, 6) + '...',
-                        name: quoteTokenData?.name || 'Unknown Token',
-                        decimals: quoteTokenData?.decimals || 18,
-                        logoUrl: quoteTokenData?.logoUrl
-                    } as any,
-                    isValidPair: true,
-                };
-            }
-
-            // Parse pool if present
-            let pool: PoolOption | null = null;
-            const fee = searchParams.get('fee');
-            if (fee && tokenPair) {
-                // TODO: Create proper PoolOption object when pools are implemented
-                pool = {
-                    pool: {} as any,
-                    fee: parseInt(fee),
-                    feePercentage: `${parseInt(fee) / 10000}%`,
-                    tickSpacing: parseInt(fee) === 500 ? 10 : parseInt(fee) === 3000 ? 60 : 200,
-                    liquidity: BigInt(0),
-                };
-            }
-
-            // Parse position config if present
-            let positionConfig: PositionConfig | null = null;
-            const lowerPrice = searchParams.get('lowerPrice');
-            const upperPrice = searchParams.get('upperPrice');
-            const liquidityAmount = searchParams.get('liquidityAmount');
-            if (lowerPrice && upperPrice && liquidityAmount) {
-                positionConfig = {
-                    lowerPrice: BigInt(Math.floor(parseFloat(lowerPrice) * 1e6)),
-                    upperPrice: BigInt(Math.floor(parseFloat(upperPrice) * 1e6)),
-                    liquidityAmount: BigInt(Math.floor(parseFloat(liquidityAmount) * 1e18)),
-                    baseTokenAmount: BigInt(0),
-                    quoteTokenAmount: BigInt(0),
-                    expectedFees: BigInt(0),
-                };
-            }
-
-            // Determine the maximum allowed step based on available data
-            let maxAllowedStep = 0;
-            if (chain) maxAllowedStep = Math.max(maxAllowedStep, 1);
-            if (tokenPair) maxAllowedStep = Math.max(maxAllowedStep, 2);
-            if (pool) maxAllowedStep = Math.max(maxAllowedStep, 3);
-            if (positionConfig) maxAllowedStep = Math.max(maxAllowedStep, 4);
-
-            // Only override the step from URL if it's significantly ahead of available data
-            // Allow users to be one step ahead to make selections
-            const finalStep = step <= maxAllowedStep + 1 ? step : maxAllowedStep;
-
-            setWizardState({
-                currentStep: finalStep,
-                selectedChain: chain,
-                selectedTokenPair: tokenPair,
-                selectedPool: pool,
-                positionConfig: positionConfig,
-            });
-        };
-
-        // Execute the async URL loading
-        loadStateFromUrl();
-    }, [isOpen, searchParams]);
-
-    // Update URL when state changes
-    const updateWizardState = useCallback(
-        (updates: Partial<WizardState>) => {
-            const newState = { ...wizardState, ...updates };
-            setWizardState(newState);
-
-            // Build new URL parameters
-            const params = new URLSearchParams(searchParams);
-            params.set('wizard', 'true');
-            params.set('step', newState.currentStep.toString());
-
-            if (newState.selectedChain) {
-                params.set('chain', newState.selectedChain);
-            } else {
-                params.delete('chain');
-            }
-
-            if (newState.selectedTokenPair) {
-                params.set('baseToken', normalizeAddress(newState.selectedTokenPair.baseToken.address));
-                params.set('quoteToken', normalizeAddress(newState.selectedTokenPair.quoteToken.address));
-            } else {
-                params.delete('baseToken');
-                params.delete('quoteToken');
-            }
-
-            if (newState.selectedPool) {
-                params.set('fee', newState.selectedPool.fee.toString());
-            } else {
-                params.delete('fee');
-            }
-
-            if (newState.positionConfig) {
-                params.set('lowerPrice', (Number(newState.positionConfig.lowerPrice) / 1e6).toString());
-                params.set('upperPrice', (Number(newState.positionConfig.upperPrice) / 1e6).toString());
-                params.set('liquidityAmount', (Number(newState.positionConfig.liquidityAmount) / 1e18).toString());
-            } else {
-                params.delete('lowerPrice');
-                params.delete('upperPrice');
-                params.delete('liquidityAmount');
-            }
-
-            router.push(`?${params.toString()}`);
-        },
-        [wizardState, searchParams, router]
-    );
-
-    const goToStep = useCallback((step: number) => {
-        updateWizardState({
-            currentStep: Math.max(0, Math.min(step, TOTAL_STEPS - 1)),
-        });
-    }, [updateWizardState]);
-
-    const goNext = useCallback(() => {
-        goToStep(wizardState.currentStep + 1);
-    }, [goToStep, wizardState.currentStep]);
-
-    const goBack = useCallback(() => {
-        goToStep(wizardState.currentStep - 1);
-    }, [goToStep, wizardState.currentStep]);
-
-    // Handle closing wizard and cleaning up URL
+    // Handle closing wizard - let parent handle URL clearing if available
     const handleClose = useCallback(() => {
-        const params = new URLSearchParams(searchParams);
-        // Remove all wizard-related parameters
-        params.delete('wizard');
-        params.delete('step');
-        params.delete('chain');
-        params.delete('baseToken');
-        params.delete('quoteToken');
-        params.delete('fee');
-        params.delete('lowerPrice');
-        params.delete('upperPrice');
-        params.delete('liquidityAmount');
+        onClose?.();
+    }, [onClose]);
 
-        const newUrl = params.toString() ? `?${params.toString()}` : '/dashboard';
-        router.push(newUrl);
-        onClose();
-    }, [searchParams, router, onClose]);
+    useEffect(() => {
+        const step = searchParams.get("step");
+        if (step) setCurrentStep(parseInt(step));
+    }, [searchParams]);
 
     const canGoNext = useCallback(() => {
-        switch (wizardState.currentStep) {
-            case 0: // Open Position
-                return true;
-            case 1: // Chain Selection
-                return wizardState.selectedChain !== null;
-            case 2: // Token Pair
-                return wizardState.selectedTokenPair !== null;
-            case 3: // Pool Selection
-                return wizardState.selectedPool !== null;
-            case 4: // Position Config
-                return wizardState.positionConfig !== null;
-            default:
-                return false;
+        if (currentStep >= 5) {
+            if (isPositionCreated) return false;
         }
-    }, [wizardState]);
+        if (currentStep >= 4) {
+            if (isPoisitionConfigured) return false;
+            return false;
+        }
+        if (currentStep >= 3) {
+            if (!isPoolSelected) return false;
+        }
+        if (currentStep >= 2) {
+            if (!isTokenPairSelected) return false;
+        }
+        if (currentStep >= 1) {
+            if (!isChainSelected) return false;
+        }
+        return true;
+    }, [
+        currentStep,
+        isChainSelected,
+        isPoisitionConfigured,
+        isPoolSelected,
+        isPositionCreated,
+        isTokenPairSelected,
+    ]);
 
     const getStepTitle = (step: number): string => {
         switch (step) {
@@ -255,43 +84,23 @@ export function PositionWizard({
             case 3:
                 return t("positionWizard.steps.poolSelection.title");
             case 4:
-                return t("positionWizard.steps.positionConfig.title");
+                return "Configure your position parameters and analyze the risk profile.";
+            case 5:
+                return "Position Summary";
             default:
                 return "";
         }
     };
 
     const renderCurrentStep = () => {
-        switch (wizardState.currentStep) {
+        switch (currentStep) {
             case 0:
-                return (
-                    <OpenPositionStep
-                        onNext={goNext}
-                    />
-                );
+                return <OpenPositionStep />;
             case 1:
-                return (
-                    <ChainSelectionStep
-                        selectedChain={wizardState.selectedChain}
-                        onChainSelect={(chain) =>
-                            updateWizardState({ selectedChain: chain })
-                        }
-                        onNext={goNext}
-                        onBack={goBack}
-                    />
-                );
+                return <ChainSelectionStep onChainSelect={setChainSelected} />;
             case 2:
-                return (
-                    <TokenPairStep
-                        chain={wizardState.selectedChain!}
-                        selectedPair={wizardState.selectedTokenPair}
-                        onPairSelect={(pair) =>
-                            updateWizardState({ selectedTokenPair: pair })
-                        }
-                        onNext={goNext}
-                        onBack={goBack}
-                    />
-                );
+                return <TokenPairStep onTokenPairSelect={setTokenPairSelected} />;
+            /*
             case 3:
                 return (
                     <PoolSelectionStep
@@ -310,21 +119,49 @@ export function PositionWizard({
                     <PositionConfigStep
                         pool={wizardState.selectedPool!.pool}
                         config={wizardState.positionConfig}
-                        onConfigChange={(config) =>
-                            updateWizardState({ positionConfig: config })
-                        }
+                        onConfigChange={handleConfigChange}
                         onCreatePosition={() => {
                             // TODO: Implement position creation
                             onPositionCreated?.(wizardState);
-                            onClose();
+                            handleClose();
                         }}
                         onBack={goBack}
                     />
                 );
+            case 5:
+                return (
+                    <PositionSummaryStep
+                        chain={wizardState.selectedChain!}
+                        tokenPair={wizardState.selectedTokenPair!}
+                        selectedPool={wizardState.selectedPool!}
+                        config={wizardState.positionConfig!}
+                        onCreatePosition={() => {
+                            // TODO: Implement position creation
+                            onPositionCreated?.(wizardState);
+                            handleClose();
+                        }}
+                        onBack={goBack}
+                    />
+                );*/
             default:
                 return null;
         }
     };
+
+    function goNext() {
+        if (currentStep == TOTAL_STEPS - 1) return;
+        //setCurrentStep(currentStep + 1);
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("step", Number(currentStep + 1).toString());
+        router.push(pathname + "?" + params.toString());
+    }
+
+    function goBack() {
+        if (currentStep == 0) return;
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("step", Number(currentStep - 1).toString());
+        router.push(pathname + "?" + params.toString());
+    }
 
     if (!isOpen) return null;
 
@@ -348,7 +185,7 @@ export function PositionWizard({
                                 <div
                                     key={i}
                                     className={`w-2 h-2 rounded-full transition-colors ${
-                                        i <= wizardState.currentStep
+                                        i <= currentStep
                                             ? "bg-blue-500"
                                             : "bg-slate-600"
                                     }`}
@@ -368,7 +205,7 @@ export function PositionWizard({
                 {/* Step Title */}
                 <div className="px-6 py-4 border-b border-slate-700/30">
                     <h3 className="text-lg font-semibold text-white">
-                        {getStepTitle(wizardState.currentStep)}
+                        {getStepTitle(currentStep)}
                     </h3>
                 </div>
 
@@ -381,13 +218,13 @@ export function PositionWizard({
                 <div className="flex items-center justify-between p-6 border-t border-slate-700/50">
                     <div className="text-sm text-slate-400">
                         {t("positionWizard.stepIndicator", {
-                            current: wizardState.currentStep + 1,
+                            current: currentStep + 1,
                             total: TOTAL_STEPS,
                         })}
                     </div>
 
                     <div className="flex items-center gap-3">
-                        {wizardState.currentStep > 0 && (
+                        {currentStep > 0 && (
                             <button
                                 onClick={goBack}
                                 className="flex items-center gap-2 px-4 py-2 text-slate-300 hover:text-white transition-colors"
@@ -397,7 +234,7 @@ export function PositionWizard({
                             </button>
                         )}
 
-                        {wizardState.currentStep < TOTAL_STEPS - 1 && (
+                        {currentStep < TOTAL_STEPS - 1 && (
                             <button
                                 onClick={goNext}
                                 disabled={!canGoNext()}
@@ -408,10 +245,10 @@ export function PositionWizard({
                             </button>
                         )}
 
-                        {wizardState.currentStep === TOTAL_STEPS - 1 && (
+                        {currentStep === TOTAL_STEPS - 1 && (
                             <button
                                 onClick={() => {
-                                    onPositionCreated?.(wizardState);
+                                    onPositionCreated?.(null); // TODO: Pass actual wizard state
                                     handleClose();
                                 }}
                                 disabled={!canGoNext()}

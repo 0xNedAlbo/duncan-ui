@@ -1,14 +1,31 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Check, AlertCircle, Loader2, Copy, ExternalLink } from "lucide-react";
+import { Search, Check, AlertCircle, Loader2, Copy, ExternalLink, ArrowLeft } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import type { SupportedChainsType } from "@/config/chains";
-import type { TokenPair } from "./types";
+import { isValidChainSlug } from "@/config/chains";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTokenSearch, type TokenSearchResult } from "@/hooks/api/useTokenSearch";
 import { useTokenPairValidation } from "@/hooks/useTokenPairValidation";
 import { getPopularTokens } from "@/lib/config/popularTokens";
 import { truncateAddress, truncateText, getExplorerAddressUrl } from "@/lib/utils/evm";
+
+interface TokenPair {
+    baseToken: {
+        address: string;
+        symbol: string;
+        name: string;
+        decimals: number;
+    };
+    quoteToken: {
+        address: string;
+        symbol: string;
+        name: string;
+        decimals: number;
+    };
+    isValidPair: boolean;
+}
 
 interface TokenSelection {
     token: TokenSearchResult | null;
@@ -230,66 +247,75 @@ function TokenInput({
 }
 
 interface TokenPairStepProps {
-    chain: SupportedChainsType;
-    selectedPair: TokenPair | null;
-    onPairSelect: (pair: TokenPair) => void;
-    onNext: () => void;
-    onBack: () => void;
+    // eslint-disable-next-line no-unused-vars
+    onTokenPairSelect?: (isTokenPairSelected: boolean) => void;
 }
 
-export function TokenPairStep({
-    chain,
-    selectedPair,
-    onPairSelect,
-    // onNext,
-    // onBack,
-}: TokenPairStepProps) {
+export function TokenPairStep(props: TokenPairStepProps) {
     const t = useTranslations();
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+
+    // Get chain from URL and validate
+    const chainParam = searchParams.get("chain") || "";
+    const chain = chainParam as SupportedChainsType;
+    const isValidChain = chainParam && isValidChainSlug(chainParam);
 
     // Track if we've already notified parent about current token pair
     const lastNotifiedPairRef = useRef<string | null>(null);
 
-    // Token selection state
+    // Handle navigation to chain selection if invalid chain
+    const goToChainSelection = useCallback(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("step", "1");
+        params.delete("chain");
+        router.push(pathname + "?" + params.toString());
+    }, [router, pathname, searchParams]);
+
+    // Token selection state - initialized from URL params
     const [baseSelection, setBaseSelection] = useState<TokenSelection>({
-        token: selectedPair?.baseToken ? {
-            address: selectedPair.baseToken.address,
-            symbol: selectedPair.baseToken.symbol,
-            name: selectedPair.baseToken.name || selectedPair.baseToken.symbol,
-            decimals: selectedPair.baseToken.decimals,
-            verified: true,
-            source: 'database' as const,
-            logoUrl: (selectedPair.baseToken as any).logoUrl,
-        } : null,
+        token: null,
         isSearching: false,
         showDropdown: false,
     });
 
     const [quoteSelection, setQuoteSelection] = useState<TokenSelection>({
-        token: selectedPair?.quoteToken ? {
-            address: selectedPair.quoteToken.address,
-            symbol: selectedPair.quoteToken.symbol,
-            name: selectedPair.quoteToken.name || selectedPair.quoteToken.symbol,
-            decimals: selectedPair.quoteToken.decimals,
-            verified: true,
-            source: 'database' as const,
-            logoUrl: (selectedPair.quoteToken as any).logoUrl,
-        } : null,
+        token: null,
         isSearching: false,
         showDropdown: false,
     });
 
 
-    // Token search hooks
+    // Load tokens from URL parameters on mount and param changes
+    useEffect(() => {
+        if (!isValidChain) {
+            setBaseSelection({ token: null, isSearching: false, showDropdown: false });
+            setQuoteSelection({ token: null, isSearching: false, showDropdown: false });
+            props.onTokenPairSelect?.(false);
+            return;
+        }
+
+        const baseTokenParam = searchParams.get("baseToken");
+        const quoteTokenParam = searchParams.get("quoteToken");
+
+        // TODO: Load token data from addresses if they exist in URL params
+        // For now, just notify parent about selection state
+        const hasValidSelection = baseTokenParam && quoteTokenParam;
+        props.onTokenPairSelect?.(!!hasValidSelection);
+    }, [searchParams, isValidChain, props]);
+
+    // Token search hooks - only enabled for valid chains
     const baseTokenSearch = useTokenSearch({
-        chain,
+        chain: isValidChain ? chain : "ethereum", // fallback for hook
         type: 'base',
-        enabled: baseSelection.isSearching,
+        enabled: baseSelection.isSearching && !!isValidChain,
     });
 
     const quoteTokenSearch = useTokenSearch({
-        chain,
+        chain: isValidChain ? chain : "ethereum", // fallback for hook
         type: 'quote',
-        enabled: quoteSelection.isSearching,
+        enabled: quoteSelection.isSearching && !!isValidChain,
     });
 
     // Token pair validation - only validate if both tokens have addresses
@@ -375,8 +401,13 @@ export function TokenPairStep({
         baseTokenSearch.setQuery(token.symbol);
         baseTokenSearch.clearResults();
 
-        // Create/enrich token immediately on selection
+        // Update URL parameter
         if (token.address) {
+            const params = new URLSearchParams(searchParams.toString());
+            params.set("baseToken", token.address);
+            router.push(pathname + "?" + params.toString());
+
+            // Create/enrich token immediately on selection
             const enrichedToken = await createToken(token.address);
             if (enrichedToken) {
                 setBaseSelection(prev => ({
@@ -385,7 +416,7 @@ export function TokenPairStep({
                 }));
             }
         }
-    }, [baseTokenSearch, createToken]);
+    }, [baseTokenSearch, createToken, searchParams, router, pathname]);
 
     // Select quote token and create/enrich it
     const selectQuoteToken = useCallback(async (token: TokenSearchResult) => {
@@ -397,8 +428,13 @@ export function TokenPairStep({
         quoteTokenSearch.setQuery(token.symbol);
         quoteTokenSearch.clearResults();
 
-        // Create/enrich token immediately on selection
+        // Update URL parameter
         if (token.address) {
+            const params = new URLSearchParams(searchParams.toString());
+            params.set("quoteToken", token.address);
+            router.push(pathname + "?" + params.toString());
+
+            // Create/enrich token immediately on selection
             const enrichedToken = await createToken(token.address);
             if (enrichedToken) {
                 setQuoteSelection(prev => ({
@@ -407,7 +443,7 @@ export function TokenPairStep({
                 }));
             }
         }
-    }, [quoteTokenSearch, createToken]);
+    }, [quoteTokenSearch, createToken, searchParams, router, pathname]);
 
     // Update parent when both tokens are selected and valid
     useEffect(() => {
@@ -417,30 +453,45 @@ export function TokenPairStep({
 
             // Only notify parent if this is a different token pair than last time
             if (lastNotifiedPairRef.current !== pairId) {
-                const tokenPair: TokenPair = {
-                    baseToken: {
-                        address: baseSelection.token.address,
-                        symbol: baseSelection.token.symbol,
-                        name: baseSelection.token.name,
-                        decimals: baseSelection.token.decimals,
-                    } as any, // Type conversion for compatibility
-                    quoteToken: {
-                        address: quoteSelection.token.address,
-                        symbol: quoteSelection.token.symbol,
-                        name: quoteSelection.token.name,
-                        decimals: quoteSelection.token.decimals,
-                    } as any, // Type conversion for compatibility
-                    isValidPair: true,
-                };
-                onPairSelect(tokenPair);
+                props.onTokenPairSelect?.(true);
                 lastNotifiedPairRef.current = pairId;
             }
         } else {
-            // Clear the ref when tokens are invalid/missing
-            lastNotifiedPairRef.current = null;
+            // Clear the ref when tokens are invalid/missing and notify parent
+            if (lastNotifiedPairRef.current !== null) {
+                props.onTokenPairSelect?.(false);
+                lastNotifiedPairRef.current = null;
+            }
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [baseSelection.token, quoteSelection.token, validation.isValid]);
+    }, [baseSelection.token, quoteSelection.token, validation.isValid, props]);
+
+    // Show chain validation error if chain is invalid
+    if (!isValidChain) {
+        return (
+            <div className="space-y-6">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                        <div>
+                            <h5 className="text-red-400 font-medium">
+                                Invalid Chain Selected
+                            </h5>
+                            <p className="text-red-200/80 text-sm mt-1">
+                                Please select a valid blockchain network to continue with token pair selection.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={goToChainSelection}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                        Go to Chain Selection
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

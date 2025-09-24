@@ -1,35 +1,41 @@
 "use client";
 
 import { useTranslations } from "@/i18n/client";
-import type { SupportedChainsType } from "@/config/chains";
+import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface ChainSelectionStepProps {
-    selectedChain: SupportedChainsType | null;
-    onChainSelect: (chain: SupportedChainsType) => void;
-    onNext: () => void;
-    onBack: () => void;
+    // eslint-disable-next-line no-unused-vars
+    onChainSelect?: (isChainSelected: boolean) => void;
 }
 
-export function ChainSelectionStep({
-    selectedChain,
-    onChainSelect,
-    // eslint-disable-next-line no-unused-vars
-    onNext,
-    // eslint-disable-next-line no-unused-vars
-    onBack,
-}: ChainSelectionStepProps) {
+export function ChainSelectionStep(props: ChainSelectionStepProps) {
     const t = useTranslations();
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const [selectedChain, setSelectedChain] =
+        useState<SupportedChainsType | null>(null);
 
-    const chains: { id: SupportedChainsType; name: string; description: string }[] = [
+    const chains: {
+        id: SupportedChainsType;
+        name: string;
+        description: string;
+    }[] = [
         {
             id: "ethereum",
             name: "Ethereum",
-            description: t("positionWizard.chainSelection.ethereum.description"),
+            description: t(
+                "positionWizard.chainSelection.ethereum.description"
+            ),
         },
         {
             id: "arbitrum",
             name: "Arbitrum",
-            description: t("positionWizard.chainSelection.arbitrum.description"),
+            description: t(
+                "positionWizard.chainSelection.arbitrum.description"
+            ),
         },
         {
             id: "base",
@@ -37,6 +43,24 @@ export function ChainSelectionStep({
             description: t("positionWizard.chainSelection.base.description"),
         },
     ];
+
+    useEffect(() => {
+        const chainParam = searchParams.get("chain") || "";
+        if (!chainParam || !SUPPORTED_CHAINS.includes(chainParam)) {
+            setSelectedChain(null);
+            props.onChainSelect?.(false);
+        } else {
+            setSelectedChain(chainParam as SupportedChainsType);
+            props.onChainSelect?.(true);
+        }
+    }, [props, searchParams]);
+
+    function onChainSelected(chainId: SupportedChainsType) {
+        if (!chainId) return;
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("chain", chainId);
+        router.push(pathname + "?" + params.toString());
+    }
 
     return (
         <div className="space-y-6">
@@ -48,7 +72,7 @@ export function ChainSelectionStep({
                 {chains.map((chain) => (
                     <button
                         key={chain.id}
-                        onClick={() => onChainSelect(chain.id)}
+                        onClick={() => onChainSelected(chain.id)}
                         className={`p-4 border-2 rounded-lg transition-all text-left ${
                             selectedChain === chain.id
                                 ? "border-blue-500 bg-blue-500/10"
@@ -58,7 +82,9 @@ export function ChainSelectionStep({
                         <h4 className="text-lg font-semibold text-white mb-1">
                             {chain.name}
                         </h4>
-                        <p className="text-slate-300 text-sm">{chain.description}</p>
+                        <p className="text-slate-300 text-sm">
+                            {chain.description}
+                        </p>
                     </button>
                 ))}
             </div>
