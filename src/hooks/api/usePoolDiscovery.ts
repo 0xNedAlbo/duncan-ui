@@ -14,6 +14,10 @@ export interface PoolDiscoveryResult {
     tickSpacing: number;
     liquidity: string; // BigInt as string
     exists: boolean;
+    // Pool metrics from subgraph (USD values)
+    tvlUSD?: string;
+    volumeUSD?: string;
+    feesUSD?: string;
     pool?: {
         chain: string;
         poolAddress: string;
@@ -145,4 +149,16 @@ export function formatPoolLiquidity(liquidityString: string): string {
     if (liquidityNum >= 1e6) return `$${(liquidityNum / 1e6).toFixed(1)}M`;
     if (liquidityNum >= 1e3) return `$${(liquidityNum / 1e3).toFixed(1)}K`;
     return `$${liquidityNum.toFixed(2)}`;
+}
+
+// Helper function to format USD values from subgraph
+export function formatUSDValue(usdString?: string): string {
+    if (!usdString || usdString === "0") return "N/A";
+
+    const usdNum = parseFloat(usdString);
+
+    if (usdNum >= 1e9) return `$${(usdNum / 1e9).toFixed(1)}B`;
+    if (usdNum >= 1e6) return `$${(usdNum / 1e6).toFixed(1)}M`;
+    if (usdNum >= 1e3) return `$${(usdNum / 1e3).toFixed(1)}K`;
+    return `$${usdNum.toFixed(2)}`;
 }

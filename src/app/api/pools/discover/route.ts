@@ -34,6 +34,10 @@ interface PoolDiscoverySuccessResponse {
         tickSpacing: number;
         liquidity: string;
         exists: boolean;
+        // Pool metrics from subgraph (USD values)
+        tvlUSD?: string;
+        volumeUSD?: string;
+        feesUSD?: string;
         pool?: {
             chain: string;
             poolAddress: string;
@@ -188,6 +192,10 @@ export const GET = withAuthAndLogging<PoolDiscoveryResponse>(
                 tickSpacing: result.tickSpacing,
                 liquidity: result.liquidity,
                 exists: result.exists,
+                // Subgraph metrics are now included by poolDiscoveryService
+                tvlUSD: result.tvlUSD,
+                volumeUSD: result.volumeUSD,
+                feesUSD: result.feesUSD,
                 pool: result.pool ? {
                     chain: result.pool.chain,
                     poolAddress: result.pool.poolAddress,

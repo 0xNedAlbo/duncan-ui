@@ -3,7 +3,7 @@
 import { useTranslations } from "@/i18n/client";
 import { Loader2, AlertCircle, Zap, ExternalLink } from "lucide-react";
 import type { TokenPair, PoolOption } from "./types";
-import { usePoolDiscovery, getRecommendedPool, formatPoolLiquidity, type PoolDiscoveryResult } from "@/hooks/api/usePoolDiscovery";
+import { usePoolDiscovery, getRecommendedPool, formatUSDValue, type PoolDiscoveryResult } from "@/hooks/api/usePoolDiscovery";
 import type { SupportedChainsType } from "@/config/chains";
 import { getExplorerAddressUrl } from "@/lib/utils/evm";
 
@@ -11,6 +11,7 @@ interface PoolSelectionStepProps {
     chain: SupportedChainsType;
     tokenPair: TokenPair;
     selectedPool: PoolOption | null;
+    // eslint-disable-next-line no-unused-vars
     onPoolSelect: (pool: PoolOption) => void;
     onNext: () => void;
     onBack: () => void;
@@ -220,16 +221,25 @@ export function PoolSelectionStep({
                                                             <span className="text-xs text-slate-500 font-mono">
                                                                 {poolResult.poolAddress.slice(0, 6)}...{poolResult.poolAddress.slice(-4)}
                                                             </span>
-                                                            <button
+                                                            <span
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     window.open(getExplorerAddressUrl(poolResult.poolAddress, chain), '_blank');
                                                                 }}
-                                                                className="text-slate-400 hover:text-slate-200 transition-colors p-0.5"
+                                                                className="text-slate-400 hover:text-slate-200 transition-colors p-0.5 cursor-pointer inline-flex items-center justify-center"
                                                                 title="View on blockchain explorer"
+                                                                role="button"
+                                                                tabIndex={0}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        window.open(getExplorerAddressUrl(poolResult.poolAddress, chain), '_blank');
+                                                                    }
+                                                                }}
                                                             >
                                                                 <ExternalLink className="w-3 h-3" />
-                                                            </button>
+                                                            </span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -244,13 +254,29 @@ export function PoolSelectionStep({
                                     )}
                                 </div>
 
-                                <div className="grid grid-cols-1 gap-4 text-sm">
+                                <div className="grid grid-cols-3 gap-4 text-sm">
                                     <div>
                                         <p className="text-slate-400 mb-1">
-                                            {t("positionWizard.poolSelection.liquidity")}
+                                            {t("positionWizard.poolSelection.tvl")}
                                         </p>
                                         <p className="text-white font-medium">
-                                            {formatPoolLiquidity(poolResult.liquidity)}
+                                            {poolResult.tvlUSD ? formatUSDValue(poolResult.tvlUSD) : 'N/A'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-400 mb-1">
+                                            Volume 24h
+                                        </p>
+                                        <p className="text-white font-medium">
+                                            {poolResult.volumeUSD ? formatUSDValue(poolResult.volumeUSD) : 'N/A'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-400 mb-1">
+                                            Fees 24h
+                                        </p>
+                                        <p className="text-white font-medium">
+                                            {poolResult.feesUSD ? formatUSDValue(poolResult.feesUSD) : 'N/A'}
                                         </p>
                                     </div>
                                 </div>
