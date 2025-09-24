@@ -295,6 +295,7 @@ export function PositionWizard({
             case 3:
                 return (
                     <PoolSelectionStep
+                        chain={wizardState.selectedChain!}
                         tokenPair={wizardState.selectedTokenPair!}
                         selectedPool={wizardState.selectedPool}
                         onPoolSelect={(pool) =>

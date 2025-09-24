@@ -423,7 +423,7 @@
         "title": "Choose Token Pair"
       },
       "poolSelection": {
-        "title": "Select Pool"
+        "title": "Select the pool with your desired fee tier."
       },
       "positionConfig": {
         "title": "Configure Position"
@@ -501,13 +501,20 @@
       "liquidity": "Liquidity",
       "volume24h": "24h Volume",
       "tvl": "TVL",
+      "loading": "Discovering available pools...",
+      "error": "Failed to discover pools",
+      "genericError": "An error occurred while discovering pools",
+      "noPoolsTitle": "No Pools Available",
+      "noPoolsDescription": "No liquidity pools exist for this token pair. Try a different pair or check back later.",
+      "allFeeTiers": "Available Fee Tiers",
+      "available": "Available",
+      "notAvailable": "Not Available",
       "feeExplanation": {
         "title": "Fee Tier Explanation",
         "low": "For stable pairs with low volatility",
         "medium": "Standard fee for most pairs",
         "high": "For volatile or exotic pairs"
-      },
-      "implementationNote": "Pool discovery and metrics to be implemented."
+      }
     },
     "positionConfig": {
       "description": "Configure your position parameters and analyze the risk profile.",

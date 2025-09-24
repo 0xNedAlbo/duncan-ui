@@ -442,7 +442,7 @@
         "title": "Token-Paar auswählen"
       },
       "poolSelection": {
-        "title": "Pool auswählen"
+        "title": "Wähle den Pool mit der gewünschten Gebührenstufe."
       },
       "positionConfig": {
         "title": "Position konfigurieren"
@@ -520,13 +520,20 @@
       "liquidity": "Liquidität",
       "volume24h": "24h Volumen",
       "tvl": "TVL",
+      "loading": "Entdecke verfügbare Pools...",
+      "error": "Fehler beim Entdecken der Pools",
+      "genericError": "Ein Fehler ist beim Entdecken der Pools aufgetreten",
+      "noPoolsTitle": "Keine Pools verfügbar",
+      "noPoolsDescription": "Für dieses Token-Paar existieren keine Liquiditätspools. Versuche ein anderes Paar oder schaue später nochmal vorbei.",
+      "allFeeTiers": "Verfügbare Gebührenstufen",
+      "available": "Verfügbar",
+      "notAvailable": "Nicht verfügbar",
       "feeExplanation": {
         "title": "Gebührenstufen Erklärung",
         "low": "Für stabile Paare mit geringer Volatilität",
         "medium": "Standard-Fee für die meisten Paare",
         "high": "Für volatile oder exotische Paare"
-      },
-      "implementationNote": "Pool-Entdeckung und Metriken werden implementiert."
+      }
     },
     "positionConfig": {
       "description": "Konfiguriere deine Positionsparameter und analysiere das Risikoprofil.",

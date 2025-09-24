@@ -4,6 +4,7 @@ import { EtherscanEventService } from "./etherscan/etherscanEventService";
 import { EtherscanBlockInfoService } from "./etherscan/etherscanBlockInfoService";
 import { EvmBlockInfoService } from "./evm/evmBlockInfoService";
 import { PoolService } from "./pools/poolService";
+import { PoolDiscoveryService } from "./pools/poolDiscoveryService";
 import { PoolPriceService } from "./prices/poolPriceService";
 import { QuoteTokenService } from "./positions/quoteTokenService";
 import { PositionImportService } from "./positions/positionImportService";
@@ -24,6 +25,7 @@ export interface Services {
     etherscanBlockInfoService: EtherscanBlockInfoService;
     evmBlockInfoService: EvmBlockInfoService;
     poolService: PoolService;
+    poolDiscoveryService: PoolDiscoveryService;
     poolPriceService: PoolPriceService;
     quoteTokenService: QuoteTokenService;
     positionImportService: PositionImportService;
@@ -72,6 +74,11 @@ export class DefaultServiceFactory implements ServiceFactory {
             { tokenService }
         );
 
+        const poolDiscoveryService = new PoolDiscoveryService(
+            { rpcClients },
+            { poolService }
+        );
+
         const positionAprService = new PositionAprService(prisma);
 
         const positionLedgerService = new PositionLedgerService(
@@ -108,6 +115,7 @@ export class DefaultServiceFactory implements ServiceFactory {
             etherscanBlockInfoService,
             evmBlockInfoService,
             poolService,
+            poolDiscoveryService,
             poolPriceService,
             quoteTokenService,
             positionImportService,

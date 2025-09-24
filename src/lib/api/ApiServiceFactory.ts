@@ -1,8 +1,10 @@
 import { AlchemyTokenService } from "@/services/alchemy/tokenMetadata";
+import { CoinGeckoService } from "@/services/coingecko/coinGeckoService";
 import { EtherscanEventService } from "@/services/etherscan/etherscanEventService";
 import { EtherscanBlockInfoService } from "@/services/etherscan/etherscanBlockInfoService";
 import { EvmBlockInfoService } from "@/services/evm/evmBlockInfoService";
 import { PoolService } from "@/services/pools/poolService";
+import { PoolDiscoveryService } from "@/services/pools/poolDiscoveryService";
 import { PoolPriceService } from "@/services/prices/poolPriceService";
 import { QuoteTokenService } from "@/services/positions/quoteTokenService";
 import { PositionImportService } from "@/services/positions/positionImportService";
@@ -114,6 +116,17 @@ export class ApiServiceFactory {
         return this.serviceInstances.poolService;
     }
 
+    public get poolDiscoveryService(): PoolDiscoveryService {
+        if (!this.serviceInstances.poolDiscoveryService) {
+            const { rpcClients } = this.clients;
+            this.serviceInstances.poolDiscoveryService = new PoolDiscoveryService(
+                { rpcClients },
+                { poolService: this.poolService }
+            );
+        }
+        return this.serviceInstances.poolDiscoveryService;
+    }
+
     public get positionLedgerService(): PositionLedgerService {
         if (!this.serviceInstances.positionLedgerService) {
             const { prisma, etherscanClient } = this.clients;
@@ -195,4 +208,32 @@ export class ApiServiceFactory {
         }
         return this.serviceInstances.apiKeyService;
     }
+
+    public getServices(): Services {
+        return {
+            alchemyTokenService: this.alchemyTokenService,
+            coinGeckoService: new CoinGeckoService(),
+            etherscanEventService: this.etherscanEventService,
+            etherscanBlockInfoService: this.etherscanBlockInfoService,
+            evmBlockInfoService: this.evmBlockInfoService,
+            poolService: this.poolService,
+            poolDiscoveryService: this.poolDiscoveryService,
+            poolPriceService: this.poolPriceService,
+            quoteTokenService: this.quoteTokenService,
+            positionImportService: this.positionImportService,
+            positionLookupService: this.positionLookupService,
+            positionLedgerService: this.positionLedgerService,
+            positionService: this.positionService,
+            positionPnLService: this.positionPnLService,
+            positionAprService: this.positionAprService,
+            curveDataService: this.curveDataService,
+            tokenService: this.tokenService,
+            apiKeyService: this.apiKeyService,
+        };
+    }
+}
+
+// Helper function for convenience
+export function getApiServiceFactory(): ApiServiceFactory {
+    return ApiServiceFactory.getInstance();
 }
