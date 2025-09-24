@@ -475,3 +475,93 @@ src/
 - Simplified mobile-first position creation
 
 This comprehensive plan transforms DUNCAN from a position tracking tool into a sophisticated position planning and risk management platform, aligning perfectly with the project's vision of innovative DeFi risk management.
+
+---
+
+## Pool Selection Step Implementation Plan (Implementation Phase)
+
+### Overview
+Implement the pool selection step in the position wizard that uses the Uniswap V3 Factory to discover available pools for the selected token pair and displays them with relevant metrics.
+
+### Current State Analysis
+- Token pair selection step is complete and working
+- Pool selection step exists but only shows mock data
+- Infrastructure exists with Uniswap V3 Factory contract utilities and `getPoolAddress` method in position service
+- No dedicated pool discovery API exists yet
+
+### Available Components
+- `UNISWAP_V3_FACTORY_ABI` and `UNISWAP_V3_FACTORY_ADDRESSES` from `/src/lib/contracts/uniswapV3Factory.ts`
+- `getPoolAddress` method in `PositionService` that queries the factory for pool addresses
+- `SUPPORTED_FEE_TIERS` (100, 500, 3000, 10000) and utility functions for formatting
+- `PoolService` with pool creation and state management capabilities
+
+### Implementation Steps
+
+#### 1. Create Pool Discovery Service
+- **New file**: `src/services/pools/poolDiscoveryService.ts`
+- **Key methods**:
+  - `findPoolsForTokenPair()` - Query factory for all fee tiers (100, 500, 3000, 10000)
+  - `getPoolMetrics()` - Fetch liquidity, volume, and TVL data for each pool
+  - `enrichPoolData()` - Create/update pool records in database
+
+#### 2. Create Pool Discovery API
+- **New file**: `src/app/api/pools/discover/route.ts`
+- **Endpoint**: `GET /api/pools/discover?chain={chain}&tokenA={address}&tokenB={address}`
+- **Features**:
+  - Use `withAuthAndLogging()` wrapper for authentication
+  - Query Uniswap V3 Factory for each fee tier
+  - Return pool options with metrics (liquidity, volume24h, TVL)
+  - Handle zero address responses (non-existent pools)
+
+#### 3. Update Pool Selection Step Component
+- **File**: `src/components/positions/wizard/PoolSelectionStep.tsx`
+- **Changes**:
+  - Replace mock data with API call using React Query
+  - Implement real pool selection logic
+  - Add loading states and error handling
+  - Show "No pools available" state when appropriate
+  - Enhance pool metrics display with real data
+
+#### 4. Create React Query Hook
+- **New file**: `src/hooks/api/usePoolDiscovery.ts`
+- **Features**:
+  - Fetch available pools for token pair
+  - Cache results appropriately
+  - Handle loading and error states
+  - Auto-refetch on token pair changes
+
+#### 5. Extend Pool Service
+- **File**: `src/services/pools/poolService.ts`
+- **New methods**:
+  - `findPoolsForTokenPair()` - Leverage existing `getPoolAddress()` method
+  - `getPoolMetrics()` - Fetch liquidity and state data
+  - `enrichPoolWithMetrics()` - Combine pool data with metrics
+
+### Technical Details
+
+**Pool Discovery Logic:**
+1. For each fee tier (100, 500, 3000, 10000), query factory.getPool()
+2. Filter out zero addresses (non-existent pools)
+3. For existing pools, fetch current state (liquidity, sqrtPriceX96)
+4. Optionally fetch 24h volume from external sources
+5. Return sorted by liquidity (highest first)
+
+**Data Flow:**
+1. User selects token pair → triggers pool discovery
+2. API queries factory for all fee tiers in parallel
+3. Filters existing pools and fetches metrics
+4. Returns enriched pool options
+5. Component displays pools with recommendation logic
+
+**Error Handling:**
+- Handle factory query failures gracefully
+- Show appropriate messages for unsupported chains
+- Handle network errors with retry functionality
+- Fallback to cached data when possible
+
+**BigInt Precision Requirements:**
+- All liquidity, volume, and TVL values stored as BigInt strings
+- Only convert to human-readable format in UI components
+- Maintain precision throughout service → API → frontend chain
+
+This implementation will transform the pool selection step from mock data to a fully functional interface that discovers real Uniswap V3 pools using the factory contract.
