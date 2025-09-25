@@ -8,6 +8,7 @@ import { useTranslations } from "@/i18n/client";
 import { OpenPositionStep } from "./OpenPositionStep";
 import { ChainSelectionStep } from "./ChainSelectionStep";
 import { TokenPairStep } from "./TokenPairStep";
+import { PoolSelectionStep } from "./PoolSelectionStep";
 
 interface PositionWizardProps {
     isOpen: boolean;
@@ -100,20 +101,9 @@ export function PositionWizard({
                 return <ChainSelectionStep onChainSelect={setChainSelected} />;
             case 2:
                 return <TokenPairStep onTokenPairSelect={setTokenPairSelected} />;
-            /*
             case 3:
-                return (
-                    <PoolSelectionStep
-                        chain={wizardState.selectedChain!}
-                        tokenPair={wizardState.selectedTokenPair!}
-                        selectedPool={wizardState.selectedPool}
-                        onPoolSelect={(pool) =>
-                            updateWizardState({ selectedPool: pool })
-                        }
-                        onNext={goNext}
-                        onBack={goBack}
-                    />
-                );
+                return <PoolSelectionStep onPoolSelect={setPoolSelected} />;
+            /*
             case 4:
                 return (
                     <PositionConfigStep

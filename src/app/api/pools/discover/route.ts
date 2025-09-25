@@ -202,6 +202,7 @@ export const GET = withAuthAndLogging<PoolDiscoveryResponse>(
                     protocol: result.pool.protocol,
                     fee: result.pool.fee,
                     tickSpacing: result.pool.tickSpacing,
+                    liquidity: result.liquidity,
                     token0: {
                         address: result.pool.token0.address,
                         symbol: result.pool.token0.symbol,

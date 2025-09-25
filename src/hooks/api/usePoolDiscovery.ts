@@ -24,6 +24,7 @@ export interface PoolDiscoveryResult {
         protocol: string;
         fee: number;
         tickSpacing: number;
+        liquidity: string;
         token0: {
             address: string;
             symbol: string;
@@ -116,8 +117,7 @@ export function usePoolDiscovery({
 
     return {
         ...query,
-        pools: query.data || [],
-        availablePools: query.data ? query.data.filter(pool => pool.exists) : [],
+        data: query.data ? query.data.filter(pool => pool.exists) : undefined,
         isLoading: query.isLoading,
         isError: query.isError,
         error: query.error?.message || null,
@@ -140,16 +140,6 @@ export function getRecommendedPool(pools: PoolDiscoveryResult[]): PoolDiscoveryR
     })[0];
 }
 
-// Helper function to format liquidity display
-export function formatPoolLiquidity(liquidityString: string): string {
-    const liquidity = BigInt(liquidityString);
-    const liquidityNum = Number(liquidity) / 1e18; // Assume 18 decimals for display
-
-    if (liquidityNum >= 1e9) return `$${(liquidityNum / 1e9).toFixed(1)}B`;
-    if (liquidityNum >= 1e6) return `$${(liquidityNum / 1e6).toFixed(1)}M`;
-    if (liquidityNum >= 1e3) return `$${(liquidityNum / 1e3).toFixed(1)}K`;
-    return `$${liquidityNum.toFixed(2)}`;
-}
 
 // Helper function to format USD values from subgraph
 export function formatUSDValue(usdString?: string): string {
