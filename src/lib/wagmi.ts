@@ -5,19 +5,27 @@ import {
 } from "@/config/chains";
 import { createPublicClient, PublicClient } from "viem";
 import { http, createConfig } from "wagmi";
-import { mainnet, arbitrum, base } from "wagmi/chains";
 import { injected, walletConnect } from "wagmi/connectors";
+import type { Chain } from "viem";
 
 const projectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || "";
 
+// Build chains and transports dynamically from supported chains
+const chains: Chain[] = [];
+const transports: Record<number, any> = {};
+
+SUPPORTED_CHAINS.forEach((chainName) => {
+    const chainConfig = getChainConfig(chainName as SupportedChainsType);
+    if (chainConfig?.viemChain) {
+        chains.push(chainConfig.viemChain);
+        transports[chainConfig.chainId] = http(chainConfig.rpcUrl);
+    }
+});
+
 export const config = createConfig({
-    chains: [mainnet, arbitrum, base],
+    chains: chains as any,
     connectors: [injected(), walletConnect({ projectId })],
-    transports: {
-        [mainnet.id]: http(),
-        [arbitrum.id]: http(),
-        [base.id]: http(),
-    },
+    transports,
 });
 
 const clients: Map<SupportedChainsType, PublicClient> = new Map<
