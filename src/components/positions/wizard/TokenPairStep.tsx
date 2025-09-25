@@ -1,31 +1,30 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Check, AlertCircle, Loader2, Copy, ExternalLink, ArrowLeft } from "lucide-react";
+import {
+    Search,
+    Check,
+    AlertCircle,
+    Loader2,
+    Copy,
+    ExternalLink,
+    ArrowLeft,
+} from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import type { SupportedChainsType } from "@/config/chains";
 import { isValidChainSlug } from "@/config/chains";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTokenSearch, type TokenSearchResult } from "@/hooks/api/useTokenSearch";
+import {
+    useTokenSearch,
+    type TokenSearchResult,
+} from "@/hooks/api/useTokenSearch";
 import { useTokenPairValidation } from "@/hooks/useTokenPairValidation";
 import { getPopularTokens } from "@/lib/config/popularTokens";
-import { truncateAddress, truncateText, getExplorerAddressUrl } from "@/lib/utils/evm";
-
-interface TokenPair {
-    baseToken: {
-        address: string;
-        symbol: string;
-        name: string;
-        decimals: number;
-    };
-    quoteToken: {
-        address: string;
-        symbol: string;
-        name: string;
-        decimals: number;
-    };
-    isValidPair: boolean;
-}
+import {
+    truncateAddress,
+    truncateText,
+    getExplorerAddressUrl,
+} from "@/lib/utils/evm";
 
 interface TokenSelection {
     token: TokenSearchResult | null;
@@ -34,13 +33,13 @@ interface TokenSelection {
 }
 
 interface TokenInputProps {
-    type: 'base' | 'quote';
+    type: "base" | "quote";
     selection: TokenSelection;
     query: string;
     chain: SupportedChainsType;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line no-unused-vars
     onQueryChange: (query: string) => void;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line no-unused-vars
     onTokenSelect: (token: TokenSearchResult) => void;
     searchHook: ReturnType<typeof useTokenSearch>;
     popularTokens: any[];
@@ -51,7 +50,6 @@ interface TokenInputProps {
 }
 
 function TokenInput({
-    type: _type,
     selection,
     query,
     chain,
@@ -80,7 +78,9 @@ function TokenInput({
                     value={query}
                     onChange={(e) => onQueryChange(e.target.value)}
                     placeholder={placeholder}
-                    className={`w-full pl-10 pr-4 py-3 bg-slate-700 border rounded-lg text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 border-slate-600 focus:ring-${color.split('-')[1]}-500`}
+                    className={`w-full pl-10 pr-4 py-3 bg-slate-700 border rounded-lg text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 border-slate-600 focus:ring-${
+                        color.split("-")[1]
+                    }-500`}
                 />
                 {searchHook.isLoading && (
                     <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
@@ -99,22 +99,32 @@ function TokenInput({
                     )}
                     <div className="flex-1">
                         <div className="flex items-center gap-2">
-                            <span className="font-semibold text-white">{selection.token.symbol}</span>
+                            <span className="font-semibold text-white">
+                                {selection.token.symbol}
+                            </span>
                             {selection.token.verified && (
                                 <Check className="w-4 h-4 text-green-400" />
                             )}
                         </div>
                         <div className="flex items-center gap-2 text-xs">
-                            <span className="text-slate-400">{truncateText(selection.token.name, 16)}</span>
+                            <span className="text-slate-400">
+                                {truncateText(selection.token.name, 16)}
+                            </span>
                             {selection.token.address && (
                                 <>
-                                    <span className="text-slate-500 font-mono">{truncateAddress(selection.token.address)}</span>
+                                    <span className="text-slate-500 font-mono">
+                                        {truncateAddress(
+                                            selection.token.address
+                                        )}
+                                    </span>
                                     <div className="flex items-center gap-1">
                                         <div
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (selection.token?.address) {
-                                                    navigator.clipboard.writeText(selection.token.address);
+                                                    navigator.clipboard.writeText(
+                                                        selection.token.address
+                                                    );
                                                 }
                                             }}
                                             className="text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
@@ -126,7 +136,14 @@ function TokenInput({
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (selection.token?.address) {
-                                                    window.open(getExplorerAddressUrl(selection.token.address, chain), '_blank');
+                                                    window.open(
+                                                        getExplorerAddressUrl(
+                                                            selection.token
+                                                                .address,
+                                                            chain
+                                                        ),
+                                                        "_blank"
+                                                    );
                                                 }
                                             }}
                                             className="text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
@@ -158,14 +175,16 @@ function TokenInput({
                         {popularTokens.map((token) => (
                             <button
                                 key={token.address}
-                                onClick={() => onTokenSelect({
-                                    address: token.address,
-                                    symbol: token.symbol,
-                                    name: token.name,
-                                    decimals: 18, // Default - will be resolved
-                                    verified: true,
-                                    source: 'popular',
-                                })}
+                                onClick={() =>
+                                    onTokenSelect({
+                                        address: token.address,
+                                        symbol: token.symbol,
+                                        name: token.name,
+                                        decimals: 18, // Default - will be resolved
+                                        verified: true,
+                                        source: "popular",
+                                    })
+                                }
                                 className="px-3 py-1 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded-full transition-colors"
                             >
                                 {token.symbol}
@@ -194,20 +213,34 @@ function TokenInput({
                                 )}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <span className="font-semibold text-white">{token.symbol}</span>
-                                        {token.verified && <Check className="w-3 h-3 text-green-400" />}
-                                        <span className="text-xs text-slate-400">{token.source}</span>
+                                        <span className="font-semibold text-white">
+                                            {token.symbol}
+                                        </span>
+                                        {token.verified && (
+                                            <Check className="w-3 h-3 text-green-400" />
+                                        )}
+                                        <span className="text-xs text-slate-400">
+                                            {token.source}
+                                        </span>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm">
-                                        <span className="text-slate-300">{truncateText(token.name, 16)}</span>
+                                        <span className="text-slate-300">
+                                            {truncateText(token.name, 16)}
+                                        </span>
                                         {token.address && (
                                             <>
-                                                <span className="text-slate-500 font-mono text-xs">{truncateAddress(token.address)}</span>
+                                                <span className="text-slate-500 font-mono text-xs">
+                                                    {truncateAddress(
+                                                        token.address
+                                                    )}
+                                                </span>
                                                 <div className="flex items-center gap-1">
                                                     <div
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            navigator.clipboard.writeText(token.address!);
+                                                            navigator.clipboard.writeText(
+                                                                token.address!
+                                                            );
                                                         }}
                                                         className="text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                                                         title="Copy address"
@@ -217,7 +250,13 @@ function TokenInput({
                                                     <div
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            window.open(getExplorerAddressUrl(token.address!, chain), '_blank');
+                                                            window.open(
+                                                                getExplorerAddressUrl(
+                                                                    token.address!,
+                                                                    chain
+                                                                ),
+                                                                "_blank"
+                                                            );
                                                         }}
                                                         className="text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                                                         title="View on explorer"
@@ -270,6 +309,9 @@ export function TokenPairStep(props: TokenPairStepProps) {
         const params = new URLSearchParams(searchParams.toString());
         params.set("step", "1");
         params.delete("chain");
+        params.delete("baseToken");
+        params.delete("quoteToken");
+        params.delete("poolAddress");
         router.push(pathname + "?" + params.toString());
     }, [router, pathname, searchParams]);
 
@@ -286,12 +328,19 @@ export function TokenPairStep(props: TokenPairStepProps) {
         showDropdown: false,
     });
 
-
     // Load tokens from URL parameters on mount and param changes
     useEffect(() => {
         if (!isValidChain) {
-            setBaseSelection({ token: null, isSearching: false, showDropdown: false });
-            setQuoteSelection({ token: null, isSearching: false, showDropdown: false });
+            setBaseSelection({
+                token: null,
+                isSearching: false,
+                showDropdown: false,
+            });
+            setQuoteSelection({
+                token: null,
+                isSearching: false,
+                showDropdown: false,
+            });
             props.onTokenPairSelect?.(false);
             return;
         }
@@ -308,142 +357,157 @@ export function TokenPairStep(props: TokenPairStepProps) {
     // Token search hooks - only enabled for valid chains
     const baseTokenSearch = useTokenSearch({
         chain: isValidChain ? chain : "ethereum", // fallback for hook
-        type: 'base',
+        type: "base",
         enabled: baseSelection.isSearching && !!isValidChain,
     });
 
     const quoteTokenSearch = useTokenSearch({
         chain: isValidChain ? chain : "ethereum", // fallback for hook
-        type: 'quote',
+        type: "quote",
         enabled: quoteSelection.isSearching && !!isValidChain,
     });
 
     // Token pair validation - only validate if both tokens have addresses
     const validation = useTokenPairValidation(
-        baseSelection.token?.address ? baseSelection.token as any : null,
-        quoteSelection.token?.address ? quoteSelection.token as any : null
+        baseSelection.token?.address ? (baseSelection.token as any) : null,
+        quoteSelection.token?.address ? (quoteSelection.token as any) : null
     );
 
     // Popular tokens
-    const popularBaseTokens = getPopularTokens(chain, 'base');
-    const popularQuoteTokens = getPopularTokens(chain, 'quote');
+    const popularBaseTokens = getPopularTokens(chain, "base");
+    const popularQuoteTokens = getPopularTokens(chain, "quote");
 
     // Handle base token search
-    const handleBaseTokenSearch = useCallback((query: string) => {
-        baseTokenSearch.setQuery(query);
-        setBaseSelection(prev => ({
-            ...prev,
-            isSearching: query.length >= 3,
-            showDropdown: query.length >= 3,
-        }));
-    }, [baseTokenSearch]);
+    const handleBaseTokenSearch = useCallback(
+        (query: string) => {
+            baseTokenSearch.setQuery(query);
+            setBaseSelection((prev) => ({
+                ...prev,
+                isSearching: query.length >= 3,
+                showDropdown: query.length >= 3,
+            }));
+        },
+        [baseTokenSearch]
+    );
 
     // Handle quote token search
-    const handleQuoteTokenSearch = useCallback((query: string) => {
-        quoteTokenSearch.setQuery(query);
-        setQuoteSelection(prev => ({
-            ...prev,
-            isSearching: query.length >= 3,
-            showDropdown: query.length >= 3,
-        }));
-    }, [quoteTokenSearch]);
+    const handleQuoteTokenSearch = useCallback(
+        (query: string) => {
+            quoteTokenSearch.setQuery(query);
+            setQuoteSelection((prev) => ({
+                ...prev,
+                isSearching: query.length >= 3,
+                showDropdown: query.length >= 3,
+            }));
+        },
+        [quoteTokenSearch]
+    );
 
     // Create and enrich individual tokens
-    const createToken = useCallback(async (tokenAddress: string): Promise<TokenSearchResult | null> => {
-        try {
-            const response = await fetch('/api/tokens', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    chain,
-                    address: tokenAddress,
-                }),
-            });
+    const createToken = useCallback(
+        async (tokenAddress: string): Promise<TokenSearchResult | null> => {
+            try {
+                const response = await fetch("/api/tokens", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        chain,
+                        address: tokenAddress,
+                    }),
+                });
 
-            if (!response.ok) {
+                if (!response.ok) {
+                    // Token creation failed but don't block user flow
+                    console.warn("Token creation failed:", response.statusText);
+                    return null;
+                }
+
+                const tokenResult = await response.json();
+
+                if (tokenResult.success && tokenResult.token) {
+                    const token = tokenResult.token;
+                    return {
+                        address: token.address,
+                        symbol: token.symbol,
+                        name: token.name,
+                        decimals: token.decimals,
+                        verified: token.verified,
+                        logoUrl: token.logoUrl,
+                        source: "database" as const,
+                    };
+                }
+
+                return null;
+            } catch (error) {
                 // Token creation failed but don't block user flow
-                console.warn('Token creation failed:', response.statusText);
+                console.warn("Token creation error:", error);
                 return null;
             }
-
-            const tokenResult = await response.json();
-
-            if (tokenResult.success && tokenResult.token) {
-                const token = tokenResult.token;
-                return {
-                    address: token.address,
-                    symbol: token.symbol,
-                    name: token.name,
-                    decimals: token.decimals,
-                    verified: token.verified,
-                    logoUrl: token.logoUrl,
-                    source: 'database' as const,
-                };
-            }
-
-            return null;
-        } catch (error) {
-            // Token creation failed but don't block user flow
-            console.warn('Token creation error:', error);
-            return null;
-        }
-    }, [chain]);
+        },
+        [chain]
+    );
 
     // Select base token and create/enrich it
-    const selectBaseToken = useCallback(async (token: TokenSearchResult) => {
-        setBaseSelection({
-            token,
-            isSearching: false,
-            showDropdown: false,
-        });
-        baseTokenSearch.setQuery(token.symbol);
-        baseTokenSearch.clearResults();
+    const selectBaseToken = useCallback(
+        async (token: TokenSearchResult) => {
+            setBaseSelection({
+                token,
+                isSearching: false,
+                showDropdown: false,
+            });
+            baseTokenSearch.setQuery(token.symbol);
+            baseTokenSearch.clearResults();
 
-        // Update URL parameter
-        if (token.address) {
-            const params = new URLSearchParams(searchParams.toString());
-            params.set("baseToken", token.address);
-            router.push(pathname + "?" + params.toString());
+            // Update URL parameter
+            if (token.address) {
+                const params = new URLSearchParams(searchParams.toString());
+                params.set("baseToken", token.address);
+                router.push(pathname + "?" + params.toString());
 
-            // Create/enrich token immediately on selection
-            const enrichedToken = await createToken(token.address);
-            if (enrichedToken) {
-                setBaseSelection(prev => ({
-                    ...prev,
-                    token: enrichedToken
-                }));
+                // Create/enrich token immediately on selection
+                const enrichedToken = await createToken(token.address);
+                if (enrichedToken) {
+                    setBaseSelection((prev) => ({
+                        ...prev,
+                        token: enrichedToken,
+                    }));
+                }
             }
-        }
-    }, [baseTokenSearch, createToken, searchParams, router, pathname]);
+        },
+        [baseTokenSearch, createToken, searchParams, router, pathname]
+    );
 
     // Select quote token and create/enrich it
-    const selectQuoteToken = useCallback(async (token: TokenSearchResult) => {
-        setQuoteSelection({
-            token,
-            isSearching: false,
-            showDropdown: false,
-        });
-        quoteTokenSearch.setQuery(token.symbol);
-        quoteTokenSearch.clearResults();
+    const selectQuoteToken = useCallback(
+        async (token: TokenSearchResult) => {
+            setQuoteSelection({
+                token,
+                isSearching: false,
+                showDropdown: false,
+            });
+            quoteTokenSearch.setQuery(token.symbol);
+            quoteTokenSearch.clearResults();
 
-        // Update URL parameter
-        if (token.address) {
-            const params = new URLSearchParams(searchParams.toString());
-            params.set("quoteToken", token.address);
-            router.push(pathname + "?" + params.toString());
+            // Update URL parameter
+            if (token.address) {
+                const params = new URLSearchParams(searchParams.toString());
+                params.set("quoteToken", token.address);
+                router.push(pathname + "?" + params.toString());
 
-            // Create/enrich token immediately on selection
-            const enrichedToken = await createToken(token.address);
-            if (enrichedToken) {
-                setQuoteSelection(prev => ({
-                    ...prev,
-                    token: enrichedToken
-                }));
+                // Create/enrich token immediately on selection
+                const enrichedToken = await createToken(token.address);
+                if (enrichedToken) {
+                    setQuoteSelection((prev) => ({
+                        ...prev,
+                        token: enrichedToken,
+                    }));
+                }
             }
-        }
-    }, [quoteTokenSearch, createToken, searchParams, router, pathname]);
+        },
+        [quoteTokenSearch, createToken, searchParams, router, pathname]
+    );
 
     // Update parent when both tokens are selected and valid
     useEffect(() => {
@@ -477,7 +541,8 @@ export function TokenPairStep(props: TokenPairStepProps) {
                                 Invalid Chain Selected
                             </h5>
                             <p className="text-red-200/80 text-sm mt-1">
-                                Please select a valid blockchain network to continue with token pair selection.
+                                Please select a valid blockchain network to
+                                continue with token pair selection.
                             </p>
                         </div>
                     </div>
@@ -507,15 +572,25 @@ export function TokenPairStep(props: TokenPairStepProps) {
                 <div className="space-y-2 text-sm text-slate-300">
                     <p>
                         <span className="text-blue-400 font-medium">
-                            {t("positionWizard.tokenPair.explanation.baseToken")}:
+                            {t(
+                                "positionWizard.tokenPair.explanation.baseToken"
+                            )}
+                            :
                         </span>{" "}
-                        {t("positionWizard.tokenPair.explanation.baseDescription")}
+                        {t(
+                            "positionWizard.tokenPair.explanation.baseDescription"
+                        )}
                     </p>
                     <p>
                         <span className="text-green-400 font-medium">
-                            {t("positionWizard.tokenPair.explanation.quoteToken")}:
+                            {t(
+                                "positionWizard.tokenPair.explanation.quoteToken"
+                            )}
+                            :
                         </span>{" "}
-                        {t("positionWizard.tokenPair.explanation.quoteDescription")}
+                        {t(
+                            "positionWizard.tokenPair.explanation.quoteDescription"
+                        )}
                     </p>
                 </div>
             </div>
@@ -531,12 +606,18 @@ export function TokenPairStep(props: TokenPairStepProps) {
                     onTokenSelect={selectBaseToken}
                     searchHook={baseTokenSearch}
                     popularTokens={popularBaseTokens}
-                    placeholder={t("positionWizard.tokenPair.searchPlaceholder")}
+                    placeholder={t(
+                        "positionWizard.tokenPair.searchPlaceholder"
+                    )}
                     label={t("positionWizard.tokenPair.baseToken")}
                     color="text-blue-400"
                     onClearToken={() => {
-                        setBaseSelection({ token: null, isSearching: false, showDropdown: false });
-                        baseTokenSearch.setQuery('');
+                        setBaseSelection({
+                            token: null,
+                            isSearching: false,
+                            showDropdown: false,
+                        });
+                        baseTokenSearch.setQuery("");
                     }}
                 />
 
@@ -549,32 +630,42 @@ export function TokenPairStep(props: TokenPairStepProps) {
                     onTokenSelect={selectQuoteToken}
                     searchHook={quoteTokenSearch}
                     popularTokens={popularQuoteTokens}
-                    placeholder={t("positionWizard.tokenPair.searchPlaceholder")}
+                    placeholder={t(
+                        "positionWizard.tokenPair.searchPlaceholder"
+                    )}
                     label={t("positionWizard.tokenPair.quoteToken")}
                     color="text-green-400"
                     onClearToken={() => {
-                        setQuoteSelection({ token: null, isSearching: false, showDropdown: false });
-                        quoteTokenSearch.setQuery('');
+                        setQuoteSelection({
+                            token: null,
+                            isSearching: false,
+                            showDropdown: false,
+                        });
+                        quoteTokenSearch.setQuery("");
                     }}
                 />
             </div>
 
             {/* Validation Error */}
-            {validation.error && baseSelection.token && quoteSelection.token && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
-                    <div className="flex items-center gap-3">
-                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                        <div>
-                            <h5 className="text-red-400 font-medium">
-                                {t("positionWizard.tokenPair.validationError")}
-                            </h5>
-                            <p className="text-red-200/80 text-sm mt-1">
-                                {validation.error}
-                            </p>
+            {validation.error &&
+                baseSelection.token &&
+                quoteSelection.token && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                        <div className="flex items-center gap-3">
+                            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                            <div>
+                                <h5 className="text-red-400 font-medium">
+                                    {t(
+                                        "positionWizard.tokenPair.validationError"
+                                    )}
+                                </h5>
+                                <p className="text-red-200/80 text-sm mt-1">
+                                    {validation.error}
+                                </p>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
             {/* Bottom Note - matches chain selection step height */}
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
@@ -582,7 +673,6 @@ export function TokenPairStep(props: TokenPairStepProps) {
                     {t("positionWizard.tokenPair.note")}
                 </p>
             </div>
-
         </div>
     );
 }

@@ -149,7 +149,26 @@ export function PositionWizard({
     function goBack() {
         if (currentStep == 0) return;
         const params = new URLSearchParams(searchParams.toString());
-        params.set("step", Number(currentStep - 1).toString());
+        const newStep = currentStep - 1;
+        params.set("step", Number(newStep).toString());
+
+        // Clean up URL parameters from subsequent steps
+        if (newStep <= 1) {
+            // Going back to chain selection or earlier - remove all subsequent params
+            params.delete("chain");
+            params.delete("baseToken");
+            params.delete("quoteToken");
+            params.delete("poolAddress");
+        } else if (newStep <= 2) {
+            // Going back to token pair selection - remove token and pool params
+            params.delete("baseToken");
+            params.delete("quoteToken");
+            params.delete("poolAddress");
+        } else if (newStep <= 3) {
+            // Going back to pool selection - remove pool params
+            params.delete("poolAddress");
+        }
+
         router.push(pathname + "?" + params.toString());
     }
 
