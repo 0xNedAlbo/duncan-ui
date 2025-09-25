@@ -50,6 +50,8 @@ export class CoinGeckoService {
     'ethereum': 'ethereum',
     'arbitrum': 'arbitrum-one',
     'base': 'base',
+    // Local testnet uses same token data as Arbitrum (since it's an Arbitrum fork)
+    'arbitrum-fork-local': 'arbitrum-one',
   };
 
   /**

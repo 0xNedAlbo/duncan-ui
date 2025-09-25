@@ -4,7 +4,7 @@ import { DefaultClientsFactory } from "@/services/ClientsFactory";
 import { DefaultServiceFactory } from "@/services/ServiceFactory";
 import { TokenEnrichmentService } from "@/services/tokens/tokenEnrichmentService";
 import { isValidAddress } from "@/lib/utils/evm";
-import type { SupportedChainsType } from "@/config/chains";
+import { SUPPORTED_CHAINS, type SupportedChainsType } from "@/config/chains";
 
 interface TokenEnrichmentRequest {
     tokens: Array<{
@@ -80,9 +80,9 @@ export const POST = withAuthAndLogging<TokenEnrichmentResponse | TokenEnrichment
                     );
                 }
 
-                if (!['ethereum', 'arbitrum', 'base'].includes(token.chain)) {
+                if (!SUPPORTED_CHAINS.includes(token.chain)) {
                     return NextResponse.json(
-                        { error: 'Invalid chain', message: `Unsupported chain: ${token.chain}` },
+                        { error: 'Invalid chain', message: `Unsupported chain: ${token.chain}. Supported: ${SUPPORTED_CHAINS.join(', ')}` },
                         { status: 400 }
                     );
                 }

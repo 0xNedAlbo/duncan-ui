@@ -134,6 +134,55 @@ export const POPULAR_TOKENS: Record<SupportedChainsType, PopularTokensByChain> =
                 logoUrl: "https://coin-images.coingecko.com/coins/images/6319/small/usdc.png?1696506694"
             }
         ]
+    },
+    // Local testnet uses same token addresses as Arbitrum (since it's an Arbitrum fork)
+    "arbitrum-fork-local": {
+        base: [
+            {
+                symbol: "WETH",
+                address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBAb1",
+                name: "Wrapped Ether",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/2518/small/weth.png?1696503332"
+            },
+            {
+                symbol: "WBTC",
+                address: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
+                name: "Wrapped BTC",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/7598/small/wrapped_bitcoin_wbtc.png?1696507857"
+            },
+            {
+                symbol: "ARB",
+                address: "0x912CE59144191C1204E64559FE8253a0e49E6548",
+                name: "Arbitrum",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/16547/small/arb.jpg?1721358242"
+            },
+            {
+                symbol: "GMX",
+                address: "0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a",
+                name: "GMX",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/18323/small/arbit.png?1696517814"
+            }
+        ],
+        quote: [
+            {
+                symbol: "WETH",
+                address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBAb1",
+                name: "Wrapped Ether",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/2518/small/weth.png?1696503332"
+            },
+            {
+                symbol: "USDC",
+                address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+                name: "USD Coin",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/6319/small/usdc.png?1696506694"
+            },
+            {
+                symbol: "USDC.e",
+                address: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
+                name: "USD Coin (Arb1)",
+                logoUrl: "https://coin-images.coingecko.com/coins/images/6319/small/usdc.png?1696506694"
+            }
+        ]
     }
 };
 

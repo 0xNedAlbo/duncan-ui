@@ -1,9 +1,9 @@
 "use client";
 
 import { useTranslations } from "@/i18n/client";
-import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
+import { SupportedChainsType, SUPPORTED_CHAINS, getChainConfig } from "@/config/chains";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 interface ChainSelectionStepProps {
     // eslint-disable-next-line no-unused-vars
@@ -22,27 +22,18 @@ export function ChainSelectionStep(props: ChainSelectionStepProps) {
         id: SupportedChainsType;
         name: string;
         description: string;
-    }[] = [
-        {
-            id: "ethereum",
-            name: "Ethereum",
-            description: t(
-                "positionWizard.chainSelection.ethereum.description"
-            ),
-        },
-        {
-            id: "arbitrum",
-            name: "Arbitrum",
-            description: t(
-                "positionWizard.chainSelection.arbitrum.description"
-            ),
-        },
-        {
-            id: "base",
-            name: "Base",
-            description: t("positionWizard.chainSelection.base.description"),
-        },
-    ];
+    }[] = useMemo(() => {
+        return SUPPORTED_CHAINS.map((chainKey) => {
+            const config = getChainConfig(chainKey);
+            return {
+                id: chainKey as SupportedChainsType,
+                name: config?.shortName || chainKey,
+                description: t(
+                    `positionWizard.chainSelection.${chainKey}.description` as any
+                ),
+            };
+        });
+    }, [t]);
 
     useEffect(() => {
         const chainParam = searchParams.get("chain") || "";

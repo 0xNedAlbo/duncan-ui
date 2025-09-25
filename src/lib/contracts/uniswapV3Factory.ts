@@ -31,6 +31,8 @@ export const UNISWAP_V3_FACTORY_ADDRESSES: Record<string, `0x${string}`> = {
   ethereum: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
   arbitrum: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
   base: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD',
+  // Local testnet uses same address as Arbitrum (since it's an Arbitrum fork)
+  'arbitrum-fork-local': '0x1F98431c8aD98523631AE4a59f267346ea31F984',
 };
 
 // Chain ID mapping
@@ -39,6 +41,7 @@ export function getChainId(chainName: string): number {
     ethereum: 1,
     arbitrum: 42161,
     base: 8453,
+    'arbitrum-fork-local': 31337,
   };
 
   const chainId = chainIds[chainName.toLowerCase()];

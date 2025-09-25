@@ -5,7 +5,7 @@ import { DefaultServiceFactory } from "@/services/ServiceFactory";
 import { OnChainTokenService } from "@/services/tokens/onChainTokenService";
 import { isValidAddress } from "@/lib/utils/evm";
 import { getPopularTokens, findPopularToken } from "@/lib/config/popularTokens";
-import type { SupportedChainsType } from "@/config/chains";
+import { SUPPORTED_CHAINS, type SupportedChainsType } from "@/config/chains";
 
 interface TokenSearchResponse {
     results: Array<{
@@ -48,9 +48,9 @@ export const GET = withAuthAndLogging<TokenSearchResponse | TokenSearchError>(
             );
         }
 
-        if (!['ethereum', 'arbitrum', 'base'].includes(chain)) {
+        if (!SUPPORTED_CHAINS.includes(chain)) {
             return NextResponse.json(
-                { error: 'Invalid chain', message: 'Supported chains: ethereum, arbitrum, base' },
+                { error: 'Invalid chain', message: `Supported chains: ${SUPPORTED_CHAINS.join(', ')}` },
                 { status: 400 }
             );
         }

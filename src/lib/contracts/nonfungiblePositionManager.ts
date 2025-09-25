@@ -9,6 +9,8 @@ export const NONFUNGIBLE_POSITION_MANAGER_ADDRESSES: Record<number, Address> = {
   42161: normalizeAddress('0xC36442b4a4522E871399CD717aBDD847Ab11FE88') as Address,
   // Base
   8453: normalizeAddress('0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1') as Address,
+  // Local testnet (Arbitrum fork) - uses same address as Arbitrum
+  31337: normalizeAddress('0xC36442b4a4522E871399CD717aBDD847Ab11FE88') as Address,
 };
 
 // ABI for the positions() and ownerOf() functions
@@ -176,6 +178,8 @@ export function getChainName(chainId: number): string {
       return 'arbitrum';
     case 8453:
       return 'base';
+    case 31337:
+      return 'arbitrum-fork-local';
     default:
       throw new Error(`Unsupported chain ID: ${chainId}`);
   }
@@ -190,6 +194,8 @@ export function getChainId(chainName: string): number {
       return 42161;
     case 'base':
       return 8453;
+    case 'arbitrum-fork-local':
+      return 31337;
     default:
       throw new Error(`Unsupported chain: ${chainName}`);
   }

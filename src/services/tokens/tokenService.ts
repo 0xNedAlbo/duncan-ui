@@ -29,13 +29,19 @@ export class TokenService {
     private enrichmentService: TokenEnrichmentService;
 
     constructor(
-        requiredClients: Pick<Clients, 'prisma' | 'rpcClients'>,
-        requiredServices: Pick<Services, 'alchemyTokenService' | 'coinGeckoService'>
+        requiredClients: Pick<Clients, "prisma" | "rpcClients">,
+        requiredServices: Pick<
+            Services,
+            "alchemyTokenService" | "coinGeckoService"
+        >
     ) {
         this.prisma = requiredClients.prisma;
         this.alchemyService = requiredServices.alchemyTokenService;
         this.enrichmentService = new TokenEnrichmentService(
-            { prisma: requiredClients.prisma, rpcClients: requiredClients.rpcClients },
+            {
+                prisma: requiredClients.prisma,
+                rpcClients: requiredClients.rpcClients,
+            },
             { coinGeckoService: requiredServices.coinGeckoService }
         );
     }
@@ -66,6 +72,7 @@ export class TokenService {
      * Find a token by chain and address, or create it if it doesn't exist
      */
     async findOrCreateToken(chain: string, address: string): Promise<Token> {
+
         this.validateInput(chain, address);
 
         // Normalize address to EIP-55 checksum format
@@ -80,6 +87,7 @@ export class TokenService {
                 },
             },
         });
+        console.log(existingToken);
 
         if (existingToken) {
             return existingToken;
@@ -88,7 +96,7 @@ export class TokenService {
         // Token doesn't exist, create and enrich it directly
         const enrichmentResult = await this.enrichmentService.enrichToken({
             chain: chain as any,
-            address: normalizedAddress
+            address: normalizedAddress,
         });
 
         if (enrichmentResult.success) {
@@ -108,7 +116,9 @@ export class TokenService {
         }
 
         // Enrichment failed, create token with minimal on-chain data as fallback
-        throw new Error(`Failed to create and enrich token ${normalizedAddress} on ${chain}: ${enrichmentResult.message}`);
+        throw new Error(
+            `Failed to create and enrich token ${normalizedAddress} on ${chain}: ${enrichmentResult.message}`
+        );
     }
 
     /**
@@ -259,7 +269,9 @@ export class TokenService {
             return [];
         }
 
-        const normalizedAddresses = addresses.map((addr) => normalizeAddress(addr));
+        const normalizedAddresses = addresses.map((addr) =>
+            normalizeAddress(addr)
+        );
 
         return await this.prisma.token.findMany({
             where: {
@@ -285,7 +297,9 @@ export class TokenService {
             return [];
         }
 
-        const normalizedAddresses = addresses.map((addr) => normalizeAddress(addr));
+        const normalizedAddresses = addresses.map((addr) =>
+            normalizeAddress(addr)
+        );
 
         // Check which tokens already exist
         const existingTokens = await this.getTokensByAddresses(
@@ -436,15 +450,6 @@ export class TokenService {
         // Basic Ethereum address validation (case-insensitive)
         if (!/^0x[a-fA-F0-9]{40}$/i.test(address)) {
             throw new Error(`Invalid Ethereum address format: ${address}`);
-        }
-
-        // Check if chain is supported by Alchemy
-        if (!this.alchemyService.isChainSupported(chain)) {
-            throw new Error(
-                `Unsupported chain: ${chain}. Supported chains: ${this.alchemyService
-                    .getSupportedChains()
-                    .join(", ")}`
-            );
         }
     }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuthAndLogging } from "@/lib/api/withAuth";
 import { DefaultServiceFactory } from "@/services/ServiceFactory";
 import { isValidAddress } from "@/lib/utils/evm";
-import type { SupportedChainsType } from "@/config/chains";
+import { SUPPORTED_CHAINS, type SupportedChainsType } from "@/config/chains";
 
 interface TokenCreateRequest {
     chain: SupportedChainsType;
@@ -35,28 +35,43 @@ export const POST = withAuthAndLogging<TokenCreateResponse | TokenCreateError>(
             const body: TokenCreateRequest = await request.json();
 
             log.debug(
-                { userId: user.userId, chain: body.chain, address: body.address },
-                'Token creation request'
+                {
+                    userId: user.userId,
+                    chain: body.chain,
+                    address: body.address,
+                },
+                "Token creation request"
             );
 
             // Validate request body
             if (!body.chain || !body.address) {
                 return NextResponse.json(
-                    { error: 'Invalid request', message: 'chain and address are required' },
+                    {
+                        error: "Invalid request",
+                        message: "chain and address are required",
+                    },
                     { status: 400 }
                 );
             }
 
-            if (!['ethereum', 'arbitrum', 'base'].includes(body.chain)) {
+            if (!SUPPORTED_CHAINS.includes(body.chain)) {
                 return NextResponse.json(
-                    { error: 'Invalid chain', message: `Unsupported chain: ${body.chain}` },
+                    {
+                        error: "Invalid chain",
+                        message: `Unsupported chain: ${
+                            body.chain
+                        }. Supported: ${SUPPORTED_CHAINS.join(", ")}`,
+                    },
                     { status: 400 }
                 );
             }
 
             if (!isValidAddress(body.address)) {
                 return NextResponse.json(
-                    { error: 'Invalid address', message: `Invalid address format: ${body.address}` },
+                    {
+                        error: "Invalid address",
+                        message: `Invalid address format: ${body.address}`,
+                    },
                     { status: 400 }
                 );
             }
@@ -66,16 +81,19 @@ export const POST = withAuthAndLogging<TokenCreateResponse | TokenCreateError>(
             const { tokenService } = servicesFactory.getServices();
 
             // Create token with enrichment
-            const createdToken = await tokenService.findOrCreateToken(body.chain, body.address);
+            const createdToken = await tokenService.findOrCreateToken(
+                body.chain,
+                body.address
+            );
 
             log.debug(
                 {
                     userId: user.userId,
                     tokenAddress: createdToken.address,
                     tokenSymbol: createdToken.symbol,
-                    source: createdToken.source
+                    source: createdToken.source,
                 },
-                'Token created successfully'
+                "Token created successfully"
             );
 
             return NextResponse.json({
@@ -92,14 +110,13 @@ export const POST = withAuthAndLogging<TokenCreateResponse | TokenCreateError>(
                     source: createdToken.source,
                 },
             });
-
         } catch (error) {
-            log.error({ error, userId: user.userId }, 'Token creation failed');
+            log.error({ error, userId: user.userId }, "Token creation failed");
 
             return NextResponse.json(
                 {
-                    error: 'Token creation failed',
-                    message: 'An error occurred while creating the token'
+                    error: "Token creation failed",
+                    message: "An error occurred while creating the token",
                 },
                 { status: 500 }
             );

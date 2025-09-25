@@ -470,6 +470,9 @@
       "base": {
         "description": "Coinbase Layer-2 for cheaper transactions"
       },
+      "arbitrum-fork-local": {
+        "description": "Local development testnet (forked from Arbitrum)"
+      },
       "note": "You can create additional positions on other chains later."
     },
     "tokenPair": {

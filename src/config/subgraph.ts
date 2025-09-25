@@ -25,6 +25,13 @@ export const SUBGRAPH_ENDPOINTS: Record<string, SubgraphConfig> = {
     chainId: 8453,
     available: true,
     name: 'Uniswap V3 (Base)'
+  },
+  // Local testnet uses Arbitrum subgraph (since it's an Arbitrum fork)
+  'arbitrum-fork-local': {
+    endpoint: 'https://gateway.thegraph.com/api/[api-key]/subgraphs/id/FbCGRftH4a3yZugY7TnbYgPJVEv2LvMT6oF1fxPe9aJM',
+    chainId: 31337,
+    available: true,
+    name: 'Uniswap V3 (Local Fork - Arbitrum Data)'
   }
 };
 

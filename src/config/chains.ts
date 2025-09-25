@@ -3,6 +3,31 @@
 import { mainnet, arbitrum, base, type Chain } from "viem/chains";
 import { normalizeAddress } from "@/lib/utils/evm";
 
+// Local development chain (Arbitrum fork)
+const arbitrumForkLocal: Chain = {
+    id: 31337,
+    name: "Arbitrum Fork (Local)",
+    nativeCurrency: {
+        decimals: 18,
+        name: "Ether",
+        symbol: "ETH",
+    },
+    rpcUrls: {
+        default: {
+            http: ["http://localhost:8545"],
+        },
+    },
+    blockExplorers: {
+        default: { name: "Local", url: "http://localhost:8545" },
+    },
+    contracts: {
+        multicall3: {
+            address: "0xca11bde05977b3631167028862be2a173976ca11",
+            blockCreated: 0,
+        },
+    },
+};
+
 export type FinalityConfig =
     | { type: "blockTag" }
     | { type: "blockHeight"; minBlockHeight: number };
@@ -73,6 +98,25 @@ const CHAIN_CONFIG: Record<string, ChainConfig> = {
     },
 };
 
+// Add development-only chains
+if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+    CHAIN_CONFIG["arbitrum-fork-local"] = {
+        chainId: 31337,
+        name: "Arbitrum Fork (Local)",
+        shortName: "Local Fork",
+        slug: "arbitrum-fork-local",
+        viemChain: arbitrumForkLocal,
+        wrappedNativeToken: {
+            address: normalizeAddress("0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"),
+            symbol: "WETH",
+            name: "Wrapped Ether",
+            decimals: 18,
+        },
+        explorer: "http://localhost:8545",
+        finality: { type: "blockHeight", minBlockHeight: 1 },
+    };
+}
+
 let isInitialized = false;
 
 // Helper Functions
@@ -92,15 +136,21 @@ export function getChainConfig(chain: string): ChainConfig {
                     CHAIN_CONFIG[chainName].rpcUrl =
                         process.env.NEXT_PUBLIC_BASE_RPC_URL;
                     break;
+                case "arbitrum-fork-local":
+                    CHAIN_CONFIG[chainName].rpcUrl =
+                        process.env.NEXT_PUBLIC_LOCAL_RPC_URL || "http://localhost:8545";
+                    break;
                 default:
                     throw new Error("Unknown chain name: " + chainName);
             }
-            if (!CHAIN_CONFIG[chainName])
+            // Skip RPC URL validation for local development chain (always has fallback)
+            if (chainName !== "arbitrum-fork-local" && !CHAIN_CONFIG[chainName].rpcUrl) {
                 throw new Error(
-                    `Missing NEXT_PUBLIC_[chainName]_RPC_URL for chain: ${chainName}`
+                    `Missing NEXT_PUBLIC_${chainName.toUpperCase()}_RPC_URL for chain: ${chainName}`
                 );
-            isInitialized = true;
+            }
         });
+        isInitialized = true;
     }
     return CHAIN_CONFIG[chain.toLowerCase()] || null;
 }
@@ -122,17 +172,26 @@ export function isWrappedNativeToken(address: string, chain: string): boolean {
         : false;
 }
 
-// Unterstützte Chains
+// Unterstützte Chains - computed dynamically
 export const SUPPORTED_CHAINS = Object.keys(CHAIN_CONFIG);
 
-export type SupportedChainsType = "ethereum" | "arbitrum" | "base";
+export type SupportedChainsType = "ethereum" | "arbitrum" | "base" |
+    (typeof process.env.NODE_ENV extends "development" ? "arbitrum-fork-local" : never);
 
-// Chain ID Mapping
-export const CHAIN_ID_TO_NAME: Record<number, string> = {
+// Base chain ID mapping
+const BASE_CHAIN_ID_MAPPING: Record<number, string> = {
     1: "ethereum",
     42161: "arbitrum",
     8453: "base",
 };
+
+// Build chain ID mapping dynamically (matches CHAIN_CONFIG)
+export const CHAIN_ID_TO_NAME: Record<number, string> = { ...BASE_CHAIN_ID_MAPPING };
+
+// Add development chain IDs if in development mode
+if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+    CHAIN_ID_TO_NAME[31337] = "arbitrum-fork-local";
+}
 
 /**
  * Get chain ID for a supported chain

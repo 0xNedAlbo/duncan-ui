@@ -217,23 +217,6 @@ class ApiDebugger {
         return this.apiRequest<T>(urlOrEndpoint, { method: "DELETE" });
     }
 
-    /**
-     * Run example API calls for testing
-     */
-    async runExamples() {
-        console.log("🧪 Running example API calls...\n");
-
-        // Test health endpoint
-        await this.get("/api/health");
-
-        // Test positions endpoint (new Uniswap V3 route)
-        await this.get("/api/positions/uniswapv3/list");
-
-        // Test positions with pagination
-        await this.get("/api/positions/uniswapv3/list?page=1&limit=10");
-
-        console.log("🏁 Example runs completed!");
-    }
 }
 
 /**
@@ -244,7 +227,6 @@ function parseArgs(args: string[]) {
         method?: string;
         endpoint?: string;
         body?: any;
-        examples?: boolean;
         help?: boolean;
         baseUrl?: string;
     } = {};
@@ -276,9 +258,6 @@ function parseArgs(args: string[]) {
             case "--base":
                 parsed.baseUrl = args[++i];
                 break;
-            case "--examples":
-                parsed.examples = true;
-                break;
             case "--help":
             case "-h":
                 parsed.help = true;
@@ -305,7 +284,6 @@ Options:
   -u, --url <URL>          Full URL (e.g., http://localhost:3001/api/tokens)
   -b, --body <JSON>         Request body as JSON string
   --base-url <URL>          Base URL for endpoints (default: NEXTAUTH_URL or http://localhost:3000)
-  --examples                Run predefined example calls
   -h, --help                Show this help message
 
 Examples:
@@ -326,9 +304,6 @@ Examples:
 
   # Using custom base URL for multiple endpoints
   npx tsx scripts/debug/api-debug.ts --base-url "http://localhost:3001" -m GET -e "/api/positions/uniswapv3/list"
-
-  # Run examples
-  npx tsx scripts/debug/api-debug.ts --examples
 
 `);
 }
@@ -356,9 +331,7 @@ async function main() {
 
     console.log("");
 
-    if (parsed.examples) {
-        await apiDebugger.runExamples();
-    } else if (parsed.method && parsed.endpoint) {
+    if (parsed.method && parsed.endpoint) {
         // Command line mode with method and endpoint
         let result;
 
@@ -392,7 +365,7 @@ async function main() {
     } else {
         // Default: show help and exit
         console.log(
-            "❌ Please specify either --examples or provide --method and --endpoint"
+            "❌ Please provide --method and --endpoint"
         );
         console.log("Use --help for usage information.");
         process.exit(1);
