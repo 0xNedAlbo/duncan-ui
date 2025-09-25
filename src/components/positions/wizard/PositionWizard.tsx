@@ -4,11 +4,14 @@ import { useState, useCallback, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X, ArrowLeft, ArrowRight } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
+import type { SupportedChainsType } from "@/config/chains";
+import { isValidChainSlug } from "@/config/chains";
 
 import { OpenPositionStep } from "./OpenPositionStep";
 import { ChainSelectionStep } from "./ChainSelectionStep";
 import { TokenPairStep } from "./TokenPairStep";
 import { PoolSelectionStep } from "./PoolSelectionStep";
+import { PositionConfigStep } from "./PositionConfigStep";
 
 interface PositionWizardProps {
     isOpen: boolean;
@@ -33,7 +36,7 @@ export function PositionWizard({
     const [isTokenPairSelected, setTokenPairSelected] =
         useState<boolean>(false);
     const [isPoolSelected, setPoolSelected] = useState<boolean>(false);
-    const [isPoisitionConfigured, setPositionConfigured] =
+    const [isPositionConfigured, setPositionConfigured] =
         useState<boolean>(false);
     const [isPositionCreated, setPositionCreated] = useState<boolean>(false);
 
@@ -47,32 +50,60 @@ export function PositionWizard({
         if (step) setCurrentStep(parseInt(step));
     }, [searchParams]);
 
+    // Initialize wizard state from URL parameters when loading at a specific step
+    useEffect(() => {
+        const chainParam = searchParams.get("chain");
+        const baseTokenParam = searchParams.get("baseToken");
+        const quoteTokenParam = searchParams.get("quoteToken");
+        const poolAddressParam = searchParams.get("poolAddress");
+
+        // Validate and set chain selection state
+        const isValidChain = chainParam && isValidChainSlug(chainParam);
+        setChainSelected(!!isValidChain);
+
+        // Validate and set token pair selection state
+        const hasValidTokenPair = !!baseTokenParam && !!quoteTokenParam;
+        setTokenPairSelected(hasValidTokenPair);
+
+        // Validate and set pool selection state
+        const hasValidPool = !!poolAddressParam;
+        setPoolSelected(hasValidPool);
+
+        // Note: Position configured state is handled by the PositionConfigStep callback
+        // so we don't set it here to avoid conflicts
+    }, [searchParams]);
+
     const canGoNext = useCallback(() => {
+        // Step 0: Always can go next from intro step
+        if (currentStep === 0) return true;
+
+        // Step 1: Need chain selected
+        if (currentStep === 1) return isChainSelected;
+
+        // Step 2: Need chain and token pair selected
+        if (currentStep === 2) return isChainSelected && isTokenPairSelected;
+
+        // Step 3: Need chain, token pair, and pool selected
+        if (currentStep === 3) return isChainSelected && isTokenPairSelected && isPoolSelected;
+
+        // Step 4: Need everything including position configured
+        if (currentStep === 4) return isChainSelected && isTokenPairSelected && isPoolSelected && isPositionConfigured;
+
+        // Step 5+: Handle later steps
         if (currentStep >= 5) {
-            if (isPositionCreated) return false;
+            return isPositionCreated; // Can only proceed if position is created
         }
-        if (currentStep >= 4) {
-            if (isPoisitionConfigured) return false;
-            return false;
-        }
-        if (currentStep >= 3) {
-            if (!isPoolSelected) return false;
-        }
-        if (currentStep >= 2) {
-            if (!isTokenPairSelected) return false;
-        }
-        if (currentStep >= 1) {
-            if (!isChainSelected) return false;
-        }
-        return true;
+
+        return false;
     }, [
         currentStep,
         isChainSelected,
-        isPoisitionConfigured,
+        isPositionConfigured,
         isPoolSelected,
         isPositionCreated,
         isTokenPairSelected,
     ]);
+
 
     const getStepTitle = (step: number): string => {
         switch (step) {
@@ -103,22 +134,9 @@ export function PositionWizard({
                 return <TokenPairStep onTokenPairSelect={setTokenPairSelected} />;
             case 3:
                 return <PoolSelectionStep onPoolSelect={setPoolSelected} />;
-            /*
             case 4:
-                return (
-                    <PositionConfigStep
-                        pool={wizardState.selectedPool!.pool}
-                        config={wizardState.positionConfig}
-                        onConfigChange={handleConfigChange}
-                        onCreatePosition={() => {
-                            // TODO: Implement position creation
-                            onPositionCreated?.(wizardState);
-                            handleClose();
-                        }}
-                        onBack={goBack}
-                    />
-                );
-            case 5:
+                return <PositionConfigStep onConfigSelect={setPositionConfigured} />;
+            /*case 5:
                 return (
                     <PositionSummaryStep
                         chain={wizardState.selectedChain!}
@@ -159,14 +177,28 @@ export function PositionWizard({
             params.delete("baseToken");
             params.delete("quoteToken");
             params.delete("poolAddress");
+            params.delete("tickLower");
+            params.delete("tickUpper");
+            params.delete("liquidity");
         } else if (newStep <= 2) {
             // Going back to token pair selection - remove token and pool params
             params.delete("baseToken");
             params.delete("quoteToken");
             params.delete("poolAddress");
+            params.delete("tickLower");
+            params.delete("tickUpper");
+            params.delete("liquidity");
         } else if (newStep <= 3) {
             // Going back to pool selection - remove pool params
             params.delete("poolAddress");
+            params.delete("tickLower");
+            params.delete("tickUpper");
+            params.delete("liquidity");
+        } else if (newStep <= 4) {
+            // Going back to position config - remove position params
+            params.delete("tickLower");
+            params.delete("tickUpper");
+            params.delete("liquidity");
         }
 
         router.push(pathname + "?" + params.toString());
