@@ -43,12 +43,48 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         enabled: !!isValidChain && !!poolAddressParam,
     });
 
+    // Calculate default ticks based on ±20% around current price
+    const calculateDefaultTicks = useCallback(() => {
+        if (!pool?.currentTick) {
+            throw new Error("Cannot calculate default ticks: pool currentTick is not available");
+        }
+
+        // Get current sqrt price
+        const currentTick = pool.currentTick;
+        const tickSpacing = pool.tickSpacing || 60;
+
+        // Calculate ±20% price range
+        // For tick math: price = 1.0001^tick
+        // So for ±20%: new_tick = current_tick ± log(1.2) / log(1.0001)
+        const priceMultiplier = Math.log(1.2) / Math.log(1.0001);
+
+        const lowerTick =
+            Math.floor((currentTick - priceMultiplier) / tickSpacing) *
+            tickSpacing;
+        const upperTick =
+            Math.ceil((currentTick + priceMultiplier) / tickSpacing) *
+            tickSpacing;
+
+        return { lower: lowerTick, upper: upperTick };
+    }, [pool?.currentTick, pool?.tickSpacing]);
+
+    // Get default ticks
+    const defaultTicks = useMemo(() => {
+        try {
+            return calculateDefaultTicks();
+        } catch (error) {
+            console.error("Failed to calculate default ticks:", error);
+            // Return null to indicate calculation failed - will be handled in state initialization
+            return null;
+        }
+    }, [calculateDefaultTicks]);
+
     // State for the core position parameters - initialize from URL or defaults
     const [tickLower, setTickLower] = useState<number>(
-        tickLowerParam ? parseInt(tickLowerParam) : -60
+        tickLowerParam ? parseInt(tickLowerParam) : defaultTicks?.lower || 0
     );
     const [tickUpper, setTickUpper] = useState<number>(
-        tickUpperParam ? parseInt(tickUpperParam) : 60
+        tickUpperParam ? parseInt(tickUpperParam) : defaultTicks?.upper || 0
     );
     const [liquidity, setLiquidity] = useState<string>(
         liquidityParam || "1000000000000000000"
@@ -57,15 +93,24 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
     // Sync local state with URL parameters when they change
     useEffect(() => {
         if (tickLowerParam !== null) {
-            setTickLower(parseInt(tickLowerParam) || -60);
+            setTickLower(parseInt(tickLowerParam) || defaultTicks?.lower || 0);
         }
         if (tickUpperParam !== null) {
-            setTickUpper(parseInt(tickUpperParam) || 60);
+            setTickUpper(parseInt(tickUpperParam) || defaultTicks?.upper || 0);
         }
         if (liquidityParam !== null) {
             setLiquidity(liquidityParam || "1000000000000000000");
         }
-    }, [tickLowerParam, tickUpperParam, liquidityParam]);
+    }, [tickLowerParam, tickUpperParam, liquidityParam, defaultTicks]);
+
+    // Update tick values when pool changes (if not set from URL params)
+    useEffect(() => {
+        // Only update if there are no URL parameters (meaning we should use defaults)
+        if (!tickLowerParam && !tickUpperParam && pool?.currentTick && defaultTicks) {
+            setTickLower(defaultTicks.lower);
+            setTickUpper(defaultTicks.upper);
+        }
+    }, [pool?.currentTick, defaultTicks, tickLowerParam, tickUpperParam]);
 
     // Handle navigation to previous steps if invalid parameters
     const goToChainSelection = useCallback(() => {
@@ -108,7 +153,9 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         if (!isValidChain || !poolAddressParam) return;
 
         // Don't update URL if we're still loading from URL parameters
-        const currentTickLower = tickLowerParam ? parseInt(tickLowerParam) : -60;
+        const currentTickLower = tickLowerParam
+            ? parseInt(tickLowerParam)
+            : -60;
         const currentTickUpper = tickUpperParam ? parseInt(tickUpperParam) : 60;
         const currentLiquidity = liquidityParam || "1000000000000000000";
 
@@ -124,13 +171,30 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
             params.set("liquidity", liquidity);
             router.replace(pathname + "?" + params.toString());
         }
-    }, [tickLower, tickUpper, liquidity, isValidChain, poolAddressParam, tickLowerParam, tickUpperParam, liquidityParam, router, pathname, searchParams]);
+    }, [
+        tickLower,
+        tickUpper,
+        liquidity,
+        isValidChain,
+        poolAddressParam,
+        tickLowerParam,
+        tickUpperParam,
+        liquidityParam,
+        router,
+        pathname,
+        searchParams,
+    ]);
 
     // Pool-token validation logic (order-agnostic) - memoized to prevent unnecessary recalculations
     const validation = useMemo(() => {
         // Check if pool is loaded successfully
         if (isPoolLoading) {
-            return { isValid: false, hasValidPool: false, hasValidTokens: false, hasValidParams: false };
+            return {
+                isValid: false,
+                hasValidPool: false,
+                hasValidTokens: false,
+                hasValidParams: false,
+            };
         }
 
         if (isPoolError || !pool) {
@@ -139,7 +203,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                 hasValidPool: false,
                 hasValidTokens: false,
                 hasValidParams: false,
-                error: poolError || "Pool could not be loaded"
+                error: poolError || "Pool could not be loaded",
             };
         }
 
@@ -150,7 +214,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                 hasValidPool: true,
                 hasValidTokens: false,
                 hasValidParams: false,
-                error: "Base and quote tokens are required"
+                error: "Base and quote tokens are required",
             };
         }
 
@@ -162,7 +226,10 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         const poolTokens = [normalizedToken0, normalizedToken1];
         const hasBaseToken = poolTokens.includes(normalizedBaseToken);
         const hasQuoteToken = poolTokens.includes(normalizedQuoteToken);
-        const tokensValid = hasBaseToken && hasQuoteToken && normalizedBaseToken !== normalizedQuoteToken;
+        const tokensValid =
+            hasBaseToken &&
+            hasQuoteToken &&
+            normalizedBaseToken !== normalizedQuoteToken;
 
         if (!tokensValid) {
             return {
@@ -170,7 +237,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                 hasValidPool: true,
                 hasValidTokens: false,
                 hasValidParams: false,
-                error: "Selected tokens do not match the pool tokens"
+                error: "Selected tokens do not match the pool tokens",
             };
         }
 
@@ -184,7 +251,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                 hasValidPool: true,
                 hasValidTokens: true,
                 hasValidParams: false,
-                error: "Invalid position parameters: tick lower must be less than tick upper, and liquidity must be greater than 0"
+                // No error message - this is expected when L=0 or invalid ticks
             };
         }
 
@@ -192,7 +259,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
             isValid: true,
             hasValidPool: true,
             hasValidTokens: true,
-            hasValidParams: true
+            hasValidParams: true,
         };
     }, [
         isPoolLoading,
@@ -210,7 +277,6 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
     useEffect(() => {
         props.onConfigSelect?.(validation.isValid);
     }, [validation.isValid, props]);
-
 
     // Show validation errors for missing parameters
     if (!isValidChain) {
@@ -299,7 +365,6 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
 
     return (
         <div className="space-y-6">
-
             {/* Loading State */}
             {isPoolLoading && (
                 <div className="flex items-center justify-center py-12">
@@ -328,121 +393,157 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
             )}
 
             {/* Token Validation Error */}
-            {validation.error && validation.hasValidPool && !validation.hasValidTokens && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
-                    <div className="flex items-center gap-3">
-                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                        <div>
-                            <h5 className="text-red-400 font-medium">
-                                Token Validation Error
-                            </h5>
-                            <p className="text-red-200/80 text-sm mt-1">
-                                {validation.error}
-                            </p>
+            {validation.error &&
+                validation.hasValidPool &&
+                !validation.hasValidTokens && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                        <div className="flex items-center gap-3">
+                            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                            <div>
+                                <h5 className="text-red-400 font-medium">
+                                    Token Validation Error
+                                </h5>
+                                <p className="text-red-200/80 text-sm mt-1">
+                                    {validation.error}
+                                </p>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-
+                )}
 
             {/* Position Configuration Form */}
-            {!isPoolLoading && validation.hasValidPool && validation.hasValidTokens && (
-                <div className="max-w-md mx-auto">
-                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-6">
-                        <div className="flex items-center gap-2 mb-6">
-                            <Settings className="w-5 h-5 text-blue-400" />
-                            <h4 className="text-lg font-semibold text-white">
-                                Position Parameters
-                            </h4>
-                        </div>
-
-                        <div className="space-y-6">
-                            {/* Price Range Configuration */}
-                            <div className="space-y-4">
-                                <h5 className="text-sm font-medium text-slate-300">Price Range</h5>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-2">
-                                            Lower Tick
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={tickLower}
-                                            onChange={(e) => setTickLower(parseInt(e.target.value) || 0)}
-                                            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="-60"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-2">
-                                            Upper Tick
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={tickUpper}
-                                            onChange={(e) => setTickUpper(parseInt(e.target.value) || 0)}
-                                            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="60"
-                                        />
-                                    </div>
-                                </div>
+            {!isPoolLoading &&
+                validation.hasValidPool &&
+                validation.hasValidTokens && (
+                    <div className="max-w-md mx-auto">
+                        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-6">
+                            <div className="flex items-center gap-2 mb-6">
+                                <Settings className="w-5 h-5 text-blue-400" />
+                                <h4 className="text-lg font-semibold text-white">
+                                    Position Parameters
+                                </h4>
                             </div>
 
-                            {/* Position Size Configuration */}
-                            {pool && baseTokenParam && quoteTokenParam && (
-                                <div>
-                                    <PositionSizeConfig
-                                        pool={pool}
-                                        baseToken={{
-                                            address: baseTokenParam,
-                                            symbol: pool.token0.address.toLowerCase() === baseTokenParam.toLowerCase()
-                                                ? pool.token0.symbol
-                                                : pool.token1.symbol,
-                                            decimals: pool.token0.address.toLowerCase() === baseTokenParam.toLowerCase()
-                                                ? pool.token0.decimals
-                                                : pool.token1.decimals,
-                                            logoUrl: pool.token0.address.toLowerCase() === baseTokenParam.toLowerCase()
-                                                ? pool.token0.logoUrl
-                                                : pool.token1.logoUrl,
-                                        }}
-                                        quoteToken={{
-                                            address: quoteTokenParam,
-                                            symbol: pool.token0.address.toLowerCase() === quoteTokenParam.toLowerCase()
-                                                ? pool.token0.symbol
-                                                : pool.token1.symbol,
-                                            decimals: pool.token0.address.toLowerCase() === quoteTokenParam.toLowerCase()
-                                                ? pool.token0.decimals
-                                                : pool.token1.decimals,
-                                            logoUrl: pool.token0.address.toLowerCase() === quoteTokenParam.toLowerCase()
-                                                ? pool.token0.logoUrl
-                                                : pool.token1.logoUrl,
-                                        }}
-                                        tickLower={tickLower}
-                                        tickUpper={tickUpper}
-                                        onLiquidityChange={(newLiquidity) => {
-                                            setLiquidity(newLiquidity.toString());
-                                        }}
-                                        chain={chain}
-                                    />
-                                </div>
-                            )}
+                            <div className="space-y-6">
+                                {/* Position Size Configuration */}
+                                {pool && baseTokenParam && quoteTokenParam && (
+                                    <div>
+                                        <PositionSizeConfig
+                                            pool={pool}
+                                            baseToken={{
+                                                address: baseTokenParam,
+                                                symbol:
+                                                    pool.token0.address.toLowerCase() ===
+                                                    baseTokenParam.toLowerCase()
+                                                        ? pool.token0.symbol
+                                                        : pool.token1.symbol,
+                                                decimals:
+                                                    pool.token0.address.toLowerCase() ===
+                                                    baseTokenParam.toLowerCase()
+                                                        ? pool.token0.decimals
+                                                        : pool.token1.decimals,
+                                                logoUrl:
+                                                    pool.token0.address.toLowerCase() ===
+                                                    baseTokenParam.toLowerCase()
+                                                        ? pool.token0.logoUrl
+                                                        : pool.token1.logoUrl,
+                                            }}
+                                            quoteToken={{
+                                                address: quoteTokenParam,
+                                                symbol:
+                                                    pool.token0.address.toLowerCase() ===
+                                                    quoteTokenParam.toLowerCase()
+                                                        ? pool.token0.symbol
+                                                        : pool.token1.symbol,
+                                                decimals:
+                                                    pool.token0.address.toLowerCase() ===
+                                                    quoteTokenParam.toLowerCase()
+                                                        ? pool.token0.decimals
+                                                        : pool.token1.decimals,
+                                                logoUrl:
+                                                    pool.token0.address.toLowerCase() ===
+                                                    quoteTokenParam.toLowerCase()
+                                                        ? pool.token0.logoUrl
+                                                        : pool.token1.logoUrl,
+                                            }}
+                                            tickLower={tickLower}
+                                            tickUpper={tickUpper}
+                                            liquidity={BigInt(liquidity)}
+                                            onLiquidityChange={(
+                                                newLiquidity
+                                            ) => {
+                                                setLiquidity(
+                                                    newLiquidity.toString()
+                                                );
+                                            }}
+                                            chain={chain}
+                                        />
+                                    </div>
+                                )}
 
-                            {/* Parameter validation error */}
-                            {validation.error && validation.hasValidTokens && !validation.hasValidParams && (
-                                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                                    <div className="flex items-center gap-2">
-                                        <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-                                        <p className="text-red-200/80 text-sm">
-                                            {validation.error}
-                                        </p>
+                                {/* Price Range Configuration */}
+                                <div className="space-y-4">
+                                    <h5 className="text-sm font-medium text-slate-300">
+                                        Price Range
+                                    </h5>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-400 mb-2">
+                                                Lower Tick
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={tickLower}
+                                                onChange={(e) =>
+                                                    setTickLower(
+                                                        parseInt(
+                                                            e.target.value
+                                                        ) || 0
+                                                    )
+                                                }
+                                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                placeholder="-60"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-400 mb-2">
+                                                Upper Tick
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={tickUpper}
+                                                onChange={(e) =>
+                                                    setTickUpper(
+                                                        parseInt(
+                                                            e.target.value
+                                                        ) || 0
+                                                    )
+                                                }
+                                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                placeholder="60"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                            )}
+
+                                {/* Parameter validation error */}
+                                {validation.error &&
+                                    validation.hasValidTokens &&
+                                    !validation.hasValidParams && (
+                                        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                                            <div className="flex items-center gap-2">
+                                                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                                                <p className="text-red-200/80 text-sm">
+                                                    {validation.error}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
         </div>
     );
 }

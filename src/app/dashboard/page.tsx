@@ -45,8 +45,8 @@ function DashboardContent() {
     };
 
     const handleWizardModalOpen = () => {
-        // Start fresh with just the wizard parameter
-        router.push('?wizard=true');
+        // Start fresh with wizard parameter and step 0
+        router.push('?wizard=true&step=0');
     };
 
     return (
