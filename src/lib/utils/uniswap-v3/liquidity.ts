@@ -1,5 +1,5 @@
 import { TickMath } from "@uniswap/v3-sdk";
-import { Q96 } from "./constants";
+import { Q96, Q192 } from "./constants";
 import type { TokenAmounts } from "./types";
 
 /**
@@ -173,6 +173,224 @@ function getLiquidityFromAmount1(
     return (amount1 * Q96) / (sqrtPriceUpper - sqrtPriceLower);
 }
 
+// Assumes you already have: TickMath, getLiquidityFromAmount0, getLiquidityFromAmount1
+
+export const pow10 = (n: number) => 10n ** BigInt(n);
+
+/**
+ * Calculate liquidity from total investment amounts using exact sqrt prices
+ * Converts both base and quote amounts to total quote value, then calculates maximum liquidity
+ * @param baseAmount Amount of base token to invest (in base token decimals)
+ * @param baseDecimals Number of decimals for base token
+ * @param quoteAmount Amount of quote token to invest (in quote token decimals)
+ * @param quoteDecimals Number of decimals for quote token
+ * @param isQuoteToken0 Whether quote token is token0 (affects price calculation)
+ * @param sqrtPriceLowerX96 Lower bound sqrt price (Q96.96 format)
+ * @param sqrtPriceUpperX96 Upper bound sqrt price (Q96.96 format)
+ * @param sqrtPriceCurrentX96 Current sqrt price from pool slot0 (Q96.96 format)
+ * @returns Maximum liquidity that can be provided with total investment
+ */
+export function getLiquidityFromInvestmentAmounts(
+    baseAmount: bigint, // amount of base token (the non-quote token)
+    baseDecimals: number,
+    quoteAmount: bigint, // amount of quote token (your accounting currency)
+    quoteDecimals: number,
+    isQuoteToken0: boolean, // true: quote=token0, false: quote=token1
+    sqrtPriceLowerX96: bigint,
+    sqrtPriceUpperX96: bigint,
+    sqrtPriceCurrentX96: bigint // <- slot0.sqrtPriceX96
+): bigint {
+    if (baseAmount <= 0n && quoteAmount <= 0n) return 0n;
+
+    // Ensure ordering
+    const A =
+        sqrtPriceUpperX96 > sqrtPriceLowerX96
+            ? sqrtPriceUpperX96
+            : sqrtPriceLowerX96; // upper
+    const B =
+        sqrtPriceUpperX96 > sqrtPriceLowerX96
+            ? sqrtPriceLowerX96
+            : sqrtPriceUpperX96; // lower
+    const S = sqrtPriceCurrentX96;
+
+    // Current location vs. range
+    if (S <= B) {
+        // BELOW range -> all liquidity needs token0
+        // Convert total budget to token0 if needed, then use amount0->L
+        const totalBudgetQuote = totalBudgetInQuote(
+            baseAmount,
+            baseDecimals,
+            quoteAmount,
+            quoteDecimals,
+            isQuoteToken0,
+            S
+        );
+        const amount0 = isQuoteToken0
+            ? totalBudgetQuote // already token0 units
+            : quoteToToken0(totalBudgetQuote, quoteDecimals, baseDecimals, S); // convert token1->token0
+        return getLiquidityFromAmount0(B, A, amount0);
+    }
+
+    if (S >= A) {
+        // ABOVE range -> all liquidity needs token1
+        // Convert total budget to token1 if needed, then use amount1->L
+        const totalBudgetQuote = totalBudgetInQuote(
+            baseAmount,
+            baseDecimals,
+            quoteAmount,
+            quoteDecimals,
+            isQuoteToken0,
+            S
+        );
+        const amount1 = isQuoteToken0
+            ? token0ToQuoteToken1(
+                  totalBudgetQuote,
+                  quoteDecimals,
+                  baseDecimals,
+                  S
+              ) // convert token0->token1
+            : totalBudgetQuote; // already token1 units
+        return getLiquidityFromAmount1(B, A, amount1);
+    }
+
+    // IN RANGE: compute L = (Budget * Q96) / (K_Q96 * 10^quoteDecimals)
+    const budgetQuote = totalBudgetInQuote(
+        baseAmount,
+        baseDecimals,
+        quoteAmount,
+        quoteDecimals,
+        isQuoteToken0,
+        S
+    );
+
+    const K_Q96 = isQuoteToken0
+        ? K_Q96_inToken0(B, A, S) // quote is token0
+        : K_Q96_inToken1(B, A, S); // quote is token1
+    if (K_Q96 <= 0n) return 0n; // guard (degenerate edges)
+
+    return (budgetQuote * Q96) / (K_Q96 * pow10(quoteDecimals));
+}
+
+/**
+ * Calculate liquidity from total investment amounts using tick boundaries (compatibility wrapper)
+ * Less accurate than using exact sqrt prices - prefer getLiquidityFromInvestmentAmounts when possible
+ * @param baseAmount Amount of base token to invest (in base token decimals)
+ * @param baseDecimals Number of decimals for base token
+ * @param quoteAmount Amount of quote token to invest (in quote token decimals)
+ * @param quoteDecimals Number of decimals for quote token
+ * @param isQuoteToken0 Whether quote token is token0 (affects price calculation)
+ * @param tickUpper Upper bound tick
+ * @param tickLower Lower bound tick
+ * @param sqrtPriceCurrentX96 Current sqrt price from pool slot0 (Q96.96 format)
+ * @returns Maximum liquidity that can be provided with total investment
+ */
+export function getLiquidityFromInvestmentAmounts_withTick(
+    baseAmount: bigint,
+    baseDecimals: number,
+    quoteAmount: bigint,
+    quoteDecimals: number,
+    isQuoteToken0: boolean,
+    tickUpper: number,
+    tickLower: number,
+    sqrtPriceCurrentX96: bigint
+): bigint {
+    const sqrtPriceLowerX96 = BigInt(
+        TickMath.getSqrtRatioAtTick(tickLower).toString()
+    );
+    const sqrtPriceUpperX96 = BigInt(
+        TickMath.getSqrtRatioAtTick(tickUpper).toString()
+    );
+    return getLiquidityFromInvestmentAmounts(
+        baseAmount,
+        baseDecimals,
+        quoteAmount,
+        quoteDecimals,
+        isQuoteToken0,
+        sqrtPriceLowerX96,
+        sqrtPriceUpperX96,
+        sqrtPriceCurrentX96
+    );
+}
+
+// -----------------------------
+// Helpers
+// -----------------------------
+
+/**
+ * Convert both pockets into QUOTE token units and sum them.
+ * Uses correct Q192 price depending on whether quote is token0 or token1.
+ */
+function totalBudgetInQuote(
+    baseAmount: bigint,
+    baseDecimals: number,
+    quoteAmount: bigint,
+    quoteDecimals: number,
+    isQuoteToken0: boolean,
+    S: bigint
+): bigint {
+    const baseAsQuote = isQuoteToken0
+        ? // quote=token0, base=token1 -> price (quote/base) = Q192 / S^2
+          (baseAmount * Q192 * pow10(quoteDecimals)) /
+          (S * S * pow10(baseDecimals))
+        : // quote=token1, base=token0 -> price (quote/base) = S^2 / Q192
+          (baseAmount * S * S * pow10(quoteDecimals)) /
+          (Q192 * pow10(baseDecimals));
+    return quoteAmount + baseAsQuote;
+}
+
+/** Convert a QUOTE budget (token1) into token0 amount, respecting decimals. */
+function quoteToToken0(
+    amountQuoteToken1: bigint,
+    quoteDecimals: number, // token1 decimals in this branch
+    token0Decimals: number,
+    S: bigint
+): bigint {
+    // token0/token1 price = Q192 / S^2
+    return (
+        (amountQuoteToken1 * Q192 * pow10(token0Decimals)) /
+        (S * S * pow10(quoteDecimals))
+    );
+}
+
+/** Convert a QUOTE budget (token0) into token1 amount, respecting decimals. */
+function token0ToQuoteToken1(
+    amountQuoteToken0: bigint,
+    quoteDecimals: number, // token0 decimals in this branch
+    token1Decimals: number,
+    S: bigint
+): bigint {
+    // token1/token0 price = S^2 / Q192
+    return (
+        (amountQuoteToken0 * S * S * pow10(token1Decimals)) /
+        (Q192 * pow10(quoteDecimals))
+    );
+}
+
+/**
+ * K (quote value per unit L) in token1 units, scaled by Q96.
+ * K_Q96 = (S - B) + floor( S * (A - S) / A )
+ */
+function K_Q96_inToken1(B: bigint, A: bigint, S: bigint): bigint {
+    if (S <= B) return 0n;
+    if (S >= A) return 0n;
+    const term1 = S - B; // already in X96 units
+    const term2 = (S * (A - S)) / A; // floor(S * (A - S) / A), still X96
+    return term1 + term2; // X96
+}
+
+/**
+ * K (quote value per unit L) in token0 units, scaled by Q96.
+ * K0_perL = Q96*(A - S)/(A*S) + Q96*(S - B)/S^2
+ * => K_Q96 = Q192*(A - S)/(A*S) + Q192*(S - B)/S^2  (so that final division uses ... *Q96 / K_Q96)
+ */
+function K_Q96_inToken0(B: bigint, A: bigint, S: bigint): bigint {
+    if (S <= B) return 0n;
+    if (S >= A) return 0n;
+    const termA = (Q192 * (A - S)) / (A * S); // ~ Q96*(A - S)/(A*S) * Q96
+    const termB = (Q192 * (S - B)) / (S * S); // ~ Q96*(S - B)/S^2 * Q96
+    return termA + termB; // X96
+}
+
 /**
  * Calculate position value at current price
  * @param liquidity The position liquidity
@@ -206,10 +424,16 @@ export function calculatePositionValue(
     if (baseIsToken0) {
         // token0 = base, token1 = quote
         // Value = token0Amount * price + token1Amount
-        return (token0Amount * currentPrice) / (10n ** BigInt(baseDecimals)) + token1Amount;
+        return (
+            (token0Amount * currentPrice) / 10n ** BigInt(baseDecimals) +
+            token1Amount
+        );
     } else {
         // token0 = quote, token1 = base
         // Value = token0Amount + token1Amount * price
-        return token0Amount + (token1Amount * currentPrice) / (10n ** BigInt(baseDecimals));
+        return (
+            token0Amount +
+            (token1Amount * currentPrice) / 10n ** BigInt(baseDecimals)
+        );
     }
 }
