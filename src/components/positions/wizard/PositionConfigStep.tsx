@@ -8,6 +8,7 @@ import { isValidChainSlug } from "@/config/chains";
 import { usePool } from "@/hooks/api/usePool";
 import { isValidAddress, normalizeAddress } from "@/lib/utils/evm";
 import { PositionSizeConfig } from "./PositionSizeConfig";
+import { PositionAprPreview } from "./PositionAprPreview";
 import { TickMath } from "@uniswap/v3-sdk";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 
@@ -665,6 +666,55 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                                     tickUpper={tickUpper || TickMath.MAX_TICK}
                                     liquidity={liquidity || 0n}
                                     onLiquidityChange={onLiquidityChange}
+                                    chain={chain}
+                                />
+                            </div>
+                        )}
+
+                        {/* APR Preview */}
+                        {pool && baseToken && quoteToken && (
+                            <div>
+                                <PositionAprPreview
+                                    pool={pool}
+                                    baseToken={{
+                                        address: baseToken,
+                                        symbol:
+                                            pool.token0.address.toLowerCase() ===
+                                            baseToken.toLowerCase()
+                                                ? pool.token0.symbol
+                                                : pool.token1.symbol,
+                                        decimals:
+                                            pool.token0.address.toLowerCase() ===
+                                            baseToken.toLowerCase()
+                                                ? pool.token0.decimals
+                                                : pool.token1.decimals,
+                                        logoUrl:
+                                            pool.token0.address.toLowerCase() ===
+                                            baseToken.toLowerCase()
+                                                ? pool.token0.logoUrl
+                                                : pool.token1.logoUrl,
+                                    }}
+                                    quoteToken={{
+                                        address: quoteToken,
+                                        symbol:
+                                            pool.token0.address.toLowerCase() ===
+                                            quoteToken.toLowerCase()
+                                                ? pool.token0.symbol
+                                                : pool.token1.symbol,
+                                        decimals:
+                                            pool.token0.address.toLowerCase() ===
+                                            quoteToken.toLowerCase()
+                                                ? pool.token0.decimals
+                                                : pool.token1.decimals,
+                                        logoUrl:
+                                            pool.token0.address.toLowerCase() ===
+                                            quoteToken.toLowerCase()
+                                                ? pool.token0.logoUrl
+                                                : pool.token1.logoUrl,
+                                    }}
+                                    liquidity={liquidity || 0n}
+                                    tickLower={tickLower}
+                                    tickUpper={tickUpper}
                                     chain={chain}
                                 />
                             </div>
