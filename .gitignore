@@ -41,3 +41,4 @@ next-env.d.ts
 .vscode/chrome-profile/
 
 /src/generated/prisma
+scripts/debug/*
