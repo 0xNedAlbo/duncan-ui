@@ -1,6 +1,7 @@
 import { TickMath } from "@uniswap/v3-sdk";
 import { Q96, Q192 } from "./constants";
 import type { TokenAmounts } from "./types";
+import { mulDiv } from "../math";
 
 /**
  * Liquidity calculations for Uniswap V3 positions
@@ -129,27 +130,23 @@ export function getLiquidityFromTokenAmounts(
 
 // Helper functions for liquidity math
 
-function getAmount0FromLiquidity(
+export function getAmount0FromLiquidity(
     sqrtPriceLower: bigint,
     sqrtPriceUpper: bigint,
     liquidity: bigint
 ): bigint {
-    if (sqrtPriceUpper <= sqrtPriceLower) return 0n;
-
-    return (
-        (liquidity * (sqrtPriceUpper - sqrtPriceLower)) /
-        ((sqrtPriceLower * sqrtPriceUpper) / Q96)
-    );
+    if (sqrtPriceUpper <= sqrtPriceLower || liquidity === 0n) return 0n;
+    const numerator1 = liquidity * (sqrtPriceUpper - sqrtPriceLower); // L * (Δ√P)
+    return mulDiv(numerator1, Q96, sqrtPriceUpper * sqrtPriceLower);
 }
 
-function getAmount1FromLiquidity(
+export function getAmount1FromLiquidity(
     sqrtPriceLower: bigint,
     sqrtPriceUpper: bigint,
     liquidity: bigint
 ): bigint {
-    if (sqrtPriceUpper <= sqrtPriceLower) return 0n;
-
-    return (liquidity * (sqrtPriceUpper - sqrtPriceLower)) / Q96;
+    if (sqrtPriceUpper <= sqrtPriceLower || liquidity === 0n) return 0n;
+    return mulDiv(liquidity, sqrtPriceUpper - sqrtPriceLower, Q96);
 }
 
 function getLiquidityFromAmount0(
@@ -158,9 +155,9 @@ function getLiquidityFromAmount0(
     amount0: bigint
 ): bigint {
     if (sqrtPriceUpper <= sqrtPriceLower || amount0 <= 0n) return 0n;
-
-    const intermediate = (sqrtPriceLower * sqrtPriceUpper) / Q96;
-    return (amount0 * intermediate) / (sqrtPriceUpper - sqrtPriceLower);
+    // L = amount0 * Q96 * (√Pb - √Pa) / (√Pb * √Pa)
+    const delta = sqrtPriceUpper - sqrtPriceLower;
+    return (amount0 * Q96 * delta) / (sqrtPriceUpper * sqrtPriceLower);
 }
 
 function getLiquidityFromAmount1(
@@ -266,7 +263,7 @@ export function getLiquidityFromInvestmentAmounts(
         : K_Q96_inToken1(B, A, S); // quote is token1
     if (K_Q96 <= 0n) return 0n; // guard (degenerate edges)
 
-    return (budgetQuote * Q96) / (K_Q96 * pow10(quoteDecimals));
+    return (budgetQuote * Q96) / K_Q96;
 }
 
 /**
