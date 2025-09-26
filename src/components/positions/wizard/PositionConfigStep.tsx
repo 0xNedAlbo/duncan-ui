@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Settings, AlertCircle, Loader2, ArrowLeft } from "lucide-react";
+import { AlertCircle, Loader2, ArrowLeft } from "lucide-react";
 import type { SupportedChainsType } from "@/config/chains";
 import { isValidChainSlug } from "@/config/chains";
 import { usePool } from "@/hooks/api/usePool";
-import { normalizeAddress } from "@/lib/utils/evm";
+import { isValidAddress, normalizeAddress } from "@/lib/utils/evm";
 import { PositionSizeConfig } from "./PositionSizeConfig";
+import { TickMath } from "@uniswap/v3-sdk";
+import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 
 interface PositionConfigStepProps {
     // eslint-disable-next-line no-unused-vars
@@ -20,16 +22,78 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
     const searchParams = useSearchParams();
 
     // Get URL parameters and validate
-    const chainParam = searchParams.get("chain") || "";
-    const chain = chainParam as SupportedChainsType;
-    const isValidChain = chainParam && isValidChainSlug(chainParam);
 
-    const baseTokenParam = searchParams.get("baseToken");
-    const quoteTokenParam = searchParams.get("quoteToken");
-    const poolAddressParam = searchParams.get("poolAddress");
-    const tickLowerParam = searchParams.get("tickLower");
-    const tickUpperParam = searchParams.get("tickUpper");
-    const liquidityParam = searchParams.get("liquidity");
+    const [liquidity, setLiquidity] = useState<bigint | undefined>(0n);
+    const [tickLower, setTickLower] = useState<number | undefined>(
+        TickMath.MIN_TICK
+    );
+    const [tickUpper, setTickUpper] = useState<number | undefined>(
+        TickMath.MAX_TICK
+    );
+    const [chain, setChain] = useState<SupportedChainsType | undefined>();
+    const [poolAddress, setPoolAddress] = useState<string | undefined>();
+    const [baseToken, setBaseToken] = useState<string | undefined>();
+    const [quoteToken, setQuoteToken] = useState<string | undefined>();
+    const [lowerPrice, setLowerPrice] = useState<string>("");
+    const [upperPrice, setUpperPrice] = useState<string>("");
+
+    useEffect(() => {
+        const chainParam = searchParams.get("chain") || "";
+        const isValidChain = chainParam && isValidChainSlug(chainParam);
+        setChain(
+            isValidChain ? (chainParam as SupportedChainsType) : undefined
+        );
+        const tickLowerParam = searchParams.get("tickLower");
+        if (tickLowerParam) {
+            const newTickLower = parseInt(tickLowerParam);
+            if (!isNaN(newTickLower)) {
+                setTickLower(newTickLower);
+                // Note: convertTickToPriceSimple will be available after pool loads
+                setLowerPrice(""); // Will be updated when pool loads
+            } else {
+                setTickLower(undefined);
+            }
+        }
+        const tickUpperParam = searchParams.get("tickUpper");
+        if (tickUpperParam) {
+            const newTickUpper = parseInt(tickUpperParam);
+            if (!isNaN(newTickUpper)) {
+                setTickUpper(newTickUpper);
+                // Note: convertTickToPriceSimple will be available after pool loads
+                setUpperPrice(""); // Will be updated when pool loads
+            } else {
+                setTickUpper(undefined);
+            }
+        }
+        const liquidityParam = searchParams.get("liquidity");
+        if (liquidityParam) {
+            try {
+                setLiquidity(BigInt(liquidityParam));
+            } catch {
+                setLiquidity(undefined);
+            }
+        } else {
+            setLiquidity(undefined);
+        }
+        const poolAddressParam = searchParams.get("poolAddress");
+        if (poolAddressParam && isValidAddress(poolAddressParam)) {
+            setPoolAddress(normalizeAddress(poolAddressParam));
+        } else {
+            setPoolAddress(undefined);
+        }
+        const baseTokenParam = searchParams.get("baseToken");
+        if (baseTokenParam && isValidAddress(baseTokenParam)) {
+            setBaseToken(normalizeAddress(baseTokenParam));
+        } else {
+            setBaseToken(undefined);
+        }
+        const quoteTokenParam = searchParams.get("quoteToken");
+        if (quoteTokenParam && isValidAddress(quoteTokenParam)) {
+            setQuoteToken(normalizeAddress(quoteTokenParam));
+        } else {
+            setQuoteToken(undefined);
+        }
+    }, [searchParams]);
 
     // Use pool hook to load and validate pool
     const {
@@ -38,79 +102,65 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         isError: isPoolError,
         error: poolError,
     } = usePool({
-        chain: isValidChain ? chain : null,
-        poolAddress: poolAddressParam,
-        enabled: !!isValidChain && !!poolAddressParam,
+        chain,
+        poolAddress,
+        enabled: !!chain && !!poolAddress,
     });
 
-    // Calculate default ticks based on ±20% around current price
-    const calculateDefaultTicks = useCallback(() => {
-        if (!pool?.currentTick) {
-            throw new Error("Cannot calculate default ticks: pool currentTick is not available");
-        }
+    /**
+     * Convert tick to human-readable price
+     * @param tick The tick value to convert
+     * @returns Price as a number (quote tokens per base token)
+     * @example For WETH/USDC: tick -195340 → 3000.5 (meaning 3000.5 USDC per 1 WETH)
+     */
+    const convertTickToPriceSimple = useCallback(
+        (tick: number): number => {
+            if (!baseToken || !quoteToken || !pool) return 0;
 
-        // Get current sqrt price
-        const currentTick = pool.currentTick;
-        const tickSpacing = pool.tickSpacing || 60;
+            try {
+                // Get the correct decimals from pool data
+                const baseTokenDecimals = pool.token0.address.toLowerCase() === baseToken.toLowerCase()
+                    ? pool.token0.decimals
+                    : pool.token1.decimals;
 
-        // Calculate ±20% price range
-        // For tick math: price = 1.0001^tick
-        // So for ±20%: new_tick = current_tick ± log(1.2) / log(1.0001)
-        const priceMultiplier = Math.log(1.2) / Math.log(1.0001);
+                const quoteTokenDecimals = pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
+                    ? pool.token0.decimals
+                    : pool.token1.decimals;
 
-        const lowerTick =
-            Math.floor((currentTick - priceMultiplier) / tickSpacing) *
-            tickSpacing;
-        const upperTick =
-            Math.ceil((currentTick + priceMultiplier) / tickSpacing) *
-            tickSpacing;
+                // tickToPrice returns price in quote token decimals
+                const priceBigInt = tickToPrice(
+                    tick,
+                    baseToken,
+                    quoteToken,
+                    baseTokenDecimals
+                );
 
-        return { lower: lowerTick, upper: upperTick };
-    }, [pool?.currentTick, pool?.tickSpacing]);
-
-    // Get default ticks
-    const defaultTicks = useMemo(() => {
-        try {
-            return calculateDefaultTicks();
-        } catch (error) {
-            console.error("Failed to calculate default ticks:", error);
-            // Return null to indicate calculation failed - will be handled in state initialization
-            return null;
-        }
-    }, [calculateDefaultTicks]);
-
-    // State for the core position parameters - initialize from URL or defaults
-    const [tickLower, setTickLower] = useState<number>(
-        tickLowerParam ? parseInt(tickLowerParam) : defaultTicks?.lower || 0
-    );
-    const [tickUpper, setTickUpper] = useState<number>(
-        tickUpperParam ? parseInt(tickUpperParam) : defaultTicks?.upper || 0
-    );
-    const [liquidity, setLiquidity] = useState<string>(
-        liquidityParam || "1000000000000000000"
+                // Convert to human readable number using quote token decimals
+                const divisor = 10n ** BigInt(quoteTokenDecimals);
+                return Number(priceBigInt) / Number(divisor);
+            } catch (error) {
+                console.error("Error converting tick to price:", error);
+                return 0;
+            }
+        },
+        [baseToken, quoteToken, pool]
     );
 
-    // Sync local state with URL parameters when they change
+    // Sync price inputs with tick values when pool loads
     useEffect(() => {
-        if (tickLowerParam !== null) {
-            setTickLower(parseInt(tickLowerParam) || defaultTicks?.lower || 0);
+        if (pool && tickLower !== undefined && !lowerPrice) {
+            const price = convertTickToPriceSimple(tickLower);
+            if (price > 0) {
+                setLowerPrice(price.toString());
+            }
         }
-        if (tickUpperParam !== null) {
-            setTickUpper(parseInt(tickUpperParam) || defaultTicks?.upper || 0);
+        if (pool && tickUpper !== undefined && !upperPrice) {
+            const price = convertTickToPriceSimple(tickUpper);
+            if (price > 0) {
+                setUpperPrice(price.toString());
+            }
         }
-        if (liquidityParam !== null) {
-            setLiquidity(liquidityParam || "1000000000000000000");
-        }
-    }, [tickLowerParam, tickUpperParam, liquidityParam, defaultTicks]);
-
-    // Update tick values when pool changes (if not set from URL params)
-    useEffect(() => {
-        // Only update if there are no URL parameters (meaning we should use defaults)
-        if (!tickLowerParam && !tickUpperParam && pool?.currentTick && defaultTicks) {
-            setTickLower(defaultTicks.lower);
-            setTickUpper(defaultTicks.upper);
-        }
-    }, [pool?.currentTick, defaultTicks, tickLowerParam, tickUpperParam]);
+    }, [pool, tickLower, tickUpper, lowerPrice, upperPrice, convertTickToPriceSimple]);
 
     // Handle navigation to previous steps if invalid parameters
     const goToChainSelection = useCallback(() => {
@@ -148,42 +198,166 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         router.push(pathname + "?" + params.toString());
     }, [router, pathname, searchParams]);
 
-    // Update URL parameters when values change (but not during initial load)
-    useEffect(() => {
-        if (!isValidChain || !poolAddressParam) return;
+    /**
+     * Get current pool price for display
+     * @returns Current price as a number (quote tokens per base token)
+     * @example For WETH/USDC pool: 3000.5 (meaning 3000.5 USDC per 1 WETH)
+     */
+    const currentPrice = useMemo(() => {
+        if (!pool?.currentTick || !baseToken || !quoteToken) return 0;
 
-        // Don't update URL if we're still loading from URL parameters
-        const currentTickLower = tickLowerParam
-            ? parseInt(tickLowerParam)
-            : -60;
-        const currentTickUpper = tickUpperParam ? parseInt(tickUpperParam) : 60;
-        const currentLiquidity = liquidityParam || "1000000000000000000";
+        try {
+            // Get the correct decimals from pool data
+            const baseTokenDecimals = pool.token0.address.toLowerCase() === baseToken.toLowerCase()
+                ? pool.token0.decimals
+                : pool.token1.decimals;
 
-        // Only update URL if values have actually changed from what's in the URL
-        if (
-            tickLower !== currentTickLower ||
-            tickUpper !== currentTickUpper ||
-            liquidity !== currentLiquidity
-        ) {
-            const params = new URLSearchParams(searchParams.toString());
-            params.set("tickLower", tickLower.toString());
-            params.set("tickUpper", tickUpper.toString());
-            params.set("liquidity", liquidity);
-            router.replace(pathname + "?" + params.toString());
+            const quoteTokenDecimals = pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
+                ? pool.token0.decimals
+                : pool.token1.decimals;
+
+            // tickToPrice returns price in quote token decimals
+            const priceBigInt = tickToPrice(
+                pool.currentTick,
+                baseToken,
+                quoteToken,
+                baseTokenDecimals
+            );
+
+            // Convert to human readable number using quote token decimals
+            const divisor = 10n ** BigInt(quoteTokenDecimals);
+            return Number(priceBigInt) / Number(divisor);
+        } catch (error) {
+            console.error("Error getting current price:", error);
+            return 0;
         }
-    }, [
-        tickLower,
-        tickUpper,
-        liquidity,
-        isValidChain,
-        poolAddressParam,
-        tickLowerParam,
-        tickUpperParam,
-        liquidityParam,
-        router,
-        pathname,
-        searchParams,
-    ]);
+    }, [pool?.currentTick, baseToken, quoteToken, pool]);
+
+    /**
+     * Convert human-readable price to tick value
+     * @param price Price as a number (quote tokens per base token)
+     * @returns Tick value snapped to valid tick spacing
+     * @example For WETH/USDC: price 3000.5 → tick -195340 (3000.5 USDC per 1 WETH)
+     */
+    const convertPriceToTick = useCallback(
+        (price: number): number => {
+            if (!baseToken || !quoteToken || !pool?.tickSpacing || price <= 0) {
+                return TickMath.MIN_TICK;
+            }
+
+            try {
+                // Get the correct decimals from pool data
+                const baseTokenDecimals = pool.token0.address.toLowerCase() === baseToken.toLowerCase()
+                    ? pool.token0.decimals
+                    : pool.token1.decimals;
+
+                const quoteTokenDecimals = pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
+                    ? pool.token0.decimals
+                    : pool.token1.decimals;
+
+                // priceToTick expects price in quote token decimals as BigInt
+                const multiplier = 10n ** BigInt(quoteTokenDecimals);
+                const priceBigInt = BigInt(Math.floor(price * Number(multiplier)));
+
+                return priceToTick(
+                    priceBigInt,
+                    pool.tickSpacing,
+                    baseToken,
+                    quoteToken,
+                    baseTokenDecimals
+                );
+            } catch (error) {
+                console.error("Error converting price to tick:", error);
+                return TickMath.MIN_TICK;
+            }
+        },
+        [baseToken, quoteToken, pool?.tickSpacing, pool]
+    );
+
+    /**
+     * Convert tick to human-readable price (same as convertTickToPriceSimple but used in different contexts)
+     * @param tick The tick value to convert
+     * @returns Price as a number (quote tokens per base token)
+     * @example For WETH/USDC: tick -195340 → 3000.5 (meaning 3000.5 USDC per 1 WETH)
+     */
+    const convertTickToPrice = useCallback(
+        (tick: number): number => {
+            if (!baseToken || !quoteToken || !pool) return 0;
+
+            try {
+                // Get the correct decimals from pool data
+                const baseTokenDecimals = pool.token0.address.toLowerCase() === baseToken.toLowerCase()
+                    ? pool.token0.decimals
+                    : pool.token1.decimals;
+
+                const quoteTokenDecimals = pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
+                    ? pool.token0.decimals
+                    : pool.token1.decimals;
+
+                // tickToPrice returns price in quote token decimals
+                const priceBigInt = tickToPrice(
+                    tick,
+                    baseToken,
+                    quoteToken,
+                    baseTokenDecimals
+                );
+
+                // Convert to human readable number using quote token decimals
+                const divisor = 10n ** BigInt(quoteTokenDecimals);
+                return Number(priceBigInt) / Number(divisor);
+            } catch (error) {
+                console.error("Error converting tick to price:", error);
+                return 0;
+            }
+        },
+        [baseToken, quoteToken, pool]
+    );
+
+    function onLiquidityChange(newLiquidity: bigint) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("liquidity", newLiquidity.toString());
+        router.replace(pathname + "?" + params.toString());
+    }
+
+    // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
+    function onTickLowerChange(newTickLower: number) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("tickLower", newTickLower.toString());
+        router.replace(pathname + "?" + params.toString());
+    }
+
+    // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
+    function onTickUpperChange(newTickUpper: number) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("tickUpper", newTickUpper.toString());
+        router.replace(pathname + "?" + params.toString());
+    }
+
+    function onLowerPriceChange(newLowerPrice: string) {
+        setLowerPrice(newLowerPrice);
+        // Don't convert to tick immediately - let user finish typing
+    }
+
+    function onUpperPriceChange(newUpperPrice: string) {
+        setUpperPrice(newUpperPrice);
+        // Don't convert to tick immediately - let user finish typing
+    }
+
+    function onLowerPriceBlur() {
+        const price = parseFloat(lowerPrice);
+        if (!isNaN(price) && price > 0) {
+            const tick = convertPriceToTick(price);
+            onTickLowerChange(tick);
+        }
+    }
+
+    function onUpperPriceBlur() {
+        const price = parseFloat(upperPrice);
+        if (!isNaN(price) && price > 0) {
+            const tick = convertPriceToTick(price);
+            onTickUpperChange(tick);
+        }
+    }
 
     // Pool-token validation logic (order-agnostic) - memoized to prevent unnecessary recalculations
     const validation = useMemo(() => {
@@ -208,7 +382,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         }
 
         // Validate that both tokens exist in the pool (order-agnostic)
-        if (!baseTokenParam || !quoteTokenParam) {
+        if (!baseToken || !quoteToken) {
             return {
                 isValid: false,
                 hasValidPool: true,
@@ -218,8 +392,8 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
             };
         }
 
-        const normalizedBaseToken = normalizeAddress(baseTokenParam);
-        const normalizedQuoteToken = normalizeAddress(quoteTokenParam);
+        const normalizedBaseToken = normalizeAddress(baseToken);
+        const normalizedQuoteToken = normalizeAddress(quoteToken);
         const normalizedToken0 = normalizeAddress(pool.token0.address);
         const normalizedToken1 = normalizeAddress(pool.token1.address);
 
@@ -243,7 +417,11 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
 
         // Validate position parameters
         const liquidityBigInt = BigInt(liquidity || "0");
-        const paramsValid = tickLower < tickUpper && liquidityBigInt > 0n;
+        const paramsValid =
+            tickLower !== undefined &&
+            tickUpper !== undefined &&
+            tickLower < tickUpper &&
+            liquidityBigInt > 0n;
 
         if (!paramsValid) {
             return {
@@ -265,12 +443,12 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         isPoolLoading,
         isPoolError,
         pool,
-        poolError,
-        baseTokenParam,
-        quoteTokenParam,
+        baseToken,
+        quoteToken,
+        liquidity,
         tickLower,
         tickUpper,
-        liquidity,
+        poolError,
     ]);
 
     // Notify parent about configuration status
@@ -279,7 +457,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
     }, [validation.isValid, props]);
 
     // Show validation errors for missing parameters
-    if (!isValidChain) {
+    if (!chain) {
         return (
             <div className="space-y-6">
                 <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
@@ -307,7 +485,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         );
     }
 
-    if (!baseTokenParam || !quoteTokenParam) {
+    if (!baseToken || !quoteToken) {
         return (
             <div className="space-y-6">
                 <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
@@ -335,7 +513,11 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         );
     }
 
-    if (!poolAddressParam) {
+    if (
+        !poolAddress ||
+        (!isPoolLoading && !validation.hasValidPool) ||
+        (!isPoolLoading && !validation.hasValidTokens)
+    ) {
         return (
             <div className="space-y-6">
                 <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
@@ -415,133 +597,123 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
             {!isPoolLoading &&
                 validation.hasValidPool &&
                 validation.hasValidTokens && (
-                    <div className="max-w-md mx-auto">
-                        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-6">
-                            <div className="flex items-center gap-2 mb-6">
-                                <Settings className="w-5 h-5 text-blue-400" />
-                                <h4 className="text-lg font-semibold text-white">
-                                    Position Parameters
-                                </h4>
+                    <div className="space-y-6">
+                        {/* Position Size Configuration */}
+                        {pool && baseToken && quoteToken && (
+                            <div>
+                                <PositionSizeConfig
+                                    pool={pool}
+                                    baseToken={{
+                                        address: baseToken,
+                                        symbol:
+                                            pool.token0.address.toLowerCase() ===
+                                            baseToken.toLowerCase()
+                                                ? pool.token0.symbol
+                                                : pool.token1.symbol,
+                                        decimals:
+                                            pool.token0.address.toLowerCase() ===
+                                            baseToken.toLowerCase()
+                                                ? pool.token0.decimals
+                                                : pool.token1.decimals,
+                                        logoUrl:
+                                            pool.token0.address.toLowerCase() ===
+                                            baseToken.toLowerCase()
+                                                ? pool.token0.logoUrl
+                                                : pool.token1.logoUrl,
+                                    }}
+                                    quoteToken={{
+                                        address: quoteToken,
+                                        symbol:
+                                            pool.token0.address.toLowerCase() ===
+                                            quoteToken.toLowerCase()
+                                                ? pool.token0.symbol
+                                                : pool.token1.symbol,
+                                        decimals:
+                                            pool.token0.address.toLowerCase() ===
+                                            quoteToken.toLowerCase()
+                                                ? pool.token0.decimals
+                                                : pool.token1.decimals,
+                                        logoUrl:
+                                            pool.token0.address.toLowerCase() ===
+                                            quoteToken.toLowerCase()
+                                                ? pool.token0.logoUrl
+                                                : pool.token1.logoUrl,
+                                    }}
+                                    tickLower={tickLower || TickMath.MIN_TICK}
+                                    tickUpper={tickUpper || TickMath.MAX_TICK}
+                                    liquidity={liquidity || 0n}
+                                    onLiquidityChange={onLiquidityChange}
+                                    chain={chain}
+                                />
                             </div>
+                        )}
 
-                            <div className="space-y-6">
-                                {/* Position Size Configuration */}
-                                {pool && baseTokenParam && quoteTokenParam && (
-                                    <div>
-                                        <PositionSizeConfig
-                                            pool={pool}
-                                            baseToken={{
-                                                address: baseTokenParam,
-                                                symbol:
-                                                    pool.token0.address.toLowerCase() ===
-                                                    baseTokenParam.toLowerCase()
-                                                        ? pool.token0.symbol
-                                                        : pool.token1.symbol,
-                                                decimals:
-                                                    pool.token0.address.toLowerCase() ===
-                                                    baseTokenParam.toLowerCase()
-                                                        ? pool.token0.decimals
-                                                        : pool.token1.decimals,
-                                                logoUrl:
-                                                    pool.token0.address.toLowerCase() ===
-                                                    baseTokenParam.toLowerCase()
-                                                        ? pool.token0.logoUrl
-                                                        : pool.token1.logoUrl,
-                                            }}
-                                            quoteToken={{
-                                                address: quoteTokenParam,
-                                                symbol:
-                                                    pool.token0.address.toLowerCase() ===
-                                                    quoteTokenParam.toLowerCase()
-                                                        ? pool.token0.symbol
-                                                        : pool.token1.symbol,
-                                                decimals:
-                                                    pool.token0.address.toLowerCase() ===
-                                                    quoteTokenParam.toLowerCase()
-                                                        ? pool.token0.decimals
-                                                        : pool.token1.decimals,
-                                                logoUrl:
-                                                    pool.token0.address.toLowerCase() ===
-                                                    quoteTokenParam.toLowerCase()
-                                                        ? pool.token0.logoUrl
-                                                        : pool.token1.logoUrl,
-                                            }}
-                                            tickLower={tickLower}
-                                            tickUpper={tickUpper}
-                                            liquidity={BigInt(liquidity)}
-                                            onLiquidityChange={(
-                                                newLiquidity
-                                            ) => {
-                                                setLiquidity(
-                                                    newLiquidity.toString()
-                                                );
-                                            }}
-                                            chain={chain}
-                                        />
-                                    </div>
-                                )}
+                        {/* Price Range Configuration */}
+                        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+                            <h5 className="text-sm font-medium text-slate-300 mb-4">
+                                Price Range
+                            </h5>
 
-                                {/* Price Range Configuration */}
-                                <div className="space-y-4">
-                                    <h5 className="text-sm font-medium text-slate-300">
-                                        Price Range
-                                    </h5>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-400 mb-2">
-                                                Lower Tick
-                                            </label>
-                                            <input
-                                                type="number"
-                                                value={tickLower}
-                                                onChange={(e) =>
-                                                    setTickLower(
-                                                        parseInt(
-                                                            e.target.value
-                                                        ) || 0
-                                                    )
-                                                }
-                                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                placeholder="-60"
-                                            />
-                                        </div>
+                            {/* Current Price Display */}
+                            {currentPrice > 0 && (
+                                <div className="mb-4 p-3 bg-slate-700/50 rounded-lg">
+                                    <p className="text-xs text-slate-400 mb-1">Current Price</p>
+                                    <p className="text-white font-mono">{currentPrice.toFixed(6)}</p>
+                                </div>
+                            )}
 
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-400 mb-2">
-                                                Upper Tick
-                                            </label>
-                                            <input
-                                                type="number"
-                                                value={tickUpper}
-                                                onChange={(e) =>
-                                                    setTickUpper(
-                                                        parseInt(
-                                                            e.target.value
-                                                        ) || 0
-                                                    )
-                                                }
-                                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                placeholder="60"
-                                            />
-                                        </div>
-                                    </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-400 mb-2">
+                                        Lower Price
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={lowerPrice}
+                                        onChange={(e) => onLowerPriceChange(e.target.value)}
+                                        onBlur={onLowerPriceBlur}
+                                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="0.0"
+                                        step="any"
+                                    />
+                                    {tickLower !== undefined && (
+                                        <p className="text-xs text-slate-500 mt-1">Tick: {tickLower}</p>
+                                    )}
                                 </div>
 
-                                {/* Parameter validation error */}
-                                {validation.error &&
-                                    validation.hasValidTokens &&
-                                    !validation.hasValidParams && (
-                                        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                                            <div className="flex items-center gap-2">
-                                                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-                                                <p className="text-red-200/80 text-sm">
-                                                    {validation.error}
-                                                </p>
-                                            </div>
-                                        </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-400 mb-2">
+                                        Upper Price
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={upperPrice}
+                                        onChange={(e) => onUpperPriceChange(e.target.value)}
+                                        onBlur={onUpperPriceBlur}
+                                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="0.0"
+                                        step="any"
+                                    />
+                                    {tickUpper !== undefined && (
+                                        <p className="text-xs text-slate-500 mt-1">Tick: {tickUpper}</p>
                                     )}
+                                </div>
                             </div>
                         </div>
+
+                        {/* Parameter validation error */}
+                        {validation.error &&
+                            validation.hasValidTokens &&
+                            !validation.hasValidParams && (
+                                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                                    <div className="flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                                        <p className="text-red-200/80 text-sm">
+                                            {validation.error}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                     </div>
                 )}
         </div>

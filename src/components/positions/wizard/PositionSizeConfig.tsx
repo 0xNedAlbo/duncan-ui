@@ -44,7 +44,7 @@ export function PositionSizeConfig({
     tickUpper,
     liquidity,
     onLiquidityChange,
-    initialMode = "quote",
+    initialMode = "custom",
     chain,
 }: PositionSizeConfigProps) {
     const { isConnected } = useAccount();
@@ -55,6 +55,58 @@ export function PositionSizeConfig({
     const [baseAmountBigInt, setBaseAmountBigInt] = useState<bigint>(0n);
     const [quoteAmountBigInt, setQuoteAmountBigInt] = useState<bigint>(0n);
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
+    const [isInitialized, setIsInitialized] = useState<boolean>(false);
+
+    // Initialize input fields from liquidity prop when component first loads
+    useEffect(() => {
+        if (!isInitialized && liquidity > 0n && pool.currentTick !== null) {
+            try {
+                const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
+                    liquidity,
+                    pool.currentTick,
+                    tickLower,
+                    tickUpper
+                );
+
+                // Determine which token is which based on address comparison
+                const isQuoteToken0 =
+                    compareAddresses(quoteToken.address, baseToken.address) < 0;
+
+                const baseTokenAmount = isQuoteToken0 ? token1Amount : token0Amount;
+                const quoteTokenAmount = isQuoteToken0 ? token0Amount : token1Amount;
+
+                // Set the amounts
+                const baseAmountString = formatCompactValue(
+                    baseTokenAmount,
+                    baseToken.decimals
+                );
+                const quoteAmountString = formatCompactValue(
+                    quoteTokenAmount,
+                    quoteToken.decimals
+                );
+
+                setBaseAmount(baseAmountString);
+                setQuoteAmount(quoteAmountString);
+                setBaseAmountBigInt(baseTokenAmount);
+                setQuoteAmountBigInt(quoteTokenAmount);
+                setIsInitialized(true);
+            } catch (error) {
+                console.error("Error initializing amounts from liquidity:", error);
+                setIsInitialized(true); // Still mark as initialized to prevent retry
+            }
+        } else if (!isInitialized && liquidity === 0n) {
+            // If liquidity is 0, just mark as initialized with default values
+            setIsInitialized(true);
+        }
+    }, [
+        liquidity,
+        pool.currentTick,
+        tickLower,
+        tickUpper,
+        baseToken,
+        quoteToken,
+        isInitialized,
+    ]);
 
     // Calculate liquidity from token amounts using proper Uniswap V3 math
     const calculateLiquidity = useCallback(
@@ -117,16 +169,27 @@ export function PositionSizeConfig({
 
     // Calculate liquidity from user input and emit to parent
     useEffect(() => {
+        // Only calculate and emit changes after component is initialized
+        // This prevents clearing liquidity during initial load from URL
+        if (!isInitialized) return;
+
         const inputLiquidity = calculateLiquidity(
             baseAmountBigInt,
             quoteAmountBigInt
         );
-        onLiquidityChange(inputLiquidity);
+
+        // Only emit change if the calculated liquidity differs from current prop
+        // This prevents infinite loops when the component re-renders due to prop updates
+        if (inputLiquidity !== liquidity) {
+            onLiquidityChange(inputLiquidity);
+        }
     }, [
         baseAmountBigInt,
         quoteAmountBigInt,
         calculateLiquidity,
         onLiquidityChange,
+        liquidity,
+        isInitialized,
     ]);
 
     // Mode change handler
