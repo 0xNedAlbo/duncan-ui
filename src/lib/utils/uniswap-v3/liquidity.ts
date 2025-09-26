@@ -173,8 +173,6 @@ function getLiquidityFromAmount1(
     return (amount1 * Q96) / (sqrtPriceUpper - sqrtPriceLower);
 }
 
-// Assumes you already have: TickMath, getLiquidityFromAmount0, getLiquidityFromAmount1
-
 export const pow10 = (n: number) => 10n ** BigInt(n);
 
 /**
