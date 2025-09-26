@@ -325,11 +325,9 @@ function totalBudgetInQuote(
 ): bigint {
     const baseAsQuote = isQuoteToken0
         ? // quote=token0, base=token1 -> price (quote/base) = Q192 / S^2
-          (baseAmount * Q192 * pow10(quoteDecimals)) /
-          (S * S * pow10(baseDecimals))
+          (baseAmount * Q192) / (S * S)
         : // quote=token1, base=token0 -> price (quote/base) = S^2 / Q192
-          (baseAmount * S * S * pow10(quoteDecimals)) /
-          (Q192 * pow10(baseDecimals));
+          (baseAmount * S * S) / Q192;
     return quoteAmount + baseAsQuote;
 }
 

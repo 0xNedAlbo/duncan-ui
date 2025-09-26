@@ -46,16 +46,12 @@ interface PoolResponse {
 }
 
 interface UsePoolProps {
-    chain: SupportedChainsType | null;
-    poolAddress: string | null;
-    enabled?: boolean;
+    chain?: SupportedChainsType | null;
+    poolAddress?: string;
+    enabled: boolean;
 }
 
-export function usePool({
-    chain,
-    poolAddress,
-    enabled = true,
-}: UsePoolProps) {
+export function usePool({ chain, poolAddress, enabled }: UsePoolProps) {
     const queryKey = ["pool", chain, poolAddress];
 
     const queryFn = async (): Promise<PoolData> => {
@@ -68,7 +64,8 @@ export function usePool({
         if (!response.ok) {
             const errorData = await response.json().catch(() => null);
             throw new Error(
-                errorData?.error || `HTTP ${response.status}: ${response.statusText}`
+                errorData?.error ||
+                    `HTTP ${response.status}: ${response.statusText}`
             );
         }
 
@@ -94,7 +91,10 @@ export function usePool({
         retry: (failureCount, error) => {
             // Don't retry validation errors (4xx)
             const errorMessage = error?.message || "";
-            if (errorMessage.includes("Invalid") || errorMessage.includes("400")) {
+            if (
+                errorMessage.includes("Invalid") ||
+                errorMessage.includes("400")
+            ) {
                 return false;
             }
             // Retry network errors up to 2 times

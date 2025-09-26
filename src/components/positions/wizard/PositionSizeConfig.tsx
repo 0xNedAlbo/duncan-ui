@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { PencilLine, Check } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useTranslations } from "@/i18n/client";
 import { TokenAmountInput } from "@/components/common/TokenAmountInput";
 import type { PoolData } from "@/hooks/api/usePool";
 import type { SupportedChainsType } from "@/config/chains";
@@ -47,6 +48,7 @@ export function PositionSizeConfig({
     initialMode = "custom",
     chain,
 }: PositionSizeConfigProps) {
+    const t = useTranslations();
     const { isConnected } = useAccount();
     const { openConnectModal } = useConnectModal();
     const [mode, setMode] = useState<InputMode>(initialMode);
@@ -284,7 +286,9 @@ export function PositionSizeConfig({
                 <div className="space-y-3 border-t border-slate-700 pt-3">
                     {/* Mode selector buttons */}
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-3">
+                            <span className="text-slate-300 text-sm font-medium">{t("positionWizard.positionConfig.yourInvestment")}</span>
+                            <div className="flex items-center gap-1">
                             <button
                                 onClick={() => handleModeChange("base")}
                                 className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
@@ -315,6 +319,7 @@ export function PositionSizeConfig({
                             >
                                 {baseToken.symbol}+{quoteToken.symbol}
                             </button>
+                            </div>
                         </div>
 
                         {/* Connect wallet link */}

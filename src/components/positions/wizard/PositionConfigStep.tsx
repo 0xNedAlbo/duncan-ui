@@ -119,13 +119,17 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
 
             try {
                 // Get the correct decimals from pool data
-                const baseTokenDecimals = pool.token0.address.toLowerCase() === baseToken.toLowerCase()
-                    ? pool.token0.decimals
-                    : pool.token1.decimals;
+                const baseTokenDecimals =
+                    pool.token0.address.toLowerCase() ===
+                    baseToken.toLowerCase()
+                        ? pool.token0.decimals
+                        : pool.token1.decimals;
 
-                const quoteTokenDecimals = pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
-                    ? pool.token0.decimals
-                    : pool.token1.decimals;
+                const quoteTokenDecimals =
+                    pool.token0.address.toLowerCase() ===
+                    quoteToken.toLowerCase()
+                        ? pool.token0.decimals
+                        : pool.token1.decimals;
 
                 // tickToPrice returns price in quote token decimals
                 const priceBigInt = tickToPrice(
@@ -160,7 +164,14 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                 setUpperPrice(price.toString());
             }
         }
-    }, [pool, tickLower, tickUpper, lowerPrice, upperPrice, convertTickToPriceSimple]);
+    }, [
+        pool,
+        tickLower,
+        tickUpper,
+        lowerPrice,
+        upperPrice,
+        convertTickToPriceSimple,
+    ]);
 
     // Handle navigation to previous steps if invalid parameters
     const goToChainSelection = useCallback(() => {
@@ -208,13 +219,15 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
 
         try {
             // Get the correct decimals from pool data
-            const baseTokenDecimals = pool.token0.address.toLowerCase() === baseToken.toLowerCase()
-                ? pool.token0.decimals
-                : pool.token1.decimals;
+            const baseTokenDecimals =
+                pool.token0.address.toLowerCase() === baseToken.toLowerCase()
+                    ? pool.token0.decimals
+                    : pool.token1.decimals;
 
-            const quoteTokenDecimals = pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
-                ? pool.token0.decimals
-                : pool.token1.decimals;
+            const quoteTokenDecimals =
+                pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
+                    ? pool.token0.decimals
+                    : pool.token1.decimals;
 
             // tickToPrice returns price in quote token decimals
             const priceBigInt = tickToPrice(
@@ -231,7 +244,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
             console.error("Error getting current price:", error);
             return 0;
         }
-    }, [pool?.currentTick, baseToken, quoteToken, pool]);
+    }, [baseToken, quoteToken, pool]);
 
     /**
      * Convert human-readable price to tick value
@@ -247,17 +260,23 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
 
             try {
                 // Get the correct decimals from pool data
-                const baseTokenDecimals = pool.token0.address.toLowerCase() === baseToken.toLowerCase()
-                    ? pool.token0.decimals
-                    : pool.token1.decimals;
+                const baseTokenDecimals =
+                    pool.token0.address.toLowerCase() ===
+                    baseToken.toLowerCase()
+                        ? pool.token0.decimals
+                        : pool.token1.decimals;
 
-                const quoteTokenDecimals = pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
-                    ? pool.token0.decimals
-                    : pool.token1.decimals;
+                const quoteTokenDecimals =
+                    pool.token0.address.toLowerCase() ===
+                    quoteToken.toLowerCase()
+                        ? pool.token0.decimals
+                        : pool.token1.decimals;
 
                 // priceToTick expects price in quote token decimals as BigInt
                 const multiplier = 10n ** BigInt(quoteTokenDecimals);
-                const priceBigInt = BigInt(Math.floor(price * Number(multiplier)));
+                const priceBigInt = BigInt(
+                    Math.floor(price * Number(multiplier))
+                );
 
                 return priceToTick(
                     priceBigInt,
@@ -271,7 +290,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                 return TickMath.MIN_TICK;
             }
         },
-        [baseToken, quoteToken, pool?.tickSpacing, pool]
+        [baseToken, quoteToken, pool]
     );
 
     /**
@@ -280,19 +299,24 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
      * @returns Price as a number (quote tokens per base token)
      * @example For WETH/USDC: tick -195340 → 3000.5 (meaning 3000.5 USDC per 1 WETH)
      */
+    // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
     const convertTickToPrice = useCallback(
         (tick: number): number => {
             if (!baseToken || !quoteToken || !pool) return 0;
 
             try {
                 // Get the correct decimals from pool data
-                const baseTokenDecimals = pool.token0.address.toLowerCase() === baseToken.toLowerCase()
-                    ? pool.token0.decimals
-                    : pool.token1.decimals;
+                const baseTokenDecimals =
+                    pool.token0.address.toLowerCase() ===
+                    baseToken.toLowerCase()
+                        ? pool.token0.decimals
+                        : pool.token1.decimals;
 
-                const quoteTokenDecimals = pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
-                    ? pool.token0.decimals
-                    : pool.token1.decimals;
+                const quoteTokenDecimals =
+                    pool.token0.address.toLowerCase() ===
+                    quoteToken.toLowerCase()
+                        ? pool.token0.decimals
+                        : pool.token1.decimals;
 
                 // tickToPrice returns price in quote token decimals
                 const priceBigInt = tickToPrice(
@@ -319,14 +343,12 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         router.replace(pathname + "?" + params.toString());
     }
 
-    // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
     function onTickLowerChange(newTickLower: number) {
         const params = new URLSearchParams(searchParams.toString());
         params.set("tickLower", newTickLower.toString());
         router.replace(pathname + "?" + params.toString());
     }
 
-    // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
     function onTickUpperChange(newTickUpper: number) {
         const params = new URLSearchParams(searchParams.toString());
         params.set("tickUpper", newTickUpper.toString());
@@ -657,8 +679,12 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                             {/* Current Price Display */}
                             {currentPrice > 0 && (
                                 <div className="mb-4 p-3 bg-slate-700/50 rounded-lg">
-                                    <p className="text-xs text-slate-400 mb-1">Current Price</p>
-                                    <p className="text-white font-mono">{currentPrice.toFixed(6)}</p>
+                                    <p className="text-xs text-slate-400 mb-1">
+                                        Current Price
+                                    </p>
+                                    <p className="text-white font-mono">
+                                        {currentPrice.toFixed(6)}
+                                    </p>
                                 </div>
                             )}
 
@@ -670,14 +696,18 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                                     <input
                                         type="number"
                                         value={lowerPrice}
-                                        onChange={(e) => onLowerPriceChange(e.target.value)}
+                                        onChange={(e) =>
+                                            onLowerPriceChange(e.target.value)
+                                        }
                                         onBlur={onLowerPriceBlur}
                                         className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="0.0"
                                         step="any"
                                     />
                                     {tickLower !== undefined && (
-                                        <p className="text-xs text-slate-500 mt-1">Tick: {tickLower}</p>
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Tick: {tickLower}
+                                        </p>
                                     )}
                                 </div>
 
@@ -688,14 +718,18 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                                     <input
                                         type="number"
                                         value={upperPrice}
-                                        onChange={(e) => onUpperPriceChange(e.target.value)}
+                                        onChange={(e) =>
+                                            onUpperPriceChange(e.target.value)
+                                        }
                                         onBlur={onUpperPriceBlur}
                                         className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="0.0"
                                         step="any"
                                     />
                                     {tickUpper !== undefined && (
-                                        <p className="text-xs text-slate-500 mt-1">Tick: {tickUpper}</p>
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Tick: {tickUpper}
+                                        </p>
                                     )}
                                 </div>
                             </div>

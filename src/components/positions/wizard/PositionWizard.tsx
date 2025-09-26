@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X, ArrowLeft, ArrowRight } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
-import type { SupportedChainsType } from "@/config/chains";
 import { isValidChainSlug } from "@/config/chains";
 
 import { OpenPositionStep } from "./OpenPositionStep";
@@ -84,10 +83,17 @@ export function PositionWizard({
         if (currentStep === 2) return isChainSelected && isTokenPairSelected;
 
         // Step 3: Need chain, token pair, and pool selected
-        if (currentStep === 3) return isChainSelected && isTokenPairSelected && isPoolSelected;
+        if (currentStep === 3)
+            return isChainSelected && isTokenPairSelected && isPoolSelected;
 
         // Step 4: Need everything including position configured
-        if (currentStep === 4) return isChainSelected && isTokenPairSelected && isPoolSelected && isPositionConfigured;
+        if (currentStep === 4)
+            return (
+                isChainSelected &&
+                isTokenPairSelected &&
+                isPoolSelected &&
+                isPositionConfigured
+            );
 
         // Step 5+: Handle later steps
         if (currentStep >= 5) {
@@ -103,7 +109,6 @@ export function PositionWizard({
         isPositionCreated,
         isTokenPairSelected,
     ]);
-
 
     const getStepTitle = (step: number): string => {
         switch (step) {
@@ -131,11 +136,17 @@ export function PositionWizard({
             case 1:
                 return <ChainSelectionStep onChainSelect={setChainSelected} />;
             case 2:
-                return <TokenPairStep onTokenPairSelect={setTokenPairSelected} />;
+                return (
+                    <TokenPairStep onTokenPairSelect={setTokenPairSelected} />
+                );
             case 3:
                 return <PoolSelectionStep onPoolSelect={setPoolSelected} />;
             case 4:
-                return <PositionConfigStep onConfigSelect={setPositionConfigured} />;
+                return (
+                    <PositionConfigStep
+                        onConfigSelect={setPositionConfigured}
+                    />
+                );
             /*case 5:
                 return (
                     <PositionSummaryStep

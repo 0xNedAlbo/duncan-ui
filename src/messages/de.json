@@ -547,6 +547,7 @@
       "upperPrice": "Oberer Preis",
       "currentPrice": "Aktueller Preis",
       "liquidityAmount": "Liquiditätsbetrag",
+      "yourInvestment": "Deine Investition:",
       "positionSummary": "Positions-Zusammenfassung",
       "summary": {
         "baseToken": "Base Token",
