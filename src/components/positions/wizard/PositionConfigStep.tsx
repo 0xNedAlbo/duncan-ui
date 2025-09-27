@@ -11,6 +11,7 @@ import { PositionSizeConfig } from "./PositionSizeConfig";
 import { PositionAprPreview } from "./PositionAprPreview";
 import { PositionRangeConfig } from "./PositionRangeConfig";
 import { TickMath } from "@uniswap/v3-sdk";
+import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 
 interface PositionConfigStepProps {
     // eslint-disable-next-line no-unused-vars
@@ -25,12 +26,8 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
     // Get URL parameters and validate
 
     const [liquidity, setLiquidity] = useState<bigint | undefined>(0n);
-    const [tickLower, setTickLower] = useState<number | undefined>(
-        TickMath.MIN_TICK
-    );
-    const [tickUpper, setTickUpper] = useState<number | undefined>(
-        TickMath.MAX_TICK
-    );
+    const [tickLower, setTickLower] = useState<number>(NaN);
+    const [tickUpper, setTickUpper] = useState<number>(NaN);
     const [chain, setChain] = useState<SupportedChainsType | undefined>();
     const [poolAddress, setPoolAddress] = useState<string | undefined>();
     const [baseToken, setBaseToken] = useState<string | undefined>();
@@ -42,24 +39,12 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         setChain(
             isValidChain ? (chainParam as SupportedChainsType) : undefined
         );
-        const tickLowerParam = searchParams.get("tickLower");
-        if (tickLowerParam) {
-            const newTickLower = parseInt(tickLowerParam);
-            if (!isNaN(newTickLower)) {
-                setTickLower(newTickLower);
-            } else {
-                setTickLower(undefined);
-            }
-        }
-        const tickUpperParam = searchParams.get("tickUpper");
-        if (tickUpperParam) {
-            const newTickUpper = parseInt(tickUpperParam);
-            if (!isNaN(newTickUpper)) {
-                setTickUpper(newTickUpper);
-            } else {
-                setTickUpper(undefined);
-            }
-        }
+
+        const tickLowerParam = parseInt(searchParams.get("tickLower") || "");
+        setTickLower(tickLowerParam);
+        const tickUpperParam = parseInt(searchParams.get("tickUpper") || "");
+        setTickUpper(tickUpperParam);
+
         const liquidityParam = searchParams.get("liquidity");
         if (liquidityParam) {
             try {
@@ -102,6 +87,84 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         enabled: !!chain && !!poolAddress,
     });
 
+    // Set default ticks when pool loads and current ticks are NaN
+    useEffect(() => {
+        if (!isPoolLoading && !isPoolError && pool?.currentTick !== null && pool?.currentTick !== undefined && baseToken && quoteToken) {
+            let needsUpdate = false;
+            const params = new URLSearchParams(searchParams.toString());
+
+            // Set default lower tick if current is NaN
+            if (isNaN(tickLower)) {
+                try {
+                    // Get base token decimals from pool
+                    const baseTokenDecimals = pool.token0.address.toLowerCase() === baseToken.toLowerCase()
+                        ? pool.token0.decimals
+                        : pool.token1.decimals;
+
+                    // Calculate current price
+                    const currentPrice = tickToPrice(
+                        pool.currentTick,
+                        baseToken,
+                        quoteToken,
+                        baseTokenDecimals
+                    );
+
+                    // Set lower price to -20% from current
+                    const lowerPrice = (currentPrice * 8n) / 10n; // -20%
+                    const lowerTick = priceToTick(
+                        lowerPrice,
+                        pool.tickSpacing,
+                        baseToken,
+                        quoteToken,
+                        baseTokenDecimals
+                    );
+
+                    params.set("tickLower", lowerTick.toString());
+                    needsUpdate = true;
+                } catch (error) {
+                    console.warn("Error setting default lower tick:", error);
+                }
+            }
+
+            // Set default upper tick if current is NaN
+            if (isNaN(tickUpper)) {
+                try {
+                    // Get base token decimals from pool
+                    const baseTokenDecimals = pool.token0.address.toLowerCase() === baseToken.toLowerCase()
+                        ? pool.token0.decimals
+                        : pool.token1.decimals;
+
+                    // Calculate current price
+                    const currentPrice = tickToPrice(
+                        pool.currentTick,
+                        baseToken,
+                        quoteToken,
+                        baseTokenDecimals
+                    );
+
+                    // Set upper price to +20% from current
+                    const upperPrice = (currentPrice * 12n) / 10n; // +20%
+                    const upperTick = priceToTick(
+                        upperPrice,
+                        pool.tickSpacing,
+                        baseToken,
+                        quoteToken,
+                        baseTokenDecimals
+                    );
+
+                    params.set("tickUpper", upperTick.toString());
+                    needsUpdate = true;
+                } catch (error) {
+                    console.warn("Error setting default upper tick:", error);
+                }
+            }
+
+            // Update URL if we set any defaults
+            if (needsUpdate) {
+                router.replace(pathname + "?" + params.toString());
+            }
+        }
+    }, [isPoolLoading, isPoolError, pool, tickLower, tickUpper, baseToken, quoteToken, router, pathname, searchParams]);
 
     // Handle navigation to previous steps if invalid parameters
     const goToChainSelection = useCallback(() => {
@@ -139,7 +202,6 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         router.push(pathname + "?" + params.toString());
     }, [router, pathname, searchParams]);
 
-
     function onLiquidityChange(newLiquidity: bigint) {
         const params = new URLSearchParams(searchParams.toString());
         params.set("liquidity", newLiquidity.toString());
@@ -157,7 +219,6 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         params.set("tickUpper", newTickUpper.toString());
         router.replace(pathname + "?" + params.toString());
     }
-
 
     // Pool-token validation logic (order-agnostic) - memoized to prevent unnecessary recalculations
     const validation = useMemo(() => {
@@ -220,6 +281,8 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         const paramsValid =
             tickLower !== undefined &&
             tickUpper !== undefined &&
+            !isNaN(tickLower) &&
+            !isNaN(tickUpper) &&
             tickLower < tickUpper &&
             liquidityBigInt > 0n;
 
@@ -439,8 +502,16 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                                                 ? pool.token0.logoUrl
                                                 : pool.token1.logoUrl,
                                     }}
-                                    tickLower={tickLower || TickMath.MIN_TICK}
-                                    tickUpper={tickUpper || TickMath.MAX_TICK}
+                                    tickLower={
+                                        tickLower && !isNaN(tickLower)
+                                            ? tickLower
+                                            : TickMath.MIN_TICK
+                                    }
+                                    tickUpper={
+                                        tickUpper && !isNaN(tickUpper)
+                                            ? tickUpper
+                                            : TickMath.MAX_TICK
+                                    }
                                     liquidity={liquidity || 0n}
                                     onLiquidityChange={onLiquidityChange}
                                     chain={chain}
@@ -492,7 +563,6 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                                     liquidity={liquidity || 0n}
                                     tickLower={tickLower}
                                     tickUpper={tickUpper}
-                                    chain={chain}
                                 />
                             </div>
                         )}
@@ -540,6 +610,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                                     }}
                                     tickLower={tickLower}
                                     tickUpper={tickUpper}
+                                    liquidity={liquidity}
                                     onTickLowerChange={onTickLowerChange}
                                     onTickUpperChange={onTickUpperChange}
                                 />

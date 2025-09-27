@@ -11,6 +11,7 @@ interface PoolFeeApiResponse {
     chain: string;
     feeTier: string;
     poolLiquidity: string;
+    sqrtPriceX96: string;
     token0: {
       address: string;
       symbol: string;

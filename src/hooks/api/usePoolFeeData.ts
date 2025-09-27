@@ -14,19 +14,20 @@ interface PoolFeeData {
   chain: string;
   feeTier: string;
   poolLiquidity: string; // BigInt as string
+  sqrtPriceX96: string; // BigInt as string - current pool price as sqrt(price) * 2^96
   token0: {
     address: string;
     symbol: string;
     decimals: number;
     dailyVolume: string; // BigInt as string (token units)
-    price: string; // BigInt as string (quote token units per base token)
+    price: string; // BigInt as string (token0 price in token1 units)
   };
   token1: {
     address: string;
     symbol: string;
     decimals: number;
     dailyVolume: string; // BigInt as string (token units)
-    price: string; // BigInt as string (quote token units per base token)
+    price: string; // BigInt as string (token1 price in token0 units)
   };
   calculatedAt: string; // ISO timestamp
 }

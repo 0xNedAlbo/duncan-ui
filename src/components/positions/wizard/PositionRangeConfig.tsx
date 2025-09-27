@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { PencilLine, PencilOff } from "lucide-react";
+import { PencilLine, PencilOff, TrendingUp } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import type { PoolData } from "@/hooks/api/usePool";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 import { TickMath } from "@uniswap/v3-sdk";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
+import { InteractiveRangeSelector } from "@/components/charts/InteractiveRangeSelector";
+import { usePositionAprProjection } from "@/hooks/api/usePositionAprProjection";
+import { compareAddresses } from "@/lib/utils/evm";
 
 interface TokenInfo {
     address: string;
@@ -19,8 +22,10 @@ interface PositionRangeConfigProps {
     pool: PoolData;
     baseToken: TokenInfo;
     quoteToken: TokenInfo;
-    tickLower?: number;
-    tickUpper?: number;
+    tickLower: number;
+    tickUpper: number;
+    liquidity?: bigint;
+    totalQuoteValue?: bigint;
     // eslint-disable-next-line no-unused-vars
     onTickLowerChange: (tick: number) => void;
     // eslint-disable-next-line no-unused-vars
@@ -33,6 +38,8 @@ export function PositionRangeConfig({
     quoteToken,
     tickLower,
     tickUpper,
+    liquidity,
+    totalQuoteValue = 0n,
     onTickLowerChange,
     onTickUpperChange,
 }: PositionRangeConfigProps) {
@@ -40,6 +47,11 @@ export function PositionRangeConfig({
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [lowerPrice, setLowerPrice] = useState<string>("");
     const [upperPrice, setUpperPrice] = useState<string>("");
+
+    // Determine token roles for correct decimal scaling
+    const isToken0Base = useMemo(() => {
+        return compareAddresses(pool.token0.address, baseToken.address) === 0;
+    }, [pool.token0.address, baseToken.address]);
 
     /**
      * Convert tick to human-readable price
@@ -131,15 +143,17 @@ export function PositionRangeConfig({
         [baseToken, quoteToken, pool]
     );
 
-    // Sync price inputs with tick values when pool loads
+    // Sync price inputs with tick values for display
     useEffect(() => {
-        if (pool && tickLower !== undefined && !lowerPrice) {
+        // Convert valid ticks to price strings for input fields
+        if (pool && !isNaN(tickLower) && !lowerPrice) {
             const price = convertTickToPriceSimple(tickLower);
             if (price > 0) {
                 setLowerPrice(price.toString());
             }
         }
-        if (pool && tickUpper !== undefined && !upperPrice) {
+
+        if (pool && !isNaN(tickUpper) && !upperPrice) {
             const price = convertTickToPriceSimple(tickUpper);
             if (price > 0) {
                 setUpperPrice(price.toString());
@@ -154,6 +168,35 @@ export function PositionRangeConfig({
         convertTickToPriceSimple,
     ]);
 
+    // Use APR projection hook
+    const {
+        isLoading: isPoolFeeLoading,
+        isError: isPoolFeeError,
+        apr,
+        hasValidData,
+    } = usePositionAprProjection({
+        pool,
+        liquidity: liquidity || 0n,
+        tickLower,
+        tickUpper,
+        isToken0Base,
+        enabled: (liquidity || 0n) > 0n,
+    });
+
+    // Format APR for display
+    const prospectiveAPR = useMemo(() => {
+        if (isPoolFeeLoading) return "—";
+        if (isPoolFeeError || !hasValidData) return "—";
+
+        const aprPercent = apr * 100; // Convert decimal to percentage
+
+        if (aprPercent === 0) return 0;
+        if (aprPercent < 0.01) return "<0.01";
+        if (aprPercent > 1000) return ">1000";
+
+        return aprPercent.toFixed(2);
+    }, [apr, hasValidData, isPoolFeeLoading, isPoolFeeError]);
+
     /**
      * Get current pool price for display
      * @returns Current price as a number (quote tokens per base token)
@@ -165,12 +208,14 @@ export function PositionRangeConfig({
         try {
             // Get the correct decimals from pool data
             const baseTokenDecimals =
-                pool.token0.address.toLowerCase() === baseToken.address.toLowerCase()
+                pool.token0.address.toLowerCase() ===
+                baseToken.address.toLowerCase()
                     ? pool.token0.decimals
                     : pool.token1.decimals;
 
             const quoteTokenDecimals =
-                pool.token0.address.toLowerCase() === quoteToken.address.toLowerCase()
+                pool.token0.address.toLowerCase() ===
+                quoteToken.address.toLowerCase()
                     ? pool.token0.decimals
                     : pool.token1.decimals;
 
@@ -193,22 +238,56 @@ export function PositionRangeConfig({
 
     // Display prices for header
     const displayPrices = useMemo(() => {
-        const lowerDisplay = tickLower !== undefined ? convertTickToPriceSimple(tickLower) : 0;
-        const upperDisplay = tickUpper !== undefined ? convertTickToPriceSimple(tickUpper) : 0;
+        const lowerDisplay =
+            tickLower !== undefined && !isNaN(tickLower)
+                ? convertTickToPriceSimple(tickLower)
+                : 0;
+        const upperDisplay =
+            tickUpper !== undefined && !isNaN(tickUpper)
+                ? convertTickToPriceSimple(tickUpper)
+                : 0;
 
         // Convert to BigInt for compact formatting
-        const lowerBigInt = lowerDisplay > 0 ? BigInt(Math.floor(lowerDisplay * Number(10n ** BigInt(quoteToken.decimals)))) : 0n;
-        const upperBigInt = upperDisplay > 0 ? BigInt(Math.floor(upperDisplay * Number(10n ** BigInt(quoteToken.decimals)))) : 0n;
+        const lowerBigInt =
+            lowerDisplay > 0
+                ? BigInt(
+                      Math.floor(
+                          lowerDisplay *
+                              Number(10n ** BigInt(quoteToken.decimals))
+                      )
+                  )
+                : 0n;
+        const upperBigInt =
+            upperDisplay > 0
+                ? BigInt(
+                      Math.floor(
+                          upperDisplay *
+                              Number(10n ** BigInt(quoteToken.decimals))
+                      )
+                  )
+                : 0n;
 
         return {
-            lower: lowerBigInt > 0n ? formatCompactValue(lowerBigInt, quoteToken.decimals) : "—",
-            upper: upperBigInt > 0n ? formatCompactValue(upperBigInt, quoteToken.decimals) : "—",
+            lower:
+                lowerBigInt > 0n
+                    ? formatCompactValue(lowerBigInt, quoteToken.decimals)
+                    : "—",
+            upper:
+                upperBigInt > 0n
+                    ? formatCompactValue(upperBigInt, quoteToken.decimals)
+                    : "—",
         };
     }, [tickLower, tickUpper, convertTickToPriceSimple, quoteToken.decimals]);
 
     // Check if current price is out of range
     const isOutOfRange = useMemo(() => {
-        if (!pool?.currentTick || tickLower === undefined || tickUpper === undefined) {
+        if (
+            !pool?.currentTick ||
+            tickLower === undefined ||
+            tickUpper === undefined ||
+            isNaN(tickLower) ||
+            isNaN(tickUpper)
+        ) {
             return false;
         }
         return pool.currentTick < tickLower || pool.currentTick > tickUpper;
@@ -240,11 +319,149 @@ export function PositionRangeConfig({
         }
     }
 
+    // Calculate current price in BigInt for InteractiveRangeSelector
+    const currentPriceBigInt = useMemo(() => {
+        if (!pool?.currentTick || !baseToken || !quoteToken) return 0n;
+
+        try {
+            const baseTokenDecimals =
+                pool.token0.address.toLowerCase() ===
+                baseToken.address.toLowerCase()
+                    ? pool.token0.decimals
+                    : pool.token1.decimals;
+
+            return tickToPrice(
+                pool.currentTick,
+                baseToken.address,
+                quoteToken.address,
+                baseTokenDecimals
+            );
+        } catch (error) {
+            console.error("Error getting current price:", error);
+            return 0n;
+        }
+    }, [baseToken, quoteToken, pool]);
+
+    // Calculate price bounds in BigInt
+    const lowerPriceBigInt = useMemo(() => {
+        if (tickLower === undefined || isNaN(tickLower)) return 0n;
+        try {
+            const baseTokenDecimals =
+                pool.token0.address.toLowerCase() ===
+                baseToken.address.toLowerCase()
+                    ? pool.token0.decimals
+                    : pool.token1.decimals;
+
+            return tickToPrice(
+                tickLower,
+                baseToken.address,
+                quoteToken.address,
+                baseTokenDecimals
+            );
+        } catch {
+            return 0n;
+        }
+    }, [tickLower, baseToken, quoteToken, pool]);
+
+    const upperPriceBigInt = useMemo(() => {
+        if (tickUpper === undefined || isNaN(tickUpper)) return 0n;
+        try {
+            const baseTokenDecimals =
+                pool.token0.address.toLowerCase() ===
+                baseToken.address.toLowerCase()
+                    ? pool.token0.decimals
+                    : pool.token1.decimals;
+
+            return tickToPrice(
+                tickUpper,
+                baseToken.address,
+                quoteToken.address,
+                baseTokenDecimals
+            );
+        } catch {
+            return 0n;
+        }
+    }, [tickUpper, baseToken, quoteToken, pool]);
+
+    // Handle range change from interactive chart
+    const handleRangeChange = useCallback(
+        (newLowerPrice: bigint, newUpperPrice: bigint) => {
+            try {
+                const baseTokenDecimals =
+                    pool.token0.address.toLowerCase() ===
+                    baseToken.address.toLowerCase()
+                        ? pool.token0.decimals
+                        : pool.token1.decimals;
+
+                const newLowerTick = priceToTick(
+                    newLowerPrice,
+                    pool.tickSpacing,
+                    baseToken.address,
+                    quoteToken.address,
+                    baseTokenDecimals
+                );
+
+                const newUpperTick = priceToTick(
+                    newUpperPrice,
+                    pool.tickSpacing,
+                    baseToken.address,
+                    quoteToken.address,
+                    baseTokenDecimals
+                );
+
+                onTickLowerChange(newLowerTick);
+                onTickUpperChange(newUpperTick);
+            } catch (error) {
+                console.error("Error converting price to tick:", error);
+            }
+        },
+        [pool, baseToken, quoteToken, onTickLowerChange, onTickUpperChange]
+    );
+
+    // APR is now calculated above using real pool fee data
+
+    // Calculate position metrics for display
+    const positionMetrics = useMemo(() => {
+        if (!totalQuoteValue || totalQuoteValue === 0n) {
+            return {
+                investmentBase: "0",
+                investmentQuote: "0",
+                positionSizeBase: "0",
+                positionSizeQuote: "0",
+                lowerRangePnL: "0",
+                upperRangePnL: "0",
+            };
+        }
+
+        // These would normally be calculated from liquidity and price ranges
+        // For now, using placeholder calculations
+        const investmentBase = "3";
+        const investmentQuote = formatCompactValue(
+            totalQuoteValue,
+            quoteToken.decimals
+        );
+        const positionSizeBase = "2.5";
+        const positionSizeQuote = formatCompactValue(
+            (totalQuoteValue * 128n) / 100n,
+            quoteToken.decimals
+        );
+
+        return {
+            investmentBase,
+            investmentQuote,
+            positionSizeBase,
+            positionSizeQuote,
+            lowerRangePnL: "-4000",
+            upperRangePnL: "+1800",
+        };
+    }, [totalQuoteValue, quoteToken.decimals]);
+
     return (
-        <div className="space-y-3">
+        <div className="space-y-4">
             {/* Header with Price Range display */}
             <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-300 font-medium">
+                <span className="text-slate-300 font-medium flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
                     {t("positionWizard.positionConfig.priceRange")}:
                 </span>
                 <div className="flex items-center gap-2">
@@ -254,7 +471,8 @@ export function PositionRangeConfig({
                         </span>
                     )}
                     <span className="text-white font-medium">
-                        {displayPrices.lower} - {displayPrices.upper} {baseToken.symbol}/{quoteToken.symbol}
+                        {displayPrices.lower} - {displayPrices.upper}{" "}
+                        {baseToken.symbol}/{quoteToken.symbol}
                     </span>
                     <button
                         onClick={() => setIsExpanded(!isExpanded)}
@@ -269,20 +487,213 @@ export function PositionRangeConfig({
                 </div>
             </div>
 
-            {/* Collapsible content */}
+            {/* Main Layout: Information Panel + Interactive Chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                {/* Left Information Panel */}
+                <div className="lg:col-span-2 space-y-4">
+                    {/* APR Section */}
+                    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
+                        <div className="space-y-3">
+                            <div className="border-b border-slate-600 pb-3">
+                                <h4 className="text-yellow-400 font-bold text-lg">
+                                    Prospective APR: {prospectiveAPR}%
+                                </h4>
+                            </div>
+
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-slate-300">
+                                        Current Price:
+                                    </span>
+                                    <span className="text-white font-mono">
+                                        {currentPrice > 0
+                                            ? currentPrice.toFixed(2)
+                                            : "—"}{" "}
+                                        {quoteToken.symbol}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-300">
+                                        Lower Range:
+                                    </span>
+                                    <span className="text-white font-mono">
+                                        {displayPrices.lower}{" "}
+                                        {quoteToken.symbol}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-300">
+                                        Upper Range:
+                                    </span>
+                                    <span className="text-white font-mono">
+                                        {displayPrices.upper}{" "}
+                                        {quoteToken.symbol}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Investment Section */}
+                    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
+                        <div className="space-y-3">
+                            <div className="border-b border-slate-600 pb-2">
+                                <h4 className="text-slate-200 font-medium">
+                                    Investment
+                                </h4>
+                            </div>
+
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-slate-300">
+                                        Icon({baseToken.symbol}):
+                                    </span>
+                                    <span className="text-white font-mono">
+                                        {positionMetrics.investmentBase}{" "}
+                                        {baseToken.symbol}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-300">
+                                        Icon({quoteToken.symbol}):
+                                    </span>
+                                    <span className="text-white font-mono">
+                                        {positionMetrics.investmentQuote}{" "}
+                                        {quoteToken.symbol}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Position Size Section */}
+                    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
+                        <div className="space-y-3">
+                            <div className="border-b border-slate-600 pb-2">
+                                <h4 className="text-slate-200 font-medium">
+                                    Position Size
+                                </h4>
+                            </div>
+
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-slate-300">
+                                        Icon({baseToken.symbol}):
+                                    </span>
+                                    <span className="text-white font-mono">
+                                        {positionMetrics.positionSizeBase}{" "}
+                                        {baseToken.symbol}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-300">
+                                        Icon({quoteToken.symbol}):
+                                    </span>
+                                    <span className="text-white font-mono">
+                                        {positionMetrics.positionSizeQuote}{" "}
+                                        {quoteToken.symbol}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* PnL Analysis Section */}
+                    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
+                        <div className="space-y-3">
+                            <div className="border-b border-slate-600 pb-2">
+                                <h4 className="text-slate-200 font-medium">
+                                    PnL Analysis
+                                </h4>
+                            </div>
+
+                            <div className="space-y-2 text-sm">
+                                <div>
+                                    <div className="flex justify-between mb-1">
+                                        <span className="text-slate-300">
+                                            Lower Range:
+                                        </span>
+                                        <span className="text-red-400 font-mono">
+                                            {positionMetrics.lowerRangePnL}{" "}
+                                            {quoteToken.symbol}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-400 text-xs">
+                                            Position Size:
+                                        </span>
+                                        <span className="text-slate-400 font-mono text-xs">
+                                            {positionMetrics.investmentBase}{" "}
+                                            {baseToken.symbol}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="pt-2">
+                                    <div className="flex justify-between mb-1">
+                                        <span className="text-slate-300">
+                                            Upper Range:
+                                        </span>
+                                        <span className="text-green-400 font-mono">
+                                            {positionMetrics.upperRangePnL}{" "}
+                                            {quoteToken.symbol}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-400 text-xs">
+                                            Position Size:
+                                        </span>
+                                        <span className="text-slate-400 font-mono text-xs">
+                                            {positionMetrics.positionSizeQuote}{" "}
+                                            {quoteToken.symbol}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Interactive Chart */}
+                <div className="lg:col-span-3">
+                    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
+                        {totalQuoteValue > 0n ? (
+                            <InteractiveRangeSelector
+                                pool={{
+                                    ...pool,
+                                    token0Address: pool.token0.address,
+                                    token1Address: pool.token1.address,
+                                } as any}
+                                totalQuoteValue={totalQuoteValue}
+                                lowerPrice={lowerPriceBigInt}
+                                upperPrice={upperPriceBigInt}
+                                currentPrice={currentPriceBigInt}
+                                onRangeChange={handleRangeChange}
+                                width={600}
+                                height={400}
+                                className="w-full"
+                            />
+                        ) : (
+                            <div className="flex items-center justify-center h-96 text-slate-400">
+                                <div className="text-center">
+                                    <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                    <p>
+                                        Enter position size to see interactive
+                                        chart
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Collapsible Manual Input Section */}
             {isExpanded && (
                 <div className="space-y-3 border-t border-slate-700 pt-3">
-                    {/* Current Price Display */}
-                    {currentPrice > 0 && (
-                        <div className="mb-4 p-3 bg-slate-700/50 rounded-lg">
-                            <p className="text-xs text-slate-400 mb-1">
-                                Current Price
-                            </p>
-                            <p className="text-white font-mono">
-                                {currentPrice.toFixed(6)} {baseToken.symbol}/{quoteToken.symbol}
-                            </p>
-                        </div>
-                    )}
+                    <h5 className="text-slate-300 font-medium text-sm">
+                        Manual Price Input
+                    </h5>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -292,7 +703,9 @@ export function PositionRangeConfig({
                             <input
                                 type="number"
                                 value={lowerPrice}
-                                onChange={(e) => onLowerPriceChange(e.target.value)}
+                                onChange={(e) =>
+                                    onLowerPriceChange(e.target.value)
+                                }
                                 onBlur={onLowerPriceBlur}
                                 className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="0.0"
@@ -312,7 +725,9 @@ export function PositionRangeConfig({
                             <input
                                 type="number"
                                 value={upperPrice}
-                                onChange={(e) => onUpperPriceChange(e.target.value)}
+                                onChange={(e) =>
+                                    onUpperPriceChange(e.target.value)
+                                }
                                 onBlur={onUpperPriceBlur}
                                 className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="0.0"

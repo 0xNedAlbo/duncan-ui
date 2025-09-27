@@ -172,3 +172,77 @@ export function sqrtRatioX96ToToken0PerToken1(
     const scale1 = 10n ** BigInt(token1Decimals);
     return (Q192 * scale1) / sqrtP2;
 }
+
+/**
+ * Converts a token0 amount (raw units) into the equivalent token1 amount (raw units)
+ * using the current sqrtPriceX96 of the pool.
+ *
+ * Formula: amountToken1_raw = amountToken0_raw * (S^2 / Q192)
+ *
+ * @param token0Amount Amount of token0 in raw units (e.g. wei if token0 = WETH)
+ * @param sqrtPriceX96 Current sqrt price (Q96.96 fixed-point format)
+ * @returns Equivalent amount of token1 in raw units (e.g. micro-USDC if token1 = USDC)
+ */
+export function valueOfToken0AmountInToken1(
+    token0Amount: bigint,
+    sqrtPriceX96: bigint
+): bigint {
+    return (token0Amount * sqrtPriceX96 * sqrtPriceX96) / Q192;
+}
+
+/**
+ * Converts a token1 amount (raw units) into the equivalent token0 amount (raw units)
+ * using the current sqrtPriceX96 of the pool.
+ *
+ * Formula: amountToken0_raw = amountToken1_raw * (Q192 / S^2)
+ *
+ * @param token1Amount Amount of token1 in raw units (e.g. micro-USDC if token1 = USDC)
+ * @param sqrtPriceX96 Current sqrt price (Q96.96 fixed-point format)
+ * @returns Equivalent amount of token0 in raw units (e.g. wei if token0 = WETH)
+ */
+export function valueOfToken1AmountInToken0(
+    token1Amount: bigint,
+    sqrtPriceX96: bigint
+): bigint {
+    return (token1Amount * Q192) / (sqrtPriceX96 * sqrtPriceX96);
+}
+
+/**
+ * Computes the price of one full token1 (human unit) in terms of token0,
+ * using the current sqrtPriceX96 of the pool.
+ *
+ * Internally: converts 10^token1Decimals raw token1 into token0 raw units.
+ *
+ * @param sqrtPriceX96 Current sqrt price (Q96.96 fixed-point format)
+ * @param token1Decimals Number of decimals of token1 (e.g. 6 for USDC, 18 for WETH)
+ * @returns Price as token0 raw units per 1 token1 (human unit)
+ */
+export function pricePerToken1InToken0(
+    sqrtPriceX96: bigint,
+    token1Decimals: number
+): bigint {
+    return valueOfToken1AmountInToken0(
+        10n ** BigInt(token1Decimals),
+        sqrtPriceX96
+    );
+}
+
+/**
+ * Computes the price of one full token0 (human unit) in terms of token1,
+ * using the current sqrtPriceX96 of the pool.
+ *
+ * Internally: converts 10^token0Decimals raw token0 into token1 raw units.
+ *
+ * @param sqrtPriceX96 Current sqrt price (Q96.96 fixed-point format)
+ * @param token0Decimals Number of decimals of token0 (e.g. 18 for WETH, 8 for WBTC)
+ * @returns Price as token1 raw units per 1 token0 (human unit)
+ */
+export function pricePerToken0InToken1(
+    sqrtPriceX96: bigint,
+    token0Decimals: number
+): bigint {
+    return valueOfToken0AmountInToken1(
+        10n ** BigInt(token0Decimals),
+        sqrtPriceX96
+    );
+}

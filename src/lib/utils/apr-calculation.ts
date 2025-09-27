@@ -5,10 +5,12 @@
  */
 
 import { getTokenAmountsFromLiquidity } from "./uniswap-v3/liquidity";
+import { valueOfToken0AmountInToken1, valueOfToken1AmountInToken0 } from "./uniswap-v3/price";
 
 interface PoolFeeData {
     feeTier: string;
     poolLiquidity: string; // BigInt as string
+    sqrtPriceX96: string; // BigInt as string - current pool price as sqrt(price) * 2^96
     token0: {
         symbol: string;
         decimals: number;
@@ -51,7 +53,8 @@ export function calculateProspectiveApr(
     userLiquidity: bigint,
     currentTick: number,
     tickLower: number,
-    tickUpper: number
+    tickUpper: number,
+    isToken0Base: boolean
 ): AprCalculationResult {
     // Parse fee tier (e.g., "500" = 0.05% = 500 / 1000000)
     const feeTierBips = BigInt(poolFeeData.feeTier);
@@ -78,11 +81,13 @@ export function calculateProspectiveApr(
     const userFeesToken0 = (dailyFeesToken0 * userLiquidity) / totalLiquidity;
     const userFeesToken1 = (dailyFeesToken1 * userLiquidity) / totalLiquidity;
 
-    // Convert fees to quote token value (simplified)
+    // Convert fees to quote token value with correct token role
+    const isToken0Quote = !isToken0Base;
     const userFeesQuoteValue = calculateFeesInQuoteToken(
         userFeesToken0,
         userFeesToken1,
-        poolFeeData
+        poolFeeData,
+        isToken0Quote
     );
 
     // Calculate position value in quote token using actual token amounts
@@ -91,7 +96,8 @@ export function calculateProspectiveApr(
         currentTick,
         tickLower,
         tickUpper,
-        poolFeeData
+        poolFeeData,
+        isToken0Quote
     );
 
     // Calculate APR
@@ -123,22 +129,24 @@ export function calculateProspectiveApr(
 function calculateFeesInQuoteToken(
     feesToken0: bigint,
     feesToken1: bigint,
-    poolFeeData: PoolFeeData
+    poolFeeData: PoolFeeData,
+    isToken0Quote: boolean
 ): bigint {
-    // Use actual price data from the pool
-    // token0Price is the price of token0 in terms of token1 (scaled by token1 decimals)
-    const token0Price = BigInt(poolFeeData.token0.price); // token0 price in token1 units
-    const token1Decimals = BigInt(poolFeeData.token1.decimals);
+    const sqrtPriceX96 = BigInt(poolFeeData.sqrtPriceX96);
 
-    // Convert token0 fees to token1 equivalent
-    // feesToken0 * token0Price / (10 ** token1Decimals) gives token0 fees in token1 units
-    const token0FeesInToken1 = (feesToken0 * token0Price) / (10n ** token1Decimals);
+    if (isToken0Quote) {
+        // Quote token is token0, so convert token1 fees to token0 units
+        const token1FeesInToken0 = valueOfToken1AmountInToken0(feesToken1, sqrtPriceX96);
 
-    // token1 fees are already in token1 units
-    const token1FeesInToken1 = feesToken1;
+        // token0 fees are already in token0 (quote) units
+        return feesToken0 + token1FeesInToken0;
+    } else {
+        // Quote token is token1, so convert token0 fees to token1 units
+        const token0FeesInToken1 = valueOfToken0AmountInToken1(feesToken0, sqrtPriceX96);
 
-    // Return total fees in token1 (quote token) units
-    return token0FeesInToken1 + token1FeesInToken1;
+        // token1 fees are already in token1 (quote) units
+        return token0FeesInToken1 + feesToken1;
+    }
 }
 
 /**
@@ -149,7 +157,8 @@ function calculatePositionValueInQuoteToken(
     currentTick: number,
     tickLower: number,
     tickUpper: number,
-    poolFeeData: PoolFeeData
+    poolFeeData: PoolFeeData,
+    isToken0Quote: boolean
 ): bigint {
     // Get actual token amounts from liquidity
     const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
@@ -159,16 +168,19 @@ function calculatePositionValueInQuoteToken(
         tickUpper
     );
 
-    // Use actual price data from the pool
-    const token0Price = BigInt(poolFeeData.token0.price); // token0 price in token1 units
-    const token1Decimals = BigInt(poolFeeData.token1.decimals);
+    const sqrtPriceX96 = BigInt(poolFeeData.sqrtPriceX96);
 
-    // Convert token0 amount to token1 equivalent using actual pool price
-    const token0ValueInToken1 = (token0Amount * token0Price) / (10n ** token1Decimals);
+    if (isToken0Quote) {
+        // Quote token is token0, so convert token1 amount to token0 units
+        const token1ValueInToken0 = valueOfToken1AmountInToken0(token1Amount, sqrtPriceX96);
 
-    // token1 amount is already in token1 units
-    const token1ValueInToken1 = token1Amount;
+        // token0 amount is already in token0 (quote) units
+        return token0Amount + token1ValueInToken0;
+    } else {
+        // Quote token is token1, so convert token0 amount to token1 units
+        const token0ValueInToken1 = valueOfToken0AmountInToken1(token0Amount, sqrtPriceX96);
 
-    // Return total position value in token1 (quote token) units
-    return token0ValueInToken1 + token1ValueInToken1;
+        // token1 amount is already in token1 (quote) units
+        return token0ValueInToken1 + token1Amount;
+    }
 }

@@ -8,7 +8,7 @@ import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { normalizeAddress } from "@/lib/utils/evm";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import type { PoolWithTokens } from "@/services/pools/poolService";
-import type { InteractiveCurveData, ViewportState } from "../positions/wizard/types";
+import type { InteractiveRangeData, ViewportState } from "@/lib/utils/uniswap-v3/types";
 
 interface InteractivePnLCurveProps {
     pool: PoolWithTokens;
@@ -97,7 +97,7 @@ export function InteractivePnLCurve({
     }, [totalQuoteValue, lowerPrice, upperPrice, currentPrice, tickSpacing, baseTokenAddress, quoteTokenAddress, baseTokenDecimals, baseIsToken0]);
 
     // Generate curve data
-    const curveData = useMemo((): InteractiveCurveData | null => {
+    const curveData = useMemo((): InteractiveRangeData | null => {
         if (liquidityAmount === 0n) return null;
 
         try {

@@ -4,10 +4,9 @@ import { useState, useMemo } from "react";
 import { Eye, EyeOff, Loader2, AlertTriangle } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import type { PoolData } from "@/hooks/api/usePool";
-import type { SupportedChainsType } from "@/config/chains";
-import { usePoolFeeData } from "@/hooks/api/usePoolFeeData";
-import { calculateProspectiveApr } from "@/lib/utils/apr-calculation";
+import { usePositionAprProjection } from "@/hooks/api/usePositionAprProjection";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
+import { compareAddresses } from "@/lib/utils/evm";
 
 interface TokenInfo {
     address: string;
@@ -23,7 +22,6 @@ interface PositionAprPreviewProps {
     liquidity: bigint; // Current liquidity value
     tickLower?: number;
     tickUpper?: number;
-    chain?: SupportedChainsType;
 }
 
 export function PositionAprPreview({
@@ -33,101 +31,85 @@ export function PositionAprPreview({
     liquidity,
     tickLower,
     tickUpper,
-    chain,
 }: PositionAprPreviewProps) {
     const t = useTranslations();
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
-    // Fetch pool fee data
+    // Determine token roles for correct decimal scaling
+    const isToken0Base = useMemo(() => {
+        return compareAddresses(pool.token0.address, baseToken.address) === 0;
+    }, [pool.token0.address, baseToken.address]);
+
+    // Use the APR projection hook
     const {
-        data: poolFeeData,
         isLoading,
         isError,
         error,
-    } = usePoolFeeData(chain, pool.poolAddress, {
-        enabled: !!chain && !!pool.poolAddress && liquidity > 0n,
+        apr,
+        dailyApr,
+        sharePercent,
+        token0Fees,
+        token1Fees,
+        totalFeesQuote,
+        isOutOfRange,
+        hasValidData,
+    } = usePositionAprProjection({
+        pool,
+        liquidity,
+        tickLower,
+        tickUpper,
+        isToken0Base,
     });
-
-    // Calculate APR from pool fee data
-    const aprCalculation = useMemo(() => {
-        if (!poolFeeData || liquidity === 0n || !pool.currentTick || tickLower === undefined || tickUpper === undefined) {
-            return null;
-        }
-
-        try {
-            return calculateProspectiveApr(
-                poolFeeData,
-                liquidity,
-                pool.currentTick,
-                tickLower,
-                tickUpper
-            );
-        } catch (error) {
-            console.error("Error calculating APR:", error);
-            return null;
-        }
-    }, [poolFeeData, liquidity, pool.currentTick, tickLower, tickUpper]);
-
-    // Check if current price is out of range
-    const isOutOfRange = useMemo(() => {
-        if (!pool?.currentTick || tickLower === undefined || tickUpper === undefined) {
-            return false;
-        }
-        return pool.currentTick < tickLower || pool.currentTick > tickUpper;
-    }, [pool?.currentTick, tickLower, tickUpper]);
 
     // Format APR for display
     const displayApr = useMemo(() => {
-        if (!aprCalculation) return "—";
+        if (!hasValidData) return "—";
 
-        const apr = aprCalculation.annualizedApr;
+        const aprPercent = apr * 100; // Convert decimal to percentage
 
-        if (apr === 0) return "0%";
-        if (apr < 0.01) return "<0.01%";
-        if (apr > 1000) return ">1000%";
+        if (aprPercent === 0) return "0%";
+        if (aprPercent < 0.01) return "<0.01%";
+        if (aprPercent > 1000) return ">1000%";
 
-        return `${apr.toFixed(2)}%`;
-    }, [aprCalculation]);
+        return `${aprPercent.toFixed(2)}%`;
+    }, [apr, hasValidData]);
 
     // Format daily fees in quote token for header display
     const displayDailyFees = useMemo(() => {
-        if (!aprCalculation || !poolFeeData) return "";
+        if (!hasValidData) return "";
 
-        // Calculate total daily fees in quote token units
-        const totalDailyFeesQuote = aprCalculation.userFeesQuoteValue;
-
-        if (totalDailyFeesQuote === 0n) return "";
+        if (totalFeesQuote === 0n) return "";
 
         // Use actual quote token decimals for display formatting
-        const formattedFees = formatCompactValue(totalDailyFeesQuote, quoteToken.decimals);
+        const formattedFees = formatCompactValue(totalFeesQuote, quoteToken.decimals);
 
         return ` (${formattedFees} ${quoteToken.symbol}/day)`;
-    }, [aprCalculation, poolFeeData, quoteToken.symbol, quoteToken.decimals]);
+    }, [hasValidData, totalFeesQuote, quoteToken.symbol, quoteToken.decimals]);
 
     // Format individual token daily fees for details
     const displayTokenFees = useMemo(() => {
-        if (!aprCalculation || !poolFeeData) return null;
+        if (!hasValidData) return null;
 
-        const token0Fees = formatCompactValue(aprCalculation.userFeesToken0, baseToken.decimals);
-        const token1Fees = formatCompactValue(aprCalculation.userFeesToken1, quoteToken.decimals);
+        const token0FeesFormatted = formatCompactValue(token0Fees, baseToken.decimals);
+        const token1FeesFormatted = formatCompactValue(token1Fees, quoteToken.decimals);
 
         return {
-            token0: `${token0Fees} ${baseToken.symbol}/day`,
-            token1: `${token1Fees} ${quoteToken.symbol}/day`
+            token0: `${token0FeesFormatted} ${baseToken.symbol}/day`,
+            token1: `${token1FeesFormatted} ${quoteToken.symbol}/day`
         };
-    }, [aprCalculation, poolFeeData, baseToken.decimals, baseToken.symbol, quoteToken.decimals, quoteToken.symbol]);
+    }, [hasValidData, token0Fees, token1Fees, baseToken.decimals, baseToken.symbol, quoteToken.decimals, quoteToken.symbol]);
 
     // Format user share for display
     const displayUserShare = useMemo(() => {
-        if (!aprCalculation) return "—";
+        if (!hasValidData) return "—";
 
-        const share = aprCalculation.userSharePercent;
+        const sharePercentFormatted = sharePercent * 100; // Convert decimal to percentage
 
-        if (share === 0) return "0%";
-        if (share < 0.001) return "<0.001%";
+        if (sharePercentFormatted === 0) return "0%";
+        if (sharePercentFormatted < 0.001) return "<0.001%";
 
-        return `${share.toFixed(3)}%`;
-    }, [aprCalculation]);
+        return `${sharePercentFormatted.toFixed(3)}%`;
+    }, [hasValidData, sharePercent]);
 
     return (
         <div className="space-y-3">
@@ -198,7 +180,7 @@ export function PositionAprPreview({
                         </div>
                     )}
 
-                    {aprCalculation && (
+                    {hasValidData && (
                         <div className="space-y-3">
                             {/* APR Breakdown */}
                             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3">
@@ -209,7 +191,7 @@ export function PositionAprPreview({
                                 <div className="space-y-2 text-xs">
                                     <div className="flex justify-between">
                                         <span className="text-slate-400">Pool Fee Tier:</span>
-                                        <span className="text-white">{(parseInt(poolFeeData?.feeTier || "0") / 10000).toFixed(2)}%</span>
+                                        <span className="text-white">{(pool.fee / 10000).toFixed(2)}%</span>
                                     </div>
 
                                     <div className="flex justify-between">
@@ -220,7 +202,7 @@ export function PositionAprPreview({
                                     <div className="flex justify-between">
                                         <span className="text-slate-400">Daily APR:</span>
                                         <span className="text-white">
-                                            {aprCalculation.dailyApr < 0.001 ? "<0.001%" : `${aprCalculation.dailyApr.toFixed(3)}%`}
+                                            {(dailyApr * 100) < 0.001 ? "<0.001%" : `${(dailyApr * 100).toFixed(3)}%`}
                                         </span>
                                     </div>
 
@@ -252,7 +234,7 @@ export function PositionAprPreview({
                                         <div className="border-t border-slate-600 pt-2 mt-2">
                                             <div className="flex justify-between font-medium">
                                                 <span className="text-slate-300">Fee value in {quoteToken.symbol}:</span>
-                                                <span className="text-white">{formatCompactValue(aprCalculation.userFeesQuoteValue, quoteToken.decimals)} {quoteToken.symbol}/day</span>
+                                                <span className="text-white">{formatCompactValue(totalFeesQuote, quoteToken.decimals)} {quoteToken.symbol}/day</span>
                                             </div>
                                         </div>
                                     </div>
@@ -270,7 +252,7 @@ export function PositionAprPreview({
                         </div>
                     )}
 
-                    {!isLoading && !isError && !aprCalculation && liquidity === 0n && (
+                    {!isLoading && !isError && !hasValidData && liquidity === 0n && (
                         <div className="text-center py-4">
                             <p className="text-slate-400 text-sm">
                                 Configure your position size to see APR estimate

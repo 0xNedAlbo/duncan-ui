@@ -38,3 +38,56 @@ export interface PnLPoint {
     pnlPercent: number;
     phase: PositionPhase;
 }
+
+// Interactive range selection types
+export interface ViewportState {
+    zoom: number;
+    panX: number;
+    panY: number;
+    isDragging: boolean;
+    dragStart: { x: number; y: number } | null;
+}
+
+export interface CursorState {
+    x: number;
+    y: number;
+    price: bigint;
+    pnl: bigint;
+    pnlPercent: number;
+    isVisible: boolean;
+}
+
+export interface RangeMarkerState {
+    position: "lower" | "upper";
+    isDragging: boolean;
+    x: number;
+    price: bigint;
+}
+
+export interface InteractiveRangeData {
+    points: PnLPoint[];
+    priceRange: { min: bigint; max: bigint };
+    pnlRange: { min: number; max: number };
+    currentPriceIndex: number;
+    rangeIndices: {
+        lower: number;
+        upper: number;
+    };
+    lowerPrice: bigint;
+    upperPrice: bigint;
+    currentPrice: bigint;
+}
+
+export interface InteractionState {
+    viewport: ViewportState;
+    cursor: CursorState;
+    markers: {
+        lower: RangeMarkerState;
+        upper: RangeMarkerState;
+    };
+    activeMarker: "lower" | "upper" | null;
+    localDragState: {
+        lowerPrice: bigint | null;
+        upperPrice: bigint | null;
+    };
+}

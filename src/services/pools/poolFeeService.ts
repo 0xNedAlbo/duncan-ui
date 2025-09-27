@@ -6,19 +6,20 @@ export interface PoolFeeData {
   chain: string;
   feeTier: string;
   poolLiquidity: string; // BigInt as string
+  sqrtPriceX96: string; // BigInt as string - current pool price as sqrt(price) * 2^96
   token0: {
     address: string;
     symbol: string;
     decimals: number;
     dailyVolume: string; // BigInt as string (token units)
-    price: string; // BigInt as string (quote token units per base token)
+    price: string; // BigInt as string (token0 price in token1 units)
   };
   token1: {
     address: string;
     symbol: string;
     decimals: number;
     dailyVolume: string; // BigInt as string (token units)
-    price: string; // BigInt as string (quote token units per base token)
+    price: string; // BigInt as string (token1 price in token0 units)
   };
   calculatedAt: string; // ISO timestamp
 }
@@ -27,6 +28,7 @@ interface SubgraphPoolResponse {
   pools: Array<{
     id: string;
     feeTier: string;
+    sqrtPrice: string; // Current pool sqrt price
     token0: {
       id: string;
       symbol: string;
@@ -42,8 +44,8 @@ interface SubgraphPoolResponse {
       liquidity: string;
       volumeToken0: string; // Decimal string from subgraph
       volumeToken1: string; // Decimal string from subgraph
-      token0Price: string; // Decimal string from subgraph
-      token1Price: string; // Decimal string from subgraph
+      token0Price: string; // Decimal string from subgraph (token0 price in token1 units)
+      token1Price: string; // Decimal string from subgraph (token1 price in token0 units)
     }>;
   }>;
 }
@@ -92,6 +94,7 @@ export async function getPoolFeeData(
       pools(where: {id: $poolId}) {
         id
         feeTier
+        sqrtPrice
         token0 {
           id
           symbol
@@ -145,27 +148,32 @@ export async function getPoolFeeData(
   const poolLiquidity = dayData.liquidity;
   const token0Volume = decimalToBigInt(dayData.volumeToken0, token0Decimals);
   const token1Volume = decimalToBigInt(dayData.volumeToken1, token1Decimals);
-  const token0Price = decimalToBigInt(dayData.token0Price, token1Decimals); // Price in token1 units
-  const token1Price = decimalToBigInt(dayData.token1Price, token0Decimals); // Price in token0 units
+
+  // Fix: Swap the subgraph fields and use correct decimal scaling
+  // dayData.token1Price = "4021..." should be the WETH price (~4016), scale with token1 (USDC) decimals
+  // dayData.token0Price = "248" should be the USDC price (~0.000249), scale with token0 (WETH) decimals
+  const token0PriceInToken1 = decimalToBigInt(dayData.token1Price, token1Decimals); // WETH price in USDC units
+  const token1PriceInToken0 = decimalToBigInt(dayData.token0Price, token0Decimals); // USDC price in WETH units
 
   return {
     poolAddress: normalizeAddress(poolAddress),
     chain,
     feeTier: pool.feeTier,
     poolLiquidity,
+    sqrtPriceX96: pool.sqrtPrice, // Current sqrt price from pool
     token0: {
       address: normalizeAddress(pool.token0.id),
       symbol: pool.token0.symbol,
       decimals: token0Decimals,
       dailyVolume: token0Volume,
-      price: token0Price,
+      price: token0PriceInToken1, // token0 price in token1 units
     },
     token1: {
       address: normalizeAddress(pool.token1.id),
       symbol: pool.token1.symbol,
       decimals: token1Decimals,
       dailyVolume: token1Volume,
-      price: token1Price,
+      price: token1PriceInToken0, // token1 price in token0 units
     },
     calculatedAt: new Date().toISOString(),
   };
