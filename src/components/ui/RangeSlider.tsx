@@ -193,8 +193,21 @@ export function RangeSlider({
         const range = currentPrice * (percentage / 100);
         const newLowerPrice = currentPrice - range;
         const newUpperPrice = currentPrice + range;
+
+        // Check if current slider boundaries are too narrow for this preset
+        if (newLowerPrice < sliderBounds.min || newUpperPrice > sliderBounds.max) {
+            // Reset slider boundaries to accommodate the preset range with some margin
+            const marginPercent = Math.max(percentage * 0.2, 10); // 20% margin or minimum 10%
+            const margin = currentPrice * (marginPercent / 100);
+
+            setSliderBounds({
+                min: newLowerPrice - margin,
+                max: newUpperPrice + margin
+            });
+        }
+
         onRangeChange(newLowerPrice, newUpperPrice);
-    }, [currentPrice, onRangeChange]);
+    }, [currentPrice, onRangeChange, sliderBounds, setSliderBounds]);
 
     const handleMaxClick = useCallback(() => {
         onRangeChange(sliderBounds.min, sliderBounds.max);
