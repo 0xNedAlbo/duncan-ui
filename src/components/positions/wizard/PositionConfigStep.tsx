@@ -220,6 +220,13 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         router.replace(pathname + "?" + params.toString());
     }
 
+    function onTickRangeChange(newTickLower: number, newTickUpper: number) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("tickLower", newTickLower.toString());
+        params.set("tickUpper", newTickUpper.toString());
+        router.replace(pathname + "?" + params.toString());
+    }
+
     // Pool-token validation logic (order-agnostic) - memoized to prevent unnecessary recalculations
     const validation = useMemo(() => {
         // Check if pool is loaded successfully
@@ -613,6 +620,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                                     liquidity={liquidity}
                                     onTickLowerChange={onTickLowerChange}
                                     onTickUpperChange={onTickUpperChange}
+                                    onTickRangeChange={onTickRangeChange}
                                 />
                             </div>
                         )}

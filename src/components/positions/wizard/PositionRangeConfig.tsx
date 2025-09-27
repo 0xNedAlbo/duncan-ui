@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { PencilLine, PencilOff, TrendingUp } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import type { PoolData } from "@/hooks/api/usePool";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
-import { TickMath } from "@uniswap/v3-sdk";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
-import { InteractiveRangeSelector } from "@/components/charts/InteractiveRangeSelector";
+import { TickMath } from "@uniswap/v3-sdk";
+import { RangeSlider } from "@/components/ui/RangeSlider";
 import { usePositionAprProjection } from "@/hooks/api/usePositionAprProjection";
 import { compareAddresses } from "@/lib/utils/evm";
 
@@ -26,11 +26,12 @@ interface PositionRangeConfigProps {
     tickLower: number;
     tickUpper: number;
     liquidity?: bigint;
-    totalQuoteValue?: bigint;
     // eslint-disable-next-line no-unused-vars
     onTickLowerChange: (tick: number) => void;
     // eslint-disable-next-line no-unused-vars
     onTickUpperChange: (tick: number) => void;
+    // eslint-disable-next-line no-unused-vars
+    onTickRangeChange: (tickLower: number, tickUpper: number) => void;
 }
 
 export function PositionRangeConfig({
@@ -40,14 +41,12 @@ export function PositionRangeConfig({
     tickLower,
     tickUpper,
     liquidity,
-    totalQuoteValue = 0n,
     onTickLowerChange,
     onTickUpperChange,
+    onTickRangeChange,
 }: PositionRangeConfigProps) {
     const t = useTranslations();
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
-    const [lowerPrice, setLowerPrice] = useState<string>("");
-    const [upperPrice, setUpperPrice] = useState<string>("");
 
     // Determine token roles for correct decimal scaling
     const isToken0Base = useMemo(() => {
@@ -145,30 +144,6 @@ export function PositionRangeConfig({
         [baseToken, quoteToken, pool]
     );
 
-    // Sync price inputs with tick values for display
-    useEffect(() => {
-        // Convert valid ticks to price strings for input fields
-        if (pool && !isNaN(tickLower) && !lowerPrice) {
-            const price = convertTickToPriceSimple(tickLower);
-            if (price > 0) {
-                setLowerPrice(price.toString());
-            }
-        }
-
-        if (pool && !isNaN(tickUpper) && !upperPrice) {
-            const price = convertTickToPriceSimple(tickUpper);
-            if (price > 0) {
-                setUpperPrice(price.toString());
-            }
-        }
-    }, [
-        pool,
-        tickLower,
-        tickUpper,
-        lowerPrice,
-        upperPrice,
-        convertTickToPriceSimple,
-    ]);
 
     // Use APR projection hook
     const {
@@ -295,130 +270,7 @@ export function PositionRangeConfig({
         return pool.currentTick < tickLower || pool.currentTick > tickUpper;
     }, [pool?.currentTick, tickLower, tickUpper]);
 
-    function onLowerPriceChange(newLowerPrice: string) {
-        setLowerPrice(newLowerPrice);
-        // Don't convert to tick immediately - let user finish typing
-    }
 
-    function onUpperPriceChange(newUpperPrice: string) {
-        setUpperPrice(newUpperPrice);
-        // Don't convert to tick immediately - let user finish typing
-    }
-
-    function onLowerPriceBlur() {
-        const price = parseFloat(lowerPrice);
-        if (!isNaN(price) && price > 0) {
-            const tick = convertPriceToTick(price);
-            onTickLowerChange(tick);
-        }
-    }
-
-    function onUpperPriceBlur() {
-        const price = parseFloat(upperPrice);
-        if (!isNaN(price) && price > 0) {
-            const tick = convertPriceToTick(price);
-            onTickUpperChange(tick);
-        }
-    }
-
-    // Calculate current price in BigInt for InteractiveRangeSelector
-    const currentPriceBigInt = useMemo(() => {
-        if (!pool?.currentTick || !baseToken || !quoteToken) return 0n;
-
-        try {
-            const baseTokenDecimals =
-                pool.token0.address.toLowerCase() ===
-                baseToken.address.toLowerCase()
-                    ? pool.token0.decimals
-                    : pool.token1.decimals;
-
-            return tickToPrice(
-                pool.currentTick,
-                baseToken.address,
-                quoteToken.address,
-                baseTokenDecimals
-            );
-        } catch (error) {
-            console.error("Error getting current price:", error);
-            return 0n;
-        }
-    }, [baseToken, quoteToken, pool]);
-
-    // Calculate price bounds in BigInt
-    const lowerPriceBigInt = useMemo(() => {
-        if (tickLower === undefined || isNaN(tickLower)) return 0n;
-        try {
-            const baseTokenDecimals =
-                pool.token0.address.toLowerCase() ===
-                baseToken.address.toLowerCase()
-                    ? pool.token0.decimals
-                    : pool.token1.decimals;
-
-            return tickToPrice(
-                tickLower,
-                baseToken.address,
-                quoteToken.address,
-                baseTokenDecimals
-            );
-        } catch {
-            return 0n;
-        }
-    }, [tickLower, baseToken, quoteToken, pool]);
-
-    const upperPriceBigInt = useMemo(() => {
-        if (tickUpper === undefined || isNaN(tickUpper)) return 0n;
-        try {
-            const baseTokenDecimals =
-                pool.token0.address.toLowerCase() ===
-                baseToken.address.toLowerCase()
-                    ? pool.token0.decimals
-                    : pool.token1.decimals;
-
-            return tickToPrice(
-                tickUpper,
-                baseToken.address,
-                quoteToken.address,
-                baseTokenDecimals
-            );
-        } catch {
-            return 0n;
-        }
-    }, [tickUpper, baseToken, quoteToken, pool]);
-
-    // Handle range change from interactive chart
-    const handleRangeChange = useCallback(
-        (newLowerPrice: bigint, newUpperPrice: bigint) => {
-            try {
-                const baseTokenDecimals =
-                    pool.token0.address.toLowerCase() ===
-                    baseToken.address.toLowerCase()
-                        ? pool.token0.decimals
-                        : pool.token1.decimals;
-
-                const newLowerTick = priceToTick(
-                    newLowerPrice,
-                    pool.tickSpacing,
-                    baseToken.address,
-                    quoteToken.address,
-                    baseTokenDecimals
-                );
-
-                const newUpperTick = priceToTick(
-                    newUpperPrice,
-                    pool.tickSpacing,
-                    baseToken.address,
-                    quoteToken.address,
-                    baseTokenDecimals
-                );
-
-                onTickLowerChange(newLowerTick);
-                onTickUpperChange(newUpperTick);
-            } catch (error) {
-                console.error("Error converting price to tick:", error);
-            }
-        },
-        [pool, baseToken, quoteToken, onTickLowerChange, onTickUpperChange]
-    );
 
     // APR is now calculated above using real pool fee data
 
@@ -512,230 +364,116 @@ export function PositionRangeConfig({
                 </div>
             </div>
 
-            {/* Main Layout: Information Panel + Interactive Chart */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                {/* Left Information Panel */}
-                <div className="lg:col-span-2 space-y-4">
-                    {/* APR Section */}
-                    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
-                        <div className="space-y-3">
-                            <div className="border-b border-slate-600 pb-3">
-                                <h4 className="text-yellow-400 font-bold text-lg">
-                                    Prospective APR: {prospectiveAPR}%
-                                </h4>
-                            </div>
+            {/* Collapsible sections - only show when expanded */}
+            {isExpanded && (
+                <div className="space-y-6">
+                    {/* Range Selector with integrated APR */}
+                    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-6">
+                        <RangeSlider
+                            currentPrice={currentPrice}
+                            lowerPrice={convertTickToPriceSimple(tickLower)}
+                            upperPrice={convertTickToPriceSimple(tickUpper)}
+                            onRangeChange={(newLowerPrice, newUpperPrice) => {
+                                const newLowerTick = convertPriceToTick(newLowerPrice);
+                                const newUpperTick = convertPriceToTick(newUpperPrice);
+                                onTickRangeChange(newLowerTick, newUpperTick);
+                            }}
+                            quoteTokenSymbol={quoteToken.symbol}
+                            quoteTokenDecimals={quoteToken.decimals}
+                            aprValue={typeof prospectiveAPR === 'number' ? prospectiveAPR.toString() : prospectiveAPR}
+                            aprLoading={isPoolFeeLoading}
+                            className=""
+                        />
+                    </div>
+                        {/* Position Size Section */}
+                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
+                    <div className="space-y-3">
+                        <div className="border-b border-slate-600 pb-2">
+                            <h4 className="text-slate-200 font-medium">
+                                Position Size
+                            </h4>
+                        </div>
 
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span className="text-slate-300">
-                                        Current Price:
-                                    </span>
-                                    <span className="text-white font-mono">
-                                        {currentPrice > 0
-                                            ? currentPrice.toFixed(2)
-                                            : "—"}{" "}
-                                        {quoteToken.symbol}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-300">
-                                        Lower Range:
-                                    </span>
-                                    <span className="text-white font-mono">
-                                        {displayPrices.lower}{" "}
-                                        {quoteToken.symbol}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-300">
-                                        Upper Range:
-                                    </span>
-                                    <span className="text-white font-mono">
-                                        {displayPrices.upper}{" "}
-                                        {quoteToken.symbol}
-                                    </span>
-                                </div>
+                        <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-slate-300">
+                                    Icon({baseToken.symbol}):
+                                </span>
+                                <span className="text-white font-mono">
+                                    {positionMetrics.positionSizeBase}{" "}
+                                    {baseToken.symbol}
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-300">
+                                    Icon({quoteToken.symbol}):
+                                </span>
+                                <span className="text-white font-mono">
+                                    {positionMetrics.positionSizeQuote}{" "}
+                                    {quoteToken.symbol}
+                                </span>
                             </div>
                         </div>
                     </div>
+                </div>
 
+                {/* PnL Analysis Section */}
+                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
+                    <div className="space-y-3">
+                        <div className="border-b border-slate-600 pb-2">
+                            <h4 className="text-slate-200 font-medium">
+                                PnL Analysis
+                            </h4>
+                        </div>
 
-                    {/* Position Size Section */}
-                    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
-                        <div className="space-y-3">
-                            <div className="border-b border-slate-600 pb-2">
-                                <h4 className="text-slate-200 font-medium">
-                                    Position Size
-                                </h4>
-                            </div>
-
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
+                        <div className="space-y-2 text-sm">
+                            <div>
+                                <div className="flex justify-between mb-1">
                                     <span className="text-slate-300">
-                                        Icon({baseToken.symbol}):
+                                        Lower Range:
                                     </span>
-                                    <span className="text-white font-mono">
+                                    <span className="text-red-400 font-mono">
+                                        {positionMetrics.lowerRangePnL}{" "}
+                                        {quoteToken.symbol}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-400 text-xs">
+                                        Position Size:
+                                    </span>
+                                    <span className="text-slate-400 font-mono text-xs">
                                         {positionMetrics.positionSizeBase}{" "}
                                         {baseToken.symbol}
                                     </span>
                                 </div>
-                                <div className="flex justify-between">
+                            </div>
+
+                            <div className="pt-2">
+                                <div className="flex justify-between mb-1">
                                     <span className="text-slate-300">
-                                        Icon({quoteToken.symbol}):
+                                        Upper Range:
                                     </span>
-                                    <span className="text-white font-mono">
+                                    <span className="text-green-400 font-mono">
+                                        {positionMetrics.upperRangePnL}{" "}
+                                        {quoteToken.symbol}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-400 text-xs">
+                                        Position Size:
+                                    </span>
+                                    <span className="text-slate-400 font-mono text-xs">
                                         {positionMetrics.positionSizeQuote}{" "}
                                         {quoteToken.symbol}
                                     </span>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    {/* PnL Analysis Section */}
-                    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
-                        <div className="space-y-3">
-                            <div className="border-b border-slate-600 pb-2">
-                                <h4 className="text-slate-200 font-medium">
-                                    PnL Analysis
-                                </h4>
-                            </div>
-
-                            <div className="space-y-2 text-sm">
-                                <div>
-                                    <div className="flex justify-between mb-1">
-                                        <span className="text-slate-300">
-                                            Lower Range:
-                                        </span>
-                                        <span className="text-red-400 font-mono">
-                                            {positionMetrics.lowerRangePnL}{" "}
-                                            {quoteToken.symbol}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-slate-400 text-xs">
-                                            Position Size:
-                                        </span>
-                                        <span className="text-slate-400 font-mono text-xs">
-                                            {positionMetrics.positionSizeBase}{" "}
-                                            {baseToken.symbol}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="pt-2">
-                                    <div className="flex justify-between mb-1">
-                                        <span className="text-slate-300">
-                                            Upper Range:
-                                        </span>
-                                        <span className="text-green-400 font-mono">
-                                            {positionMetrics.upperRangePnL}{" "}
-                                            {quoteToken.symbol}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-slate-400 text-xs">
-                                            Position Size:
-                                        </span>
-                                        <span className="text-slate-400 font-mono text-xs">
-                                            {positionMetrics.positionSizeQuote}{" "}
-                                            {quoteToken.symbol}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Right Interactive Chart */}
-                <div className="lg:col-span-3">
-                    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
-                        {totalQuoteValue > 0n ? (
-                            <InteractiveRangeSelector
-                                pool={{
-                                    ...pool,
-                                    token0Address: pool.token0.address,
-                                    token1Address: pool.token1.address,
-                                } as any}
-                                totalQuoteValue={totalQuoteValue}
-                                lowerPrice={lowerPriceBigInt}
-                                upperPrice={upperPriceBigInt}
-                                currentPrice={currentPriceBigInt}
-                                onRangeChange={handleRangeChange}
-                                width={600}
-                                height={400}
-                                className="w-full"
-                            />
-                        ) : (
-                            <div className="flex items-center justify-center h-96 text-slate-400">
-                                <div className="text-center">
-                                    <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                                    <p>
-                                        Enter position size to see interactive
-                                        chart
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* Collapsible Manual Input Section */}
-            {isExpanded && (
-                <div className="space-y-3 border-t border-slate-700 pt-3">
-                    <h5 className="text-slate-300 font-medium text-sm">
-                        Manual Price Input
-                    </h5>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-2">
-                                Lower Price
-                            </label>
-                            <input
-                                type="number"
-                                value={lowerPrice}
-                                onChange={(e) =>
-                                    onLowerPriceChange(e.target.value)
-                                }
-                                onBlur={onLowerPriceBlur}
-                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="0.0"
-                                step="any"
-                            />
-                            {tickLower !== undefined && (
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Tick: {tickLower}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-2">
-                                Upper Price
-                            </label>
-                            <input
-                                type="number"
-                                value={upperPrice}
-                                onChange={(e) =>
-                                    onUpperPriceChange(e.target.value)
-                                }
-                                onBlur={onUpperPriceBlur}
-                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="0.0"
-                                step="any"
-                            />
-                            {tickUpper !== undefined && (
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Tick: {tickUpper}
-                                </p>
-                            )}
                         </div>
                     </div>
                 </div>
             )}
+
         </div>
     );
 }
