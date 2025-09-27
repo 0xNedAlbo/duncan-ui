@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { PencilLine, Check } from "lucide-react";
+import { PencilLine, PencilOff } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useTranslations } from "@/i18n/client";
@@ -270,10 +270,10 @@ export function PositionSizeConfig({
                     </span>
                     <button
                         onClick={() => setIsExpanded(!isExpanded)}
-                        className="p-1 hover:bg-slate-700 rounded transition-colors"
+                        className="p-1 hover:bg-slate-700 rounded transition-colors cursor-pointer"
                     >
                         {isExpanded ? (
-                            <Check className="w-4 h-4 text-slate-400" />
+                            <PencilOff className="w-4 h-4 text-slate-400" />
                         ) : (
                             <PencilLine className="w-4 h-4 text-slate-400" />
                         )}

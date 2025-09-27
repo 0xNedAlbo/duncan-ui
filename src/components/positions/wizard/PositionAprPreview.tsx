@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Eye, Loader2, AlertTriangle } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertTriangle } from "lucide-react";
+import { useTranslations } from "@/i18n/client";
 import type { PoolData } from "@/hooks/api/usePool";
 import type { SupportedChainsType } from "@/config/chains";
 import { usePoolFeeData } from "@/hooks/api/usePoolFeeData";
@@ -34,6 +35,7 @@ export function PositionAprPreview({
     tickUpper,
     chain,
 }: PositionAprPreviewProps) {
+    const t = useTranslations();
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
     // Fetch pool fee data
@@ -65,6 +67,14 @@ export function PositionAprPreview({
             return null;
         }
     }, [poolFeeData, liquidity, pool.currentTick, tickLower, tickUpper]);
+
+    // Check if current price is out of range
+    const isOutOfRange = useMemo(() => {
+        if (!pool?.currentTick || tickLower === undefined || tickUpper === undefined) {
+            return false;
+        }
+        return pool.currentTick < tickLower || pool.currentTick > tickUpper;
+    }, [pool?.currentTick, tickLower, tickUpper]);
 
     // Format APR for display
     const displayApr = useMemo(() => {
@@ -123,9 +133,16 @@ export function PositionAprPreview({
         <div className="space-y-3">
             {/* Header with APR display */}
             <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-300 font-medium">
-                    Prospective APR:
-                </span>
+                <div className="flex flex-col">
+                    <span className="text-slate-300 font-medium">
+                        Prospective APR:
+                    </span>
+                    {isOutOfRange && (
+                        <span className="text-slate-400 text-xs italic">
+                            {t("positionWizard.positionConfig.outOfRangeCondition")}
+                        </span>
+                    )}
+                </div>
                 <div className="flex items-center gap-2">
                     {isLoading ? (
                         <div className="flex items-center gap-2">
@@ -138,15 +155,19 @@ export function PositionAprPreview({
                             <span className="text-red-400">Error</span>
                         </div>
                     ) : (
-                        <span className="text-white font-medium">
+                        <span className={`text-white font-medium ${isOutOfRange ? 'line-through' : ''}`}>
                             {displayApr}{displayDailyFees}
                         </span>
                     )}
                     <button
                         onClick={() => setIsExpanded(!isExpanded)}
-                        className="p-1 hover:bg-slate-700 rounded transition-colors"
+                        className="p-1 hover:bg-slate-700 rounded transition-colors cursor-pointer"
                     >
-                        <Eye className="w-4 h-4 text-slate-400" />
+                        {isExpanded ? (
+                            <EyeOff className="w-4 h-4 text-slate-400" />
+                        ) : (
+                            <Eye className="w-4 h-4 text-slate-400" />
+                        )}
                     </button>
                 </div>
             </div>

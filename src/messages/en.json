@@ -529,6 +529,7 @@
       "currentPrice": "Current Price",
       "liquidityAmount": "Liquidity Amount",
       "yourInvestment": "Your Investment:",
+      "outOfRangeCondition": "...if the price moves into range.",
       "positionSummary": "Position Summary",
       "summary": {
         "baseToken": "Base Token",

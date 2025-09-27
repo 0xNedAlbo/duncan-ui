@@ -155,9 +155,8 @@ function getLiquidityFromAmount0(
     amount0: bigint
 ): bigint {
     if (sqrtPriceUpper <= sqrtPriceLower || amount0 <= 0n) return 0n;
-    // L = amount0 * Q96 * (√Pb - √Pa) / (√Pb * √Pa)
     const delta = sqrtPriceUpper - sqrtPriceLower;
-    return (amount0 * Q96 * delta) / (sqrtPriceUpper * sqrtPriceLower);
+    return (amount0 * (sqrtPriceLower * sqrtPriceUpper)) / (Q96 * delta);
 }
 
 function getLiquidityFromAmount1(
@@ -166,8 +165,9 @@ function getLiquidityFromAmount1(
     amount1: bigint
 ): bigint {
     if (sqrtPriceUpper <= sqrtPriceLower || amount1 <= 0n) return 0n;
-
-    return (amount1 * Q96) / (sqrtPriceUpper - sqrtPriceLower);
+    const delta = sqrtPriceUpper - sqrtPriceLower;
+    // floor(amount1 * Q96 / delta)
+    return (amount1 * Q96) / delta;
 }
 
 export const pow10 = (n: number) => 10n ** BigInt(n);
@@ -222,7 +222,7 @@ export function getLiquidityFromInvestmentAmounts(
         );
         const amount0 = isQuoteToken0
             ? totalBudgetQuote // already token0 units
-            : quoteToToken0(totalBudgetQuote, quoteDecimals, baseDecimals, S); // convert token1->token0
+            : quoteToToken0(totalBudgetQuote, S);
         return getLiquidityFromAmount0(B, A, amount0);
     }
 
@@ -238,12 +238,7 @@ export function getLiquidityFromInvestmentAmounts(
             S
         );
         const amount1 = isQuoteToken0
-            ? token0ToQuoteToken1(
-                  totalBudgetQuote,
-                  quoteDecimals,
-                  baseDecimals,
-                  S
-              ) // convert token0->token1
+            ? token0ToQuoteToken1(totalBudgetQuote, S) // convert token0->token1
             : totalBudgetQuote; // already token1 units
         return getLiquidityFromAmount1(B, A, amount1);
     }
@@ -332,31 +327,15 @@ function totalBudgetInQuote(
 }
 
 /** Convert a QUOTE budget (token1) into token0 amount, respecting decimals. */
-function quoteToToken0(
-    amountQuoteToken1: bigint,
-    quoteDecimals: number, // token1 decimals in this branch
-    token0Decimals: number,
-    S: bigint
-): bigint {
+function quoteToToken0(amountQuoteToken1: bigint, S: bigint): bigint {
     // token0/token1 price = Q192 / S^2
-    return (
-        (amountQuoteToken1 * Q192 * pow10(token0Decimals)) /
-        (S * S * pow10(quoteDecimals))
-    );
+    return (amountQuoteToken1 * Q192) / (S * S);
 }
 
 /** Convert a QUOTE budget (token0) into token1 amount, respecting decimals. */
-function token0ToQuoteToken1(
-    amountQuoteToken0: bigint,
-    quoteDecimals: number, // token0 decimals in this branch
-    token1Decimals: number,
-    S: bigint
-): bigint {
+function token0ToQuoteToken1(amountQuoteToken0: bigint, S: bigint): bigint {
     // token1/token0 price = S^2 / Q192
-    return (
-        (amountQuoteToken0 * S * S * pow10(token1Decimals)) /
-        (Q192 * pow10(quoteDecimals))
-    );
+    return (amountQuoteToken0 * S * S) / Q192;
 }
 
 /**

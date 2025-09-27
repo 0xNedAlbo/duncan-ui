@@ -548,6 +548,7 @@
       "currentPrice": "Aktueller Preis",
       "liquidityAmount": "Liquiditätsbetrag",
       "yourInvestment": "Deine Investition:",
+      "outOfRangeCondition": "...falls der Preis in den Bereich bewegt.",
       "positionSummary": "Positions-Zusammenfassung",
       "summary": {
         "baseToken": "Base Token",
