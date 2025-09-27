@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:pretty": "next dev | pino-pretty",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

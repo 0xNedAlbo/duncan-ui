@@ -5,6 +5,30 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Debug Next.js (pino-pretty via npm)",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev:pretty"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "NODE_ENV": "development",
+                "NODE_OPTIONS": "--inspect"
+            },
+            "console": "externalTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "skipFiles": [
+                "<node_internals>/**",
+                "${workspaceFolder}/node_modules/**",
+                "${workspaceFolder}/.next/**"
+            ],
+            "restart": true,
+            "autoAttachChildProcesses": true
+        },
+        {
             "name": "Debug Next.js Dev Server",
             "type": "node",
             "request": "launch",
@@ -17,7 +41,7 @@
                 "NODE_ENV": "development",
                 "NODE_OPTIONS": "--inspect"
             },
-            "console": "integratedTerminal",
+            "console": "externalTerminal",
             "internalConsoleOptions": "neverOpen",
             "skipFiles": [
                 "<node_internals>/**",
