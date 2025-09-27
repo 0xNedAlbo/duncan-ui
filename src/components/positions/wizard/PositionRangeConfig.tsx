@@ -5,6 +5,7 @@ import { PencilLine, PencilOff, TrendingUp } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import type { PoolData } from "@/hooks/api/usePool";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
+import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { TickMath } from "@uniswap/v3-sdk";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { InteractiveRangeSelector } from "@/components/charts/InteractiveRangeSelector";
@@ -52,6 +53,7 @@ export function PositionRangeConfig({
     const isToken0Base = useMemo(() => {
         return compareAddresses(pool.token0.address, baseToken.address) === 0;
     }, [pool.token0.address, baseToken.address]);
+
 
     /**
      * Convert tick to human-readable price
@@ -420,12 +422,10 @@ export function PositionRangeConfig({
 
     // APR is now calculated above using real pool fee data
 
-    // Calculate position metrics for display
+    // Calculate position metrics directly from liquidity
     const positionMetrics = useMemo(() => {
-        if (!totalQuoteValue || totalQuoteValue === 0n) {
+        if (!liquidity || liquidity === 0n || pool.currentTick === null) {
             return {
-                investmentBase: "0",
-                investmentQuote: "0",
                 positionSizeBase: "0",
                 positionSizeQuote: "0",
                 lowerRangePnL: "0",
@@ -433,28 +433,53 @@ export function PositionRangeConfig({
             };
         }
 
-        // These would normally be calculated from liquidity and price ranges
-        // For now, using placeholder calculations
-        const investmentBase = "3";
-        const investmentQuote = formatCompactValue(
-            totalQuoteValue,
-            quoteToken.decimals
-        );
-        const positionSizeBase = "2.5";
-        const positionSizeQuote = formatCompactValue(
-            (totalQuoteValue * 128n) / 100n,
-            quoteToken.decimals
-        );
+        try {
+            // Calculate actual token amounts from liquidity
+            const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
+                liquidity,
+                pool.currentTick,
+                tickLower,
+                tickUpper
+            );
 
-        return {
-            investmentBase,
-            investmentQuote,
-            positionSizeBase,
-            positionSizeQuote,
-            lowerRangePnL: "-4000",
-            upperRangePnL: "+1800",
-        };
-    }, [totalQuoteValue, quoteToken.decimals]);
+            // Determine which token is base and which is quote
+            const isQuoteToken0 = compareAddresses(quoteToken.address, baseToken.address) < 0;
+            const baseTokenAmount = isQuoteToken0 ? token1Amount : token0Amount;
+            const quoteTokenAmount = isQuoteToken0 ? token0Amount : token1Amount;
+
+            // Format position sizes for display
+            const positionSizeBase = baseTokenAmount > 0n
+                ? formatCompactValue(baseTokenAmount, baseToken.decimals)
+                : "0";
+            const positionSizeQuote = quoteTokenAmount > 0n
+                ? formatCompactValue(quoteTokenAmount, quoteToken.decimals)
+                : "0";
+
+            return {
+                positionSizeBase,
+                positionSizeQuote,
+                lowerRangePnL: "-4000", // TODO: Calculate actual PnL ranges
+                upperRangePnL: "+1800", // TODO: Calculate actual PnL ranges
+            };
+        } catch (error) {
+            console.error("Error calculating position metrics:", error);
+            return {
+                positionSizeBase: "0",
+                positionSizeQuote: "0",
+                lowerRangePnL: "0",
+                upperRangePnL: "0",
+            };
+        }
+    }, [
+        liquidity,
+        pool.currentTick,
+        tickLower,
+        tickUpper,
+        baseToken.address,
+        baseToken.decimals,
+        quoteToken.address,
+        quoteToken.decimals,
+    ]);
 
     return (
         <div className="space-y-4">
@@ -534,37 +559,6 @@ export function PositionRangeConfig({
                         </div>
                     </div>
 
-                    {/* Investment Section */}
-                    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
-                        <div className="space-y-3">
-                            <div className="border-b border-slate-600 pb-2">
-                                <h4 className="text-slate-200 font-medium">
-                                    Investment
-                                </h4>
-                            </div>
-
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span className="text-slate-300">
-                                        Icon({baseToken.symbol}):
-                                    </span>
-                                    <span className="text-white font-mono">
-                                        {positionMetrics.investmentBase}{" "}
-                                        {baseToken.symbol}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-300">
-                                        Icon({quoteToken.symbol}):
-                                    </span>
-                                    <span className="text-white font-mono">
-                                        {positionMetrics.investmentQuote}{" "}
-                                        {quoteToken.symbol}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
                     {/* Position Size Section */}
                     <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
@@ -623,7 +617,7 @@ export function PositionRangeConfig({
                                             Position Size:
                                         </span>
                                         <span className="text-slate-400 font-mono text-xs">
-                                            {positionMetrics.investmentBase}{" "}
+                                            {positionMetrics.positionSizeBase}{" "}
                                             {baseToken.symbol}
                                         </span>
                                     </div>

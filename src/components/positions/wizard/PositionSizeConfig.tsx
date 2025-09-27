@@ -8,12 +8,9 @@ import { useTranslations } from "@/i18n/client";
 import { TokenAmountInput } from "@/components/common/TokenAmountInput";
 import type { PoolData } from "@/hooks/api/usePool";
 import type { SupportedChainsType } from "@/config/chains";
-import {
-    getLiquidityFromInvestmentAmounts_withTick,
-    getTokenAmountsFromLiquidity,
-} from "@/lib/utils/uniswap-v3/liquidity";
+import { usePositionSizeCalculation } from "@/hooks/usePositionSizeCalculation";
+import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
-import { compareAddresses } from "@/lib/utils/evm";
 
 interface TokenInfo {
     address: string;
@@ -59,6 +56,17 @@ export function PositionSizeConfig({
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
+    // Use the position size calculation hook
+    const positionCalculation = usePositionSizeCalculation({
+        baseAmount: baseAmountBigInt,
+        quoteAmount: quoteAmountBigInt,
+        baseToken,
+        quoteToken,
+        pool,
+        tickLower,
+        tickUpper,
+    });
+
     // Initialize input fields from liquidity prop when component first loads
     useEffect(() => {
         if (!isInitialized && liquidity > 0n && pool.currentTick !== null) {
@@ -70,12 +78,8 @@ export function PositionSizeConfig({
                     tickUpper
                 );
 
-                // Determine which token is which based on address comparison
-                const isQuoteToken0 =
-                    compareAddresses(quoteToken.address, baseToken.address) < 0;
-
-                const baseTokenAmount = isQuoteToken0 ? token1Amount : token0Amount;
-                const quoteTokenAmount = isQuoteToken0 ? token0Amount : token1Amount;
+                const baseTokenAmount = positionCalculation.isQuoteToken0 ? token1Amount : token0Amount;
+                const quoteTokenAmount = positionCalculation.isQuoteToken0 ? token0Amount : token1Amount;
 
                 // Set the amounts
                 const baseAmountString = formatCompactValue(
@@ -108,48 +112,9 @@ export function PositionSizeConfig({
         baseToken,
         quoteToken,
         isInitialized,
+        positionCalculation.isQuoteToken0,
     ]);
 
-    // Calculate liquidity from token amounts using proper Uniswap V3 math
-    const calculateLiquidity = useCallback(
-        (baseAmountBigInt: bigint, quoteAmountBigInt: bigint): bigint => {
-            if (
-                !pool.sqrtPriceX96 ||
-                (baseAmountBigInt === 0n && quoteAmountBigInt === 0n)
-            ) {
-                return 0n;
-            }
-
-            // Determine if quote token is token0 based on address comparison
-            const isQuoteToken0 =
-                compareAddresses(quoteToken.address, baseToken.address) < 0;
-
-            try {
-                return getLiquidityFromInvestmentAmounts_withTick(
-                    baseAmountBigInt,
-                    baseToken.decimals,
-                    quoteAmountBigInt,
-                    quoteToken.decimals,
-                    isQuoteToken0,
-                    tickUpper,
-                    tickLower,
-                    BigInt(pool.sqrtPriceX96)
-                );
-            } catch (error) {
-                console.error("Error calculating liquidity:", error);
-                return 0n;
-            }
-        },
-        [
-            pool.sqrtPriceX96,
-            baseToken.address,
-            baseToken.decimals,
-            quoteToken.address,
-            quoteToken.decimals,
-            tickLower,
-            tickUpper,
-        ]
-    );
 
     // Handle base token amount change
     const handleBaseAmountChange = useCallback(
@@ -175,10 +140,7 @@ export function PositionSizeConfig({
         // This prevents clearing liquidity during initial load from URL
         if (!isInitialized) return;
 
-        const inputLiquidity = calculateLiquidity(
-            baseAmountBigInt,
-            quoteAmountBigInt
-        );
+        const inputLiquidity = positionCalculation.liquidity;
 
         // Only emit change if the calculated liquidity differs from current prop
         // This prevents infinite loops when the component re-renders due to prop updates
@@ -186,9 +148,7 @@ export function PositionSizeConfig({
             onLiquidityChange(inputLiquidity);
         }
     }, [
-        baseAmountBigInt,
-        quoteAmountBigInt,
-        calculateLiquidity,
+        positionCalculation.liquidity,
         onLiquidityChange,
         liquidity,
         isInitialized,
@@ -224,12 +184,8 @@ export function PositionSizeConfig({
                 tickUpper
             );
 
-            // Determine which token is which based on address comparison
-            const isQuoteToken0 =
-                compareAddresses(quoteToken.address, baseToken.address) < 0;
-
-            const baseTokenAmount = isQuoteToken0 ? token1Amount : token0Amount;
-            const quoteTokenAmount = isQuoteToken0
+            const baseTokenAmount = positionCalculation.isQuoteToken0 ? token1Amount : token0Amount;
+            const quoteTokenAmount = positionCalculation.isQuoteToken0
                 ? token0Amount
                 : token1Amount;
 
@@ -254,6 +210,7 @@ export function PositionSizeConfig({
         tickUpper,
         baseToken,
         quoteToken,
+        positionCalculation.isQuoteToken0,
     ]);
 
     return (
