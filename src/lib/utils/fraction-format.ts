@@ -254,8 +254,15 @@ export function formatCompactValue(
     const absValue = value < 0n ? -value : value;
     const isGreaterOrEqualToOne = absValue >= denominator;
     
-    // If less than 1, limit to 3 decimal places for compact display
+    // If less than 1, use compact format with zero-skip notation
     if (!isGreaterOrEqualToOne) {
+        // Check if the full formatted string uses zero-skip notation (subscript)
+        if (fullFormatted.includes('₍') || fullFormatted.includes('(')) {
+            // Already in zero-skip format, return as is (it's already compact)
+            return fullFormatted;
+        }
+
+        // For regular decimal format, show up to 6 significant digits after leading zeros
         const decimalSep = opts?.decimalSep ?? FORMAT_PRESET_EN.decimalSep;
         const parts = fullFormatted.split(decimalSep);
 
@@ -264,18 +271,33 @@ export function formatCompactValue(
             return fullFormatted;
         }
 
-        // Limit decimal part to 3 digits (no rounding, just truncation)
-        const truncatedDecimal = parts[1].substring(0, 3);
+        const decimalPart = parts[1];
 
-        // Remove trailing zeros
-        const trimmedDecimal = truncatedDecimal.replace(/0+$/, '');
-
-        // If no significant digits remain, return just the integer part
-        if (!trimmedDecimal) {
-            return parts[0];
+        // Find first non-zero digit
+        let firstNonZeroIndex = 0;
+        while (firstNonZeroIndex < decimalPart.length && decimalPart[firstNonZeroIndex] === '0') {
+            firstNonZeroIndex++;
         }
 
-        return parts[0] + decimalSep + trimmedDecimal;
+        // If all zeros or no significant digits, return "0"
+        if (firstNonZeroIndex >= decimalPart.length) {
+            return "0";
+        }
+
+        // Take up to 3 significant digits after the leading zeros
+        const significantPart = decimalPart.substring(firstNonZeroIndex, firstNonZeroIndex + 3);
+        const leadingZeros = decimalPart.substring(0, firstNonZeroIndex);
+
+        // Limit to max 3 leading zeros for readability
+        if (firstNonZeroIndex <= 3) {
+            return parts[0] + decimalSep + leadingZeros + significantPart;
+        } else {
+            // Use zero-skip notation for more than 3 leading zeros
+            const useSubscript = opts?.useSubscript ?? FORMAT_PRESET_EN.useSubscript;
+            const zeroCount = firstNonZeroIndex;
+            const zeroSkip = useSubscript ? `₍${zeroCount}₎` : `(${zeroCount})`;
+            return parts[0] + decimalSep + zeroSkip + significantPart;
+        }
     }
     
     // For values >= 1, truncate to max 2 decimal places

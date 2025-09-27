@@ -88,11 +88,11 @@ export function PositionAprPreview({
 
         if (totalDailyFeesQuote === 0n) return "";
 
-        // Use USDC decimals (6) for display formatting
-        const formattedFees = formatCompactValue(totalDailyFeesQuote, 6);
+        // Use actual quote token decimals for display formatting
+        const formattedFees = formatCompactValue(totalDailyFeesQuote, quoteToken.decimals);
 
         return ` (${formattedFees} ${quoteToken.symbol}/day)`;
-    }, [aprCalculation, poolFeeData, quoteToken.symbol]);
+    }, [aprCalculation, poolFeeData, quoteToken.symbol, quoteToken.decimals]);
 
     // Format individual token daily fees for details
     const displayTokenFees = useMemo(() => {

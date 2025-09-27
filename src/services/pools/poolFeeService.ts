@@ -28,10 +28,12 @@ interface SubgraphPoolResponse {
     id: string;
     feeTier: string;
     token0: {
+      id: string;
       symbol: string;
       decimals: string;
     };
     token1: {
+      id: string;
       symbol: string;
       decimals: string;
     };
@@ -91,10 +93,12 @@ export async function getPoolFeeData(
         id
         feeTier
         token0 {
+          id
           symbol
           decimals
         }
         token1 {
+          id
           symbol
           decimals
         }
@@ -150,14 +154,14 @@ export async function getPoolFeeData(
     feeTier: pool.feeTier,
     poolLiquidity,
     token0: {
-      address: normalizeAddress(poolAddress), // We'll need to get actual token addresses from pool data
+      address: normalizeAddress(pool.token0.id),
       symbol: pool.token0.symbol,
       decimals: token0Decimals,
       dailyVolume: token0Volume,
       price: token0Price,
     },
     token1: {
-      address: normalizeAddress(poolAddress), // We'll need to get actual token addresses from pool data
+      address: normalizeAddress(pool.token1.id),
       symbol: pool.token1.symbol,
       decimals: token1Decimals,
       dailyVolume: token1Volume,

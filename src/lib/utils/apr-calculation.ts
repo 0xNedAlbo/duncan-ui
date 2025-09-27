@@ -118,37 +118,31 @@ export function calculateProspectiveApr(
 }
 
 /**
- * Convert token fees to quote token value (simplified approach)
+ * Convert token fees to quote token value using actual pool prices
  */
 function calculateFeesInQuoteToken(
     feesToken0: bigint,
     feesToken1: bigint,
     poolFeeData: PoolFeeData
 ): bigint {
-    // For WETH/USDC pools, we'll use a simplified approach
-    // Convert both token fees to USD equivalent and sum them
+    // Use actual price data from the pool
+    // token0Price is the price of token0 in terms of token1 (scaled by token1 decimals)
+    const token0Price = BigInt(poolFeeData.token0.price); // token0 price in token1 units
+    const token1Decimals = BigInt(poolFeeData.token1.decimals);
 
-    // Rough price conversions (this is simplified)
-    // Token0 (WETH) ≈ $4000, Token1 (USDC) ≈ $1
-    const WETH_PRICE_USD = 4000n;
-    const USDC_PRICE_USD = 1n;
+    // Convert token0 fees to token1 equivalent
+    // feesToken0 * token0Price / (10 ** token1Decimals) gives token0 fees in token1 units
+    const token0FeesInToken1 = (feesToken0 * token0Price) / (10n ** token1Decimals);
 
-    // Convert token0 (WETH) fees to USD value
-    const token0FeesUSD =
-        (feesToken0 * WETH_PRICE_USD) /
-        10n ** BigInt(poolFeeData.token0.decimals);
+    // token1 fees are already in token1 units
+    const token1FeesInToken1 = feesToken1;
 
-    // Convert token1 (USDC) fees to USD value
-    const token1FeesUSD =
-        (feesToken1 * USDC_PRICE_USD) /
-        10n ** BigInt(poolFeeData.token1.decimals);
-
-    // Return total in USDC units (6 decimals)
-    return (token0FeesUSD + token1FeesUSD) * 10n ** 6n;
+    // Return total fees in token1 (quote token) units
+    return token0FeesInToken1 + token1FeesInToken1;
 }
 
 /**
- * Calculate position value in quote token terms using actual token amounts
+ * Calculate position value in quote token terms using actual token amounts and pool prices
  */
 function calculatePositionValueInQuoteToken(
     userLiquidity: bigint,
@@ -165,24 +159,16 @@ function calculatePositionValueInQuoteToken(
         tickUpper
     );
 
-    // Convert both token amounts to USD value
-    // Use simplified price conversion (in a real app, you'd get this from the pool data or price oracle)
+    // Use actual price data from the pool
+    const token0Price = BigInt(poolFeeData.token0.price); // token0 price in token1 units
+    const token1Decimals = BigInt(poolFeeData.token1.decimals);
 
-    // For WETH/USDC pools:
-    // token0 = WETH (~$4000), token1 = USDC (~$1)
-    const WETH_PRICE_USD = 4000n;
-    const USDC_PRICE_USD = 1n;
+    // Convert token0 amount to token1 equivalent using actual pool price
+    const token0ValueInToken1 = (token0Amount * token0Price) / (10n ** token1Decimals);
 
-    // Convert token0 (WETH) to USD
-    const token0ValueUSD =
-        (token0Amount * WETH_PRICE_USD) /
-        10n ** BigInt(poolFeeData.token0.decimals);
+    // token1 amount is already in token1 units
+    const token1ValueInToken1 = token1Amount;
 
-    // Convert token1 (USDC) to USD
-    const token1ValueUSD =
-        (token1Amount * USDC_PRICE_USD) /
-        10n ** BigInt(poolFeeData.token1.decimals);
-
-    // Return total value in USDC units (6 decimals)
-    return (token0ValueUSD + token1ValueUSD) * 10n ** 6n;
+    // Return total position value in token1 (quote token) units
+    return token0ValueInToken1 + token1ValueInToken1;
 }
