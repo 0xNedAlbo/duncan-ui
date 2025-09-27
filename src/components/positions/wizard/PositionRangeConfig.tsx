@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { PencilLine, PencilOff, TrendingUp } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import type { PoolData } from "@/hooks/api/usePool";
@@ -11,12 +11,18 @@ import { TickMath } from "@uniswap/v3-sdk";
 import { RangeSlider } from "@/components/ui/RangeSlider";
 import { usePositionAprProjection } from "@/hooks/api/usePositionAprProjection";
 import { compareAddresses } from "@/lib/utils/evm";
+import { PositionPnLCurve } from "@/components/charts/PositionPnLCurve";
 
 interface TokenInfo {
     address: string;
     symbol: string;
     decimals: number;
     logoUrl?: string | null;
+}
+
+interface SliderBounds {
+    min: number;
+    max: number;
 }
 
 interface PositionRangeConfigProps {
@@ -26,11 +32,8 @@ interface PositionRangeConfigProps {
     tickLower: number;
     tickUpper: number;
     liquidity?: bigint;
-    // eslint-disable-next-line no-unused-vars
     onTickLowerChange: (tick: number) => void;
-    // eslint-disable-next-line no-unused-vars
     onTickUpperChange: (tick: number) => void;
-    // eslint-disable-next-line no-unused-vars
     onTickRangeChange: (tickLower: number, tickUpper: number) => void;
 }
 
@@ -41,12 +44,68 @@ export function PositionRangeConfig({
     tickLower,
     tickUpper,
     liquidity,
-    onTickLowerChange,
-    onTickUpperChange,
+    onTickLowerChange: _onTickLowerChange, // eslint-disable-line no-unused-vars
+    onTickUpperChange: _onTickUpperChange, // eslint-disable-line no-unused-vars
     onTickRangeChange,
 }: PositionRangeConfigProps) {
     const t = useTranslations();
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
+
+    // Slider bounds state - shared between RangeSlider and PositionPnLCurve
+    const [sliderBounds, setSliderBounds] = useState<SliderBounds>(() => ({
+        min: 0,
+        max: 0,
+    }));
+
+    /**
+     * Get current pool price for display
+     * @returns Current price as a number (quote tokens per base token)
+     * @example For WETH/USDC pool: 3000.5 (meaning 3000.5 USDC per 1 WETH)
+     */
+    const currentPrice = useMemo(() => {
+        if (!pool?.currentTick || !baseToken || !quoteToken) return 0;
+
+        try {
+            // Get the correct decimals from pool data
+            const baseTokenDecimals =
+                pool.token0.address.toLowerCase() ===
+                baseToken.address.toLowerCase()
+                    ? pool.token0.decimals
+                    : pool.token1.decimals;
+
+            const quoteTokenDecimals =
+                pool.token0.address.toLowerCase() ===
+                quoteToken.address.toLowerCase()
+                    ? pool.token0.decimals
+                    : pool.token1.decimals;
+
+            // tickToPrice returns price in quote token decimals
+            const priceBigInt = tickToPrice(
+                pool.currentTick,
+                baseToken.address,
+                quoteToken.address,
+                baseTokenDecimals
+            );
+
+            // Convert to human readable number using quote token decimals
+            const divisor = 10n ** BigInt(quoteTokenDecimals);
+            return Number(priceBigInt) / Number(divisor);
+        } catch (error) {
+            console.error("Error getting current price:", error);
+            return 0;
+        }
+    }, [baseToken, quoteToken, pool]);
+
+    // Initialize slider bounds when current price is available
+    useEffect(() => {
+        if (currentPrice > 0 && (sliderBounds.min === 0 || sliderBounds.max === 0)) {
+            const DEFAULT_RANGE_PERCENT = 50; // ±50% default range
+            setSliderBounds({
+                min: currentPrice * (1 - DEFAULT_RANGE_PERCENT / 100),
+                max: currentPrice * (1 + DEFAULT_RANGE_PERCENT / 100),
+            });
+        }
+    }, [currentPrice, sliderBounds.min, sliderBounds.max]);
 
     // Determine token roles for correct decimal scaling
     const isToken0Base = useMemo(() => {
@@ -174,45 +233,6 @@ export function PositionRangeConfig({
         return aprPercent.toFixed(2);
     }, [apr, hasValidData, isPoolFeeLoading, isPoolFeeError]);
 
-    /**
-     * Get current pool price for display
-     * @returns Current price as a number (quote tokens per base token)
-     * @example For WETH/USDC pool: 3000.5 (meaning 3000.5 USDC per 1 WETH)
-     */
-    const currentPrice = useMemo(() => {
-        if (!pool?.currentTick || !baseToken || !quoteToken) return 0;
-
-        try {
-            // Get the correct decimals from pool data
-            const baseTokenDecimals =
-                pool.token0.address.toLowerCase() ===
-                baseToken.address.toLowerCase()
-                    ? pool.token0.decimals
-                    : pool.token1.decimals;
-
-            const quoteTokenDecimals =
-                pool.token0.address.toLowerCase() ===
-                quoteToken.address.toLowerCase()
-                    ? pool.token0.decimals
-                    : pool.token1.decimals;
-
-            // tickToPrice returns price in quote token decimals
-            const priceBigInt = tickToPrice(
-                pool.currentTick,
-                baseToken.address,
-                quoteToken.address,
-                baseTokenDecimals
-            );
-
-            // Convert to human readable number using quote token decimals
-            const divisor = 10n ** BigInt(quoteTokenDecimals);
-            return Number(priceBigInt) / Number(divisor);
-        } catch (error) {
-            console.error("Error getting current price:", error);
-            return 0;
-        }
-    }, [baseToken, quoteToken, pool]);
-
     // Display prices for header
     const displayPrices = useMemo(() => {
         const lowerDisplay =
@@ -269,10 +289,6 @@ export function PositionRangeConfig({
         }
         return pool.currentTick < tickLower || pool.currentTick > tickUpper;
     }, [pool?.currentTick, tickLower, tickUpper]);
-
-
-
-    // APR is now calculated above using real pool fee data
 
     // Calculate position metrics directly from liquidity
     const positionMetrics = useMemo(() => {
@@ -382,93 +398,31 @@ export function PositionRangeConfig({
                             quoteTokenDecimals={quoteToken.decimals}
                             aprValue={typeof prospectiveAPR === 'number' ? prospectiveAPR.toString() : prospectiveAPR}
                             aprLoading={isPoolFeeLoading}
+                            sliderBounds={sliderBounds}
+                            onBoundsChange={setSliderBounds}
+                            tickLowerPrice={convertTickToPriceSimple(tickLower)}
+                            tickUpperPrice={convertTickToPriceSimple(tickUpper)}
                             className=""
                         />
-                    </div>
-                        {/* Position Size Section */}
-                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
-                    <div className="space-y-3">
-                        <div className="border-b border-slate-600 pb-2">
-                            <h4 className="text-slate-200 font-medium">
-                                Position Size
+
+                        {/* Risk Profile Section */}
+                        <div className="mt-6">
+                            <h4 className="text-slate-200 font-medium mb-4">
+                                Risk Profile
                             </h4>
-                        </div>
-
-                        <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-slate-300">
-                                    Icon({baseToken.symbol}):
-                                </span>
-                                <span className="text-white font-mono">
-                                    {positionMetrics.positionSizeBase}{" "}
-                                    {baseToken.symbol}
-                                </span>
+                            <div className="flex justify-center">
+                                <PositionPnLCurve
+                                    pool={pool}
+                                    baseToken={baseToken}
+                                    quoteToken={quoteToken}
+                                    tickLower={tickLower}
+                                    tickUpper={tickUpper}
+                                    liquidity={liquidity}
+                                    priceRange={sliderBounds}
+                                    currentPrice={currentPrice}
+                                    className=""
+                                />
                             </div>
-                            <div className="flex justify-between">
-                                <span className="text-slate-300">
-                                    Icon({quoteToken.symbol}):
-                                </span>
-                                <span className="text-white font-mono">
-                                    {positionMetrics.positionSizeQuote}{" "}
-                                    {quoteToken.symbol}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* PnL Analysis Section */}
-                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-4">
-                    <div className="space-y-3">
-                        <div className="border-b border-slate-600 pb-2">
-                            <h4 className="text-slate-200 font-medium">
-                                PnL Analysis
-                            </h4>
-                        </div>
-
-                        <div className="space-y-2 text-sm">
-                            <div>
-                                <div className="flex justify-between mb-1">
-                                    <span className="text-slate-300">
-                                        Lower Range:
-                                    </span>
-                                    <span className="text-red-400 font-mono">
-                                        {positionMetrics.lowerRangePnL}{" "}
-                                        {quoteToken.symbol}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-400 text-xs">
-                                        Position Size:
-                                    </span>
-                                    <span className="text-slate-400 font-mono text-xs">
-                                        {positionMetrics.positionSizeBase}{" "}
-                                        {baseToken.symbol}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className="pt-2">
-                                <div className="flex justify-between mb-1">
-                                    <span className="text-slate-300">
-                                        Upper Range:
-                                    </span>
-                                    <span className="text-green-400 font-mono">
-                                        {positionMetrics.upperRangePnL}{" "}
-                                        {quoteToken.symbol}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-400 text-xs">
-                                        Position Size:
-                                    </span>
-                                    <span className="text-slate-400 font-mono text-xs">
-                                        {positionMetrics.positionSizeQuote}{" "}
-                                        {quoteToken.symbol}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
                         </div>
                     </div>
                 </div>

@@ -1,8 +1,13 @@
 "use client";
 
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Minus, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
+
+interface SliderBounds {
+    min: number;
+    max: number;
+}
 
 interface RangeSliderProps {
     currentPrice: number;
@@ -14,6 +19,10 @@ interface RangeSliderProps {
     aprValue?: string;
     aprLoading?: boolean;
     className?: string;
+    sliderBounds?: SliderBounds;
+    onBoundsChange?: (bounds: SliderBounds) => void;
+    tickLowerPrice?: number;
+    tickUpperPrice?: number;
 }
 
 const PRESET_PERCENTAGES = [5, 10, 20, 30, 40, 50];
@@ -29,6 +38,10 @@ export function RangeSlider({
     aprValue,
     aprLoading = false,
     className = "",
+    sliderBounds: externalSliderBounds,
+    onBoundsChange,
+    tickLowerPrice,
+    tickUpperPrice,
 }: RangeSliderProps) {
     const sliderRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState<'lower' | 'upper' | 'range' | null>(null);
@@ -41,18 +54,24 @@ export function RangeSlider({
         initialLowerPrice: number;
         initialUpperPrice: number;
     } | null>(null);
-    const [sliderBounds, setSliderBounds] = useState(() => ({
+    const [internalSliderBounds, setInternalSliderBounds] = useState(() => ({
         min: currentPrice * (1 - DEFAULT_RANGE_PERCENT / 100),
         max: currentPrice * (1 + DEFAULT_RANGE_PERCENT / 100),
     }));
 
-    // Update slider bounds when current price changes
+    // Use external bounds if provided, otherwise use internal
+    const sliderBounds = externalSliderBounds || internalSliderBounds;
+    const setSliderBounds = onBoundsChange || setInternalSliderBounds;
+
+    // Update slider bounds when current price changes (only if using internal bounds)
     useEffect(() => {
-        setSliderBounds({
-            min: currentPrice * (1 - DEFAULT_RANGE_PERCENT / 100),
-            max: currentPrice * (1 + DEFAULT_RANGE_PERCENT / 100),
-        });
-    }, [currentPrice]);
+        if (!externalSliderBounds) {
+            setInternalSliderBounds({
+                min: currentPrice * (1 - DEFAULT_RANGE_PERCENT / 100),
+                max: currentPrice * (1 + DEFAULT_RANGE_PERCENT / 100),
+            });
+        }
+    }, [currentPrice, externalSliderBounds]);
 
     // Calculate positions as percentages - use local drag state during dragging
     const currentPricePercent = useMemo(() => {
@@ -181,8 +200,8 @@ export function RangeSlider({
         onRangeChange(sliderBounds.min, sliderBounds.max);
     }, [sliderBounds, onRangeChange]);
 
-    // Handle tick extension buttons
-    const handleTickExtension = useCallback((side: 'min' | 'max', direction: 'expand' | 'contract', shiftKey: boolean = false) => {
+    // Handle boundary adjustment buttons
+    const handleBoundaryAdjustment = useCallback((side: 'min' | 'max', direction: 'decrease' | 'increase', shiftKey: boolean = false) => {
         const tickMultiplier = shiftKey ? 10 : 1;
         const changePercent = 1 * tickMultiplier; // 1% per tick, 10% with shift
 
@@ -190,21 +209,29 @@ export function RangeSlider({
         let newMax = sliderBounds.max;
 
         if (side === 'min') {
-            if (direction === 'expand') {
+            if (direction === 'decrease') {
                 newMin = sliderBounds.min * (1 - changePercent / 100);
             } else {
                 newMin = sliderBounds.min * (1 + changePercent / 100);
+                // Prevent min boundary from going above tickLowerPrice
+                if (tickLowerPrice && newMin > tickLowerPrice) {
+                    newMin = tickLowerPrice;
+                }
             }
         } else {
-            if (direction === 'expand') {
+            if (direction === 'increase') {
                 newMax = sliderBounds.max * (1 + changePercent / 100);
             } else {
                 newMax = sliderBounds.max * (1 - changePercent / 100);
+                // Prevent max boundary from going below tickUpperPrice
+                if (tickUpperPrice && newMax < tickUpperPrice) {
+                    newMax = tickUpperPrice;
+                }
             }
         }
 
         setSliderBounds({ min: newMin, max: newMax });
-    }, [sliderBounds]);
+    }, [sliderBounds, setSliderBounds, tickLowerPrice, tickUpperPrice]);
 
     // Format prices for display
     const formatPrice = useCallback((price: number) => {
@@ -235,14 +262,24 @@ export function RangeSlider({
 
             {/* Slider Container */}
             <div className="flex items-center gap-3">
-                {/* Left Tick Extension Button */}
-                <button
-                    onClick={(e) => handleTickExtension('min', 'expand', e.shiftKey)}
-                    className="p-2 bg-slate-700/80 backdrop-blur-sm border border-slate-600 rounded-lg text-slate-300 hover:text-white hover:bg-slate-600/80 transition-colors"
-                    title="Extend lower bound (Shift: 10 ticks)"
-                >
-                    <Minus className="w-4 h-4" />
-                </button>
+                {/* Left Boundary Controls */}
+                <div className="flex flex-col gap-1">
+                    <button
+                        onClick={(e) => handleBoundaryAdjustment('min', 'decrease', e.shiftKey)}
+                        className="p-1 bg-slate-700/80 backdrop-blur-sm border border-slate-600 rounded text-slate-300 hover:text-white hover:bg-slate-600/80 transition-colors"
+                        title="Decrease lower bound (Shift: 10x)"
+                    >
+                        <ChevronLeft className="w-3 h-3" />
+                    </button>
+                    <button
+                        onClick={(e) => handleBoundaryAdjustment('min', 'increase', e.shiftKey)}
+                        className="p-1 bg-slate-700/80 backdrop-blur-sm border border-slate-600 rounded text-slate-300 hover:text-white hover:bg-slate-600/80 transition-colors"
+                        title="Increase lower bound (Shift: 10x)"
+                        disabled={Boolean(tickLowerPrice && sliderBounds.min >= tickLowerPrice)}
+                    >
+                        <ChevronRight className="w-3 h-3" />
+                    </button>
+                </div>
 
                 {/* Slider Track */}
                 <div className="flex-1 relative">
@@ -289,14 +326,24 @@ export function RangeSlider({
                     </div>
                 </div>
 
-                {/* Right Tick Extension Button */}
-                <button
-                    onClick={(e) => handleTickExtension('max', 'expand', e.shiftKey)}
-                    className="p-2 bg-slate-700/80 backdrop-blur-sm border border-slate-600 rounded-lg text-slate-300 hover:text-white hover:bg-slate-600/80 transition-colors"
-                    title="Extend upper bound (Shift: 10 ticks)"
-                >
-                    <Plus className="w-4 h-4" />
-                </button>
+                {/* Right Boundary Controls */}
+                <div className="flex flex-col gap-1">
+                    <button
+                        onClick={(e) => handleBoundaryAdjustment('max', 'decrease', e.shiftKey)}
+                        className="p-1 bg-slate-700/80 backdrop-blur-sm border border-slate-600 rounded text-slate-300 hover:text-white hover:bg-slate-600/80 transition-colors"
+                        title="Decrease upper bound (Shift: 10x)"
+                        disabled={Boolean(tickUpperPrice && sliderBounds.max <= tickUpperPrice)}
+                    >
+                        <ChevronLeft className="w-3 h-3" />
+                    </button>
+                    <button
+                        onClick={(e) => handleBoundaryAdjustment('max', 'increase', e.shiftKey)}
+                        className="p-1 bg-slate-700/80 backdrop-blur-sm border border-slate-600 rounded text-slate-300 hover:text-white hover:bg-slate-600/80 transition-colors"
+                        title="Increase upper bound (Shift: 10x)"
+                    >
+                        <ChevronRight className="w-3 h-3" />
+                    </button>
+                </div>
             </div>
 
             {/* Preset Buttons and APR - aligned with slider track */}
