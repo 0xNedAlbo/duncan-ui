@@ -30,8 +30,7 @@ export interface UseTokenSearchOptions {
 export interface UseTokenSearchReturn {
     // Search state
     query: string;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    setQuery: (query: string) => void;
+    setQuery: (_query: string) => void;
     debouncedQuery: string;
 
     // Results
@@ -43,11 +42,9 @@ export interface UseTokenSearchReturn {
     popularTokens: TokenSearchResult[];
 
     // Actions
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    search: (searchQuery: string) => Promise<void>;
+    search: (_searchQuery: string) => Promise<void>;
     clearResults: () => void;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    selectToken: (token: TokenSearchResult) => void;
+    selectToken: (_token: TokenSearchResult) => void;
 
     // State
     hasSearched: boolean;

@@ -6,8 +6,7 @@
 
 import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import { apiClient } from '@/lib/app/apiClient';
-import { ApiError } from '@/lib/app/apiError';
-import { QUERY_OPTIONS } from '@/types/api';
+import { ApiError, ApiErrorCode } from '@/lib/app/apiError';
 
 interface PoolFeeData {
   poolAddress: string;
@@ -68,7 +67,7 @@ export function usePoolFeeData(
     // Transform response to extract just the pool fee data
     select: (response: PoolFeeApiResponse) => {
       if (!response.success || !response.data) {
-        throw new ApiError(response.error || 'Failed to fetch pool fee data', 500);
+        throw new ApiError(ApiErrorCode.SERVER_ERROR, response.error || 'Failed to fetch pool fee data', 500);
       }
       return response.data;
     },

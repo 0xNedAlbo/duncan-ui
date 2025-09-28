@@ -2,10 +2,49 @@
 
 import { CheckCircle, Copy } from "lucide-react";
 import { useState } from "react";
-import { useTranslations } from "@/i18n/client";
 import { compareAddresses } from "@/lib/utils/evm";
 import type { SupportedChainsType } from "@/config/chains";
-import type { PositionConfig, TokenPair, PoolOption } from "./types";
+
+interface TokenPair {
+    baseToken: {
+        address: string;
+        symbol: string;
+        name: string;
+        decimals: number;
+        logoUrl?: string;
+    };
+    quoteToken: {
+        address: string;
+        symbol: string;
+        name: string;
+        decimals: number;
+        logoUrl?: string;
+    };
+}
+
+interface PoolOption {
+    pool: {
+        poolAddress: string;
+        fee: number;
+        tickSpacing: number;
+        token0: {
+            address: string;
+            symbol: string;
+            decimals: number;
+        };
+        token1: {
+            address: string;
+            symbol: string;
+            decimals: number;
+        };
+    };
+}
+
+interface PositionConfig {
+    tickLower: number;
+    tickUpper: number;
+    liquidity: bigint;
+}
 
 interface PositionSummaryStepProps {
     chain: SupportedChainsType;
@@ -21,12 +60,10 @@ export function PositionSummaryStep({
     tokenPair,
     selectedPool,
     config,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    onCreatePosition,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    onBack,
+    onCreatePosition: _onCreatePosition,
+    onBack: _onBack,
 }: PositionSummaryStepProps) {
-    const t = useTranslations();
+    // const t = useTranslations();
     const [copiedField, setCopiedField] = useState<string | null>(null);
 
     // Determine token0IsQuote based on address ordering

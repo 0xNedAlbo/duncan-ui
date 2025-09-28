@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { withAuthAndLogging } from '@/lib/api/withAuth';
 import { getPoolFeeData } from '@/services/pools/poolFeeService';
 import { isValidAddress, normalizeAddress } from '@/lib/utils/evm';
@@ -39,7 +39,7 @@ export const GET = withAuthAndLogging<PoolFeeApiResponse>(
     // Validate required parameters
     if (!chain || !address) {
       log.warn({ userId: user.userId, chain, address }, 'Missing required parameters');
-      return Response.json(
+      return NextResponse.json(
         {
           success: false,
           error: 'Missing required parameters: chain and address',
@@ -57,7 +57,7 @@ export const GET = withAuthAndLogging<PoolFeeApiResponse>(
     // Validate chain parameter
     if (!isValidChainSlug(chain)) {
       log.warn({ chain }, 'Invalid chain parameter');
-      return Response.json(
+      return NextResponse.json(
         {
           success: false,
           error: `Invalid chain: ${chain}. Supported chains: ethereum, arbitrum, base`,
@@ -69,7 +69,7 @@ export const GET = withAuthAndLogging<PoolFeeApiResponse>(
     // Validate pool address parameter
     if (!isValidAddress(address)) {
       log.warn({ poolAddress: address }, 'Invalid pool address parameter');
-      return Response.json(
+      return NextResponse.json(
         {
           success: false,
           error: `Invalid pool address: ${address}`,
@@ -91,7 +91,7 @@ export const GET = withAuthAndLogging<PoolFeeApiResponse>(
         token1Symbol: feeData.token1.symbol,
       }, 'Pool fee data retrieved successfully');
 
-      return Response.json({
+      return NextResponse.json({
         success: true,
         data: feeData,
       });
@@ -109,7 +109,7 @@ export const GET = withAuthAndLogging<PoolFeeApiResponse>(
 
       // Check for specific error types to provide better responses
       if (errorMessage.includes('Pool not found')) {
-        return Response.json(
+        return NextResponse.json(
           {
             success: false,
             error: `Pool not found on ${chain}. Please verify the pool address.`,
@@ -119,7 +119,7 @@ export const GET = withAuthAndLogging<PoolFeeApiResponse>(
       }
 
       if (errorMessage.includes('No recent pool data')) {
-        return Response.json(
+        return NextResponse.json(
           {
             success: false,
             error: 'No recent trading data available for this pool.',
@@ -129,7 +129,7 @@ export const GET = withAuthAndLogging<PoolFeeApiResponse>(
       }
 
       if (errorMessage.includes('Rate limit')) {
-        return Response.json(
+        return NextResponse.json(
           {
             success: false,
             error: 'Rate limit exceeded. Please try again later.',
@@ -139,7 +139,7 @@ export const GET = withAuthAndLogging<PoolFeeApiResponse>(
       }
 
       // Generic server error
-      return Response.json(
+      return NextResponse.json(
         {
           success: false,
           error: 'Failed to fetch pool fee data. Please try again.',

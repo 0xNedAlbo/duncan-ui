@@ -5,10 +5,9 @@ import { PencilLine, PencilOff, TrendingUp } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import type { PoolData } from "@/hooks/api/usePool";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
-import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { TickMath } from "@uniswap/v3-sdk";
-import { RangeSlider } from "@/components/ui/RangeSlider";
+import { RangeSlider } from "@/components/common/RangeSlider";
 import { usePositionAprProjection } from "@/hooks/api/usePositionAprProjection";
 import { compareAddresses } from "@/lib/utils/evm";
 import { PositionPnLCurve } from "@/components/charts/PositionPnLCurve";
@@ -32,9 +31,9 @@ interface PositionRangeConfigProps {
     tickLower: number;
     tickUpper: number;
     liquidity?: bigint;
-    onTickLowerChange: (tick: number) => void;
-    onTickUpperChange: (tick: number) => void;
-    onTickRangeChange: (tickLower: number, tickUpper: number) => void;
+    onTickLowerChange: (_tick: number) => void;
+    onTickUpperChange: (_tick: number) => void;
+    onTickRangeChange: (_tickLower: number, _tickUpper: number) => void;
 }
 
 export function PositionRangeConfig({
@@ -44,8 +43,8 @@ export function PositionRangeConfig({
     tickLower,
     tickUpper,
     liquidity,
-    onTickLowerChange: _onTickLowerChange, // eslint-disable-line no-unused-vars
-    onTickUpperChange: _onTickUpperChange, // eslint-disable-line no-unused-vars
+    onTickLowerChange: _onTickLowerChange,
+    onTickUpperChange: _onTickUpperChange,
     onTickRangeChange,
 }: PositionRangeConfigProps) {
     const t = useTranslations();
@@ -290,64 +289,6 @@ export function PositionRangeConfig({
         return pool.currentTick < tickLower || pool.currentTick > tickUpper;
     }, [pool?.currentTick, tickLower, tickUpper]);
 
-    // Calculate position metrics directly from liquidity
-    const positionMetrics = useMemo(() => {
-        if (!liquidity || liquidity === 0n || pool.currentTick === null) {
-            return {
-                positionSizeBase: "0",
-                positionSizeQuote: "0",
-                lowerRangePnL: "0",
-                upperRangePnL: "0",
-            };
-        }
-
-        try {
-            // Calculate actual token amounts from liquidity
-            const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
-                liquidity,
-                pool.currentTick,
-                tickLower,
-                tickUpper
-            );
-
-            // Determine which token is base and which is quote
-            const isQuoteToken0 = compareAddresses(quoteToken.address, baseToken.address) < 0;
-            const baseTokenAmount = isQuoteToken0 ? token1Amount : token0Amount;
-            const quoteTokenAmount = isQuoteToken0 ? token0Amount : token1Amount;
-
-            // Format position sizes for display
-            const positionSizeBase = baseTokenAmount > 0n
-                ? formatCompactValue(baseTokenAmount, baseToken.decimals)
-                : "0";
-            const positionSizeQuote = quoteTokenAmount > 0n
-                ? formatCompactValue(quoteTokenAmount, quoteToken.decimals)
-                : "0";
-
-            return {
-                positionSizeBase,
-                positionSizeQuote,
-                lowerRangePnL: "-4000", // TODO: Calculate actual PnL ranges
-                upperRangePnL: "+1800", // TODO: Calculate actual PnL ranges
-            };
-        } catch (error) {
-            console.error("Error calculating position metrics:", error);
-            return {
-                positionSizeBase: "0",
-                positionSizeQuote: "0",
-                lowerRangePnL: "0",
-                upperRangePnL: "0",
-            };
-        }
-    }, [
-        liquidity,
-        pool.currentTick,
-        tickLower,
-        tickUpper,
-        baseToken.address,
-        baseToken.decimals,
-        quoteToken.address,
-        quoteToken.decimals,
-    ]);
 
     return (
         <div className="space-y-4">

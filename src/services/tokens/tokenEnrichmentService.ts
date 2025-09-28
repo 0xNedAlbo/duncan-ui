@@ -80,7 +80,7 @@ export class TokenEnrichmentService {
             let enrichmentData: EnrichmentData | null = null;
             try {
                 enrichmentData = await this.coinGeckoService.getTokenEnrichmentData(chain, normalizedAddress);
-            } catch (error) {
+            } catch {
                 // CoinGecko enrichment failed, continue without it
             }
 
@@ -88,7 +88,7 @@ export class TokenEnrichmentService {
             let onChainMetadata: { symbol: string; name: string; decimals: number } | null = null;
             try {
                 onChainMetadata = await this.getTokenMetadata(chain, normalizedAddress);
-            } catch (error) {
+            } catch {
                 // On-chain call failed, use existing data or defaults
                 if (!existingToken) {
                     throw new Error('Unable to get token metadata from on-chain and no existing token found');

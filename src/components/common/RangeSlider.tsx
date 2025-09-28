@@ -13,14 +13,14 @@ interface RangeSliderProps {
     currentPrice: number;
     lowerPrice: number;
     upperPrice: number;
-    onRangeChange: (lowerPrice: number, upperPrice: number) => void;
+    onRangeChange: (_lowerPrice: number, _upperPrice: number) => void;
     quoteTokenSymbol: string;
     quoteTokenDecimals: number;
     aprValue?: string;
     aprLoading?: boolean;
     className?: string;
     sliderBounds?: SliderBounds;
-    onBoundsChange?: (bounds: SliderBounds) => void;
+    onBoundsChange?: (_bounds: SliderBounds) => void;
     tickLowerPrice?: number;
     tickUpperPrice?: number;
 }

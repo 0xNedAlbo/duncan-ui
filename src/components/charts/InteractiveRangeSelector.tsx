@@ -19,7 +19,7 @@ interface InteractiveRangeSelectorProps {
     lowerPrice: bigint;
     upperPrice: bigint;
     currentPrice: bigint;
-    onRangeChange: (lowerPrice: bigint, upperPrice: bigint) => void;
+    onRangeChange: (_lowerPrice: bigint, _upperPrice: bigint) => void;
     width?: number;
     height?: number;
     className?: string;
@@ -368,7 +368,7 @@ export function InteractiveRangeSelector({
         ctx.arc(currentX, currentY, 4, 0, 2 * Math.PI);
         ctx.fill();
         ctx.stroke();
-    }, [curveData, xScale, yScale, currentPrice, height]);
+    }, [curveData, xScale, yScale, safeCurrentPrice, height]);
 
     const drawCursor = useCallback((ctx: CanvasRenderingContext2D) => {
         if (!interaction.cursor.isVisible) return;
@@ -495,7 +495,7 @@ export function InteractiveRangeSelector({
                 dragStart: { x, y },
             },
         }));
-    }, [xScale, lowerPrice, upperPrice, height]);
+    }, [xScale, safeLowerPrice, safeUpperPrice, height]);
 
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         if (!canvasRef.current || !curveData) return;
@@ -564,7 +564,7 @@ export function InteractiveRangeSelector({
                 },
             }));
         }
-    }, [curveData, priceFromX, getPnLAtPrice, interaction.activeMarker, interaction.viewport.isDragging, interaction.viewport.dragStart, onRangeChange, lowerPrice, upperPrice]);
+    }, [curveData, priceFromX, getPnLAtPrice, interaction.activeMarker, interaction.viewport.isDragging, interaction.viewport.dragStart, interaction.localDragState.lowerPrice, interaction.localDragState.upperPrice, safeLowerPrice, safeUpperPrice]);
 
     const handleMouseUp = useCallback(() => {
         // If we have local drag state, propagate final values to parent

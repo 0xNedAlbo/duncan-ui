@@ -33,8 +33,8 @@ interface PoolLookupSuccessResponse {
         fee: number;
         tickSpacing: number;
         currentTick: number | null;
-        currentPrice: string;
-        sqrtPriceX96: string;
+        currentPrice: string | null;
+        sqrtPriceX96: string | null;
         feeGrowthGlobal0X128: string;
         feeGrowthGlobal1X128: string;
         token0: {

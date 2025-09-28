@@ -14,7 +14,7 @@ export interface PopularTokensByChain {
 }
 
 // Popular tokens configuration per chain with actual CoinGecko logos
-export const POPULAR_TOKENS: Record<SupportedChainsType, PopularTokensByChain> = {
+const BASE_POPULAR_TOKENS = {
     ethereum: {
         base: [
             {
@@ -134,7 +134,11 @@ export const POPULAR_TOKENS: Record<SupportedChainsType, PopularTokensByChain> =
                 logoUrl: "https://coin-images.coingecko.com/coins/images/6319/small/usdc.png?1696506694"
             }
         ]
-    },
+    }
+};
+
+// Add development-only chains conditionally
+const DEV_POPULAR_TOKENS = process.env.NODE_ENV === "development" ? {
     // Local testnet uses same token addresses as Arbitrum (since it's an Arbitrum fork)
     "arbitrum-fork-local": {
         base: [
@@ -184,7 +188,13 @@ export const POPULAR_TOKENS: Record<SupportedChainsType, PopularTokensByChain> =
             }
         ]
     }
-};
+} : {};
+
+// Export the combined configuration
+export const POPULAR_TOKENS: Record<SupportedChainsType, PopularTokensByChain> = {
+    ...BASE_POPULAR_TOKENS,
+    ...DEV_POPULAR_TOKENS
+} as Record<SupportedChainsType, PopularTokensByChain>;
 
 /**
  * Get popular tokens for a specific chain and type

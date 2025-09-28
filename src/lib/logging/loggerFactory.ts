@@ -98,7 +98,6 @@ class LoggerRegistry {
      * Update log level for all services (runtime control)
      */
 
-    // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
     setGlobalLogLevel(_level: string): void {
         for (const [serviceName, logger] of this.services) {
             const effectiveLevel = this.getEffectiveLogLevel(serviceName);

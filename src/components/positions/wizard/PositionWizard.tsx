@@ -37,7 +37,7 @@ export function PositionWizard({
     const [isPoolSelected, setPoolSelected] = useState<boolean>(false);
     const [isPositionConfigured, setPositionConfigured] =
         useState<boolean>(false);
-    const [isPositionCreated, setPositionCreated] = useState<boolean>(false);
+    const [isPositionCreated] = useState<boolean>(false);
 
     // Handle closing wizard - let parent handle URL clearing if available
     const handleClose = useCallback(() => {
