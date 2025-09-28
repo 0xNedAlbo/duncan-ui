@@ -279,12 +279,6 @@ duncan-ui/
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
-
-- 🐛 **Bug Reports:** [GitHub Issues](https://github.com/your-username/duncan-ui/issues)
-- 💬 **Discussions:** [GitHub Discussions](https://github.com/your-username/duncan-ui/discussions)
-- 📧 **Contact:** [your-email@example.com](mailto:your-email@example.com)
-
 ---
 
 <div align="center">
