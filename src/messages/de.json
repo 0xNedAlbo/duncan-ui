@@ -446,6 +446,9 @@
       },
       "positionConfig": {
         "title": "Position konfigurieren"
+      },
+      "openPositionFinal": {
+        "title": "Position auf Uniswap eröffnen"
       }
     },
     "openPosition": {
@@ -477,6 +480,22 @@
         "message": "Uniswap V3 Positionen bergen Risiken einschließlich Impermanent Loss. Verstehe die Risiken, bevor du fortfährst."
       },
       "getStarted": "Los geht's"
+    },
+    "openPositionFinal": {
+      "walletBalance": "Wallet-Guthaben:",
+      "connectWallet": "Wallet verbinden",
+      "transactionSteps": "Transaktionsschritte",
+      "connectToContinue": "Verbinde dein Wallet, um fortzufahren",
+      "insufficientBaseOnly": "Du musst {amount} {symbol} kaufen, um deine geplante Positionsgröße zu erreichen.",
+      "insufficientQuoteOnly": "Du musst {amount} {symbol} kaufen, um deine geplante Positionsgröße zu erreichen.",
+      "insufficientBoth": "Du musst {baseAmount} {baseSymbol} und {quoteAmount} {quoteSymbol} kaufen, um deine geplante Positionsgröße zu erreichen.",
+      "sufficientFunds": "Du hast ausreichend Mittel für diese Position",
+      "cowSwapPrompt": "Möchtest du auf CowSwap tauschen?",
+      "openCowSwap": "CowSwap öffnen",
+      "approveToken": "Genehmige {amount} {symbol} für Uniswap V3 Position.",
+      "openPosition": "Position eröffnen",
+      "approve": "Genehmigen",
+      "execute": "Ausführen"
     },
     "chainSelection": {
       "description": "Wähle die Blockchain, auf der du deine Position erstellen möchtest.",

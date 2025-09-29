@@ -4,13 +4,15 @@ import { useState, useCallback, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X, ArrowLeft, ArrowRight } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
-import { isValidChainSlug } from "@/config/chains";
+import { isValidChainSlug, type SupportedChainsType } from "@/config/chains";
+import type { PoolData } from "@/hooks/api/usePool";
 
-import { OpenPositionStep } from "./OpenPositionStep";
+import { IntroStep } from "./IntroStep";
 import { ChainSelectionStep } from "./ChainSelectionStep";
 import { TokenPairStep } from "./TokenPairStep";
 import { PoolSelectionStep } from "./PoolSelectionStep";
 import { PositionConfigStep } from "./PositionConfigStep";
+import { OpenPositionStep } from "./OpenPositionStep";
 
 interface PositionWizardProps {
     isOpen: boolean;
@@ -38,6 +40,9 @@ export function PositionWizard({
     const [isPositionConfigured, setPositionConfigured] =
         useState<boolean>(false);
     const [isPositionCreated] = useState<boolean>(false);
+
+    // Mock wizard state - to be replaced with proper state management later
+    const [liquidity, setLiquidity] = useState<bigint>(0n);
 
     // Handle closing wizard - let parent handle URL clearing if available
     const handleClose = useCallback(() => {
@@ -123,7 +128,7 @@ export function PositionWizard({
             case 4:
                 return "Configure your position parameters and analyze the risk profile.";
             case 5:
-                return "Position Summary";
+                return "Open Position on Uniswap";
             default:
                 return "";
         }
@@ -132,7 +137,7 @@ export function PositionWizard({
     const renderCurrentStep = () => {
         switch (currentStep) {
             case 0:
-                return <OpenPositionStep />;
+                return <IntroStep />;
             case 1:
                 return <ChainSelectionStep onChainSelect={setChainSelected} />;
             case 2:
@@ -147,21 +152,18 @@ export function PositionWizard({
                         onConfigSelect={setPositionConfigured}
                     />
                 );
-            /*case 5:
+            case 5:
                 return (
-                    <PositionSummaryStep
-                        chain={wizardState.selectedChain!}
-                        tokenPair={wizardState.selectedTokenPair!}
-                        selectedPool={wizardState.selectedPool!}
-                        config={wizardState.positionConfig!}
-                        onCreatePosition={() => {
-                            // TODO: Implement position creation
-                            onPositionCreated?.(wizardState);
-                            handleClose();
+                    <OpenPositionStep
+                        onPositionCreated={(isCreated) => {
+                            // TODO: Handle position creation completion
+                            if (isCreated) {
+                                onPositionCreated?.(null);
+                                handleClose();
+                            }
                         }}
-                        onBack={goBack}
                     />
-                );*/
+                );
             default:
                 return null;
         }
@@ -206,10 +208,8 @@ export function PositionWizard({
             params.delete("tickUpper");
             params.delete("liquidity");
         } else if (newStep <= 4) {
-            // Going back to position config - remove position params
-            params.delete("tickLower");
-            params.delete("tickUpper");
-            params.delete("liquidity");
+            // Going back to position config - preserve position params since they're still valid
+            // Don't delete tickLower, tickUpper, or liquidity as user may want to see/modify them
         }
 
         router.push(pathname + "?" + params.toString());

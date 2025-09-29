@@ -1,128 +1,881 @@
 "use client";
 
-import { Target, TrendingUp, Shield } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { AlertCircle, Loader2, ArrowLeft, Check, Circle } from "lucide-react";
+import { useAccount, useReadContract, useWatchContractEvent } from "wagmi";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { erc20Abi, formatUnits } from "viem";
 import { useTranslations } from "@/i18n/client";
+import type { SupportedChainsType } from "@/config/chains";
+import { isValidChainSlug, getChainConfig } from "@/config/chains";
+import { usePool } from "@/hooks/api/usePool";
+import { isValidAddress, normalizeAddress } from "@/lib/utils/evm";
+import { PositionSizeConfig } from "./PositionSizeConfig";
+import { CowSwapWidget } from "@/components/common/CowSwapWidget";
+import { formatCompactValue } from "@/lib/utils/fraction-format";
+import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
+import { TickMath } from "@uniswap/v3-sdk";
 
-export function OpenPositionStep() {
+interface OpenPositionStepProps {
+    // eslint-disable-next-line no-unused-vars
+    onPositionCreated?: (isCreated: boolean) => void;
+}
+
+// Helper function to map chain names to chain IDs using centralized config
+function getChainId(chain: SupportedChainsType): number {
+    const chainConfig = getChainConfig(chain);
+    if (!chainConfig) {
+        console.error(`Unknown chain: ${chain}`);
+        return 1; // fallback to mainnet
+    }
+    return chainConfig.id;
+}
+
+export function OpenPositionStep(props: OpenPositionStepProps) {
     const t = useTranslations();
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const { address: walletAddress, isConnected } = useAccount();
+    const { openConnectModal } = useConnectModal();
 
-    const features = [
-        {
-            icon: Target,
-            title: t("positionWizard.openPosition.features.planning.title"),
-            description: t(
-                "positionWizard.openPosition.features.planning.description"
-            ),
-            color: "text-blue-400",
-            bgColor: "bg-blue-500/10",
+    // URL parameter state
+    const [liquidity, setLiquidity] = useState<bigint | undefined>(0n);
+    const [tickLower, setTickLower] = useState<number>(NaN);
+    const [tickUpper, setTickUpper] = useState<number>(NaN);
+    const [chain, setChain] = useState<SupportedChainsType | undefined>();
+    const [poolAddress, setPoolAddress] = useState<string | undefined>();
+    const [baseToken, setBaseToken] = useState<string | undefined>();
+    const [quoteToken, setQuoteToken] = useState<string | undefined>();
+
+    // Transaction states - mock for now
+    const [baseApprovalStatus, setBaseApprovalStatus] = useState<'pending' | 'completed'>('completed');
+    const [quoteApprovalStatus, setQuoteApprovalStatus] = useState<'pending' | 'completed'>('pending');
+    const [positionStatus, setPositionStatus] = useState<'pending' | 'completed'>('pending');
+
+    // CowSwap widget state
+    const [showCowSwapWidget, setShowCowSwapWidget] = useState<boolean>(false);
+    const [cowSwapBuyToken, setCowSwapBuyToken] = useState<{
+        address: string;
+        symbol: string;
+        decimals: number;
+        amount: string;
+    } | undefined>();
+
+    // Extract parameters from URL
+    useEffect(() => {
+        const chainParam = searchParams.get("chain") || "";
+        const isValidChain = chainParam && isValidChainSlug(chainParam);
+        setChain(isValidChain ? (chainParam as SupportedChainsType) : undefined);
+
+        const tickLowerParam = parseInt(searchParams.get("tickLower") || "");
+        setTickLower(tickLowerParam);
+
+        const tickUpperParam = parseInt(searchParams.get("tickUpper") || "");
+        setTickUpper(tickUpperParam);
+
+        const liquidityParam = searchParams.get("liquidity");
+        if (liquidityParam) {
+            try {
+                setLiquidity(BigInt(liquidityParam));
+            } catch {
+                setLiquidity(undefined);
+            }
+        } else {
+            setLiquidity(undefined);
+        }
+
+        const poolAddressParam = searchParams.get("poolAddress");
+        if (poolAddressParam && isValidAddress(poolAddressParam)) {
+            setPoolAddress(normalizeAddress(poolAddressParam));
+        } else {
+            setPoolAddress(undefined);
+        }
+
+        const baseTokenParam = searchParams.get("baseToken");
+        if (baseTokenParam && isValidAddress(baseTokenParam)) {
+            setBaseToken(normalizeAddress(baseTokenParam));
+        } else {
+            setBaseToken(undefined);
+        }
+
+        const quoteTokenParam = searchParams.get("quoteToken");
+        if (quoteTokenParam && isValidAddress(quoteTokenParam)) {
+            setQuoteToken(normalizeAddress(quoteTokenParam));
+        } else {
+            setQuoteToken(undefined);
+        }
+    }, [searchParams]);
+
+    // Use pool hook to load and validate pool
+    const {
+        pool,
+        isLoading: isPoolLoading,
+        isError: isPoolError,
+        error: poolError,
+    } = usePool({
+        chain,
+        poolAddress,
+        enabled: !!chain && !!poolAddress,
+    });
+
+    // Normalize wallet address for balance queries
+    const normalizedWalletAddress = walletAddress ? normalizeAddress(walletAddress) : null;
+    const normalizedBaseToken = baseToken ? normalizeAddress(baseToken) : null;
+    const normalizedQuoteToken = quoteToken ? normalizeAddress(quoteToken) : null;
+
+    // Fetch base token balance
+    const {
+        data: baseBalanceData,
+        isLoading: baseBalanceLoading,
+        refetch: refetchBaseBalance,
+    } = useReadContract({
+        address: normalizedBaseToken as `0x${string}`,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [normalizedWalletAddress as `0x${string}`],
+        query: {
+            enabled: isConnected && !!normalizedWalletAddress && !!normalizedBaseToken,
         },
-        {
-            icon: TrendingUp,
-            title: t(
-                "positionWizard.openPosition.features.visualization.title"
-            ),
-            description: t(
-                "positionWizard.openPosition.features.visualization.description"
-            ),
-            color: "text-green-400",
-            bgColor: "bg-green-500/10",
+        ...(chain && { chainId: getChainId(chain) }),
+    });
+
+    // Fetch quote token balance
+    const {
+        data: quoteBalanceData,
+        isLoading: quoteBalanceLoading,
+        refetch: refetchQuoteBalance,
+    } = useReadContract({
+        address: normalizedQuoteToken as `0x${string}`,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [normalizedWalletAddress as `0x${string}`],
+        query: {
+            enabled: isConnected && !!normalizedWalletAddress && !!normalizedQuoteToken,
         },
-        {
-            icon: Shield,
-            title: t("positionWizard.openPosition.features.risk.title"),
-            description: t(
-                "positionWizard.openPosition.features.risk.description"
-            ),
-            color: "text-amber-400",
-            bgColor: "bg-amber-500/10",
+        ...(chain && { chainId: getChainId(chain) }),
+    });
+
+    // Subscribe to base token Transfer events to automatically update balance
+    useWatchContractEvent({
+        address: normalizedBaseToken as `0x${string}`,
+        abi: erc20Abi,
+        eventName: "Transfer",
+        args: {
+            from: normalizedWalletAddress as `0x${string}`,
         },
-    ];
+        onLogs: () => {
+            refetchBaseBalance();
+        },
+        enabled: isConnected && !!normalizedWalletAddress && !!normalizedBaseToken,
+        ...(chain && { chainId: getChainId(chain) }),
+    });
 
-    return (
-        <div className="space-y-8">
-            {/* Hero Section */}
-            <div className="text-center space-y-4">
-                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <Target className="w-8 h-8 text-white" />
-                </div>
+    useWatchContractEvent({
+        address: normalizedBaseToken as `0x${string}`,
+        abi: erc20Abi,
+        eventName: "Transfer",
+        args: {
+            to: normalizedWalletAddress as `0x${string}`,
+        },
+        onLogs: () => {
+            refetchBaseBalance();
+        },
+        enabled: isConnected && !!normalizedWalletAddress && !!normalizedBaseToken,
+        ...(chain && { chainId: getChainId(chain) }),
+    });
 
-                <h3 className="text-2xl font-bold text-white">
-                    {t("positionWizard.openPosition.title")}
-                </h3>
+    // Subscribe to quote token Transfer events to automatically update balance
+    useWatchContractEvent({
+        address: normalizedQuoteToken as `0x${string}`,
+        abi: erc20Abi,
+        eventName: "Transfer",
+        args: {
+            from: normalizedWalletAddress as `0x${string}`,
+        },
+        onLogs: () => {
+            refetchQuoteBalance();
+        },
+        enabled: isConnected && !!normalizedWalletAddress && !!normalizedQuoteToken,
+        ...(chain && { chainId: getChainId(chain) }),
+    });
 
-                <p className="text-lg text-slate-300 max-w-2xl mx-auto">
-                    {t("positionWizard.openPosition.subtitle")}
-                </p>
-            </div>
+    useWatchContractEvent({
+        address: normalizedQuoteToken as `0x${string}`,
+        abi: erc20Abi,
+        eventName: "Transfer",
+        args: {
+            to: normalizedWalletAddress as `0x${string}`,
+        },
+        onLogs: () => {
+            refetchQuoteBalance();
+        },
+        enabled: isConnected && !!normalizedWalletAddress && !!normalizedQuoteToken,
+        ...(chain && { chainId: getChainId(chain) }),
+    });
 
-            {/* Process Overview */}
-            <div className="bg-slate-800/30 border border-slate-700/30 rounded-lg p-6">
-                <h4 className="text-lg font-semibold text-white mb-4">
-                    {t("positionWizard.openPosition.process.title")}
-                </h4>
+    // Convert balance data to bigint values
+    const baseBalance = baseBalanceData ? BigInt(baseBalanceData.toString()) : 0n;
+    const quoteBalance = quoteBalanceData ? BigInt(quoteBalanceData.toString()) : 0n;
 
-                <div className="grid md:grid-cols-4 gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold text-white">
-                            1
-                        </div>
-                        <span className="text-slate-300 text-sm">
-                            {t("positionWizard.openPosition.process.step1")}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold text-white">
-                            2
-                        </div>
-                        <span className="text-slate-300 text-sm">
-                            {t("positionWizard.openPosition.process.step2")}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold text-white">
-                            3
-                        </div>
-                        <span className="text-slate-300 text-sm">
-                            {t("positionWizard.openPosition.process.step3")}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold text-white">
-                            4
-                        </div>
-                        <span className="text-slate-300 text-sm">
-                            {t("positionWizard.openPosition.process.step4")}
-                        </span>
-                    </div>
-                </div>
-            </div>
+    // Calculate required token amounts from liquidity
+    const requiredAmounts = useMemo(() => {
+        if (!pool || !liquidity || liquidity === 0n || pool.currentTick === null || !baseToken || !quoteToken) {
+            return { baseAmount: 0n, quoteAmount: 0n };
+        }
 
-            {/* Features Grid */}
-            <div className="grid md:grid-cols-3 gap-6">
-                {features.map((feature, index) => {
-                    const Icon = feature.icon;
-                    return (
-                        <div
-                            key={index}
-                            className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-lg p-6 space-y-4"
-                        >
-                            <div
-                                className={`w-12 h-12 ${feature.bgColor} rounded-lg flex items-center justify-center`}
-                            >
-                                <Icon className={`w-6 h-6 ${feature.color}`} />
-                            </div>
+        try {
+            const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
+                liquidity,
+                pool.currentTick,
+                tickLower && !isNaN(tickLower) ? tickLower : TickMath.MIN_TICK,
+                tickUpper && !isNaN(tickUpper) ? tickUpper : TickMath.MAX_TICK
+            );
 
-                            <h4 className="text-lg font-semibold text-white">
-                                {feature.title}
-                            </h4>
+            // Determine which is base and which is quote
+            const isQuoteToken0 = pool.token0.address.toLowerCase() === quoteToken.toLowerCase();
+            const baseAmount = isQuoteToken0 ? token1Amount : token0Amount;
+            const quoteAmount = isQuoteToken0 ? token0Amount : token1Amount;
 
-                            <p className="text-slate-300">
-                                {feature.description}
+            return { baseAmount, quoteAmount };
+        } catch (error) {
+            console.error("Error calculating required amounts from liquidity:", error);
+            return { baseAmount: 0n, quoteAmount: 0n };
+        }
+    }, [pool, liquidity, tickLower, tickUpper, baseToken, quoteToken]);
+
+    const requiredBaseAmount = requiredAmounts.baseAmount;
+    const requiredQuoteAmount = requiredAmounts.quoteAmount;
+
+    // Handle navigation to previous steps if invalid parameters
+    const goToChainSelection = useCallback(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("step", "1");
+        params.delete("chain");
+        params.delete("baseToken");
+        params.delete("quoteToken");
+        params.delete("poolAddress");
+        params.delete("tickLower");
+        params.delete("tickUpper");
+        params.delete("liquidity");
+        router.push(pathname + "?" + params.toString());
+    }, [router, pathname, searchParams]);
+
+    const goToTokenPairSelection = useCallback(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("step", "2");
+        params.delete("baseToken");
+        params.delete("quoteToken");
+        params.delete("poolAddress");
+        params.delete("tickLower");
+        params.delete("tickUpper");
+        params.delete("liquidity");
+        router.push(pathname + "?" + params.toString());
+    }, [router, pathname, searchParams]);
+
+    const goToPoolSelection = useCallback(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("step", "3");
+        params.delete("poolAddress");
+        params.delete("tickLower");
+        params.delete("tickUpper");
+        params.delete("liquidity");
+        router.push(pathname + "?" + params.toString());
+    }, [router, pathname, searchParams]);
+
+    const goToPositionConfig = useCallback(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("step", "4");
+        router.push(pathname + "?" + params.toString());
+    }, [router, pathname, searchParams]);
+
+    // Handle liquidity changes
+    function onLiquidityChange(newLiquidity: bigint) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("liquidity", newLiquidity.toString());
+        router.replace(pathname + "?" + params.toString());
+    }
+
+    // Calculate insufficient funds
+    const insufficientFunds = useMemo(() => {
+        // Don't show insufficient funds info if not connected or still loading balances
+        if (!isConnected || baseBalanceLoading || quoteBalanceLoading) return null;
+
+        // Don't show if required amounts are not calculated yet
+        if (requiredBaseAmount === 0n && requiredQuoteAmount === 0n) return null;
+
+        const needsBase = baseBalance < requiredBaseAmount;
+        const needsQuote = quoteBalance < requiredQuoteAmount;
+
+        if (!needsBase && !needsQuote) return null;
+
+        const missingBase = needsBase ? requiredBaseAmount - baseBalance : 0n;
+        const missingQuote = needsQuote ? requiredQuoteAmount - quoteBalance : 0n;
+
+        return {
+            needsBase,
+            needsQuote,
+            missingBase,
+            missingQuote
+        };
+    }, [isConnected, baseBalance, quoteBalance, requiredBaseAmount, requiredQuoteAmount, baseBalanceLoading, quoteBalanceLoading]);
+
+    // Pool-token validation logic
+    const validation = useMemo(() => {
+        // Check if pool is loaded successfully
+        if (isPoolLoading) {
+            return {
+                isValid: false,
+                hasValidPool: false,
+                hasValidTokens: false,
+                hasValidParams: false,
+            };
+        }
+
+        if (isPoolError || !pool) {
+            return {
+                isValid: false,
+                hasValidPool: false,
+                hasValidTokens: false,
+                hasValidParams: false,
+                error: poolError || "Pool could not be loaded",
+            };
+        }
+
+        // Validate that both tokens exist in the pool
+        if (!baseToken || !quoteToken) {
+            return {
+                isValid: false,
+                hasValidPool: true,
+                hasValidTokens: false,
+                hasValidParams: false,
+                error: "Base and quote tokens are required",
+            };
+        }
+
+        const normalizedBaseToken = normalizeAddress(baseToken);
+        const normalizedQuoteToken = normalizeAddress(quoteToken);
+        const normalizedToken0 = normalizeAddress(pool.token0.address);
+        const normalizedToken1 = normalizeAddress(pool.token1.address);
+
+        const poolTokens = [normalizedToken0, normalizedToken1];
+        const hasBaseToken = poolTokens.includes(normalizedBaseToken);
+        const hasQuoteToken = poolTokens.includes(normalizedQuoteToken);
+        const tokensValid =
+            hasBaseToken &&
+            hasQuoteToken &&
+            normalizedBaseToken !== normalizedQuoteToken;
+
+        if (!tokensValid) {
+            return {
+                isValid: false,
+                hasValidPool: true,
+                hasValidTokens: false,
+                hasValidParams: false,
+                error: "Selected tokens do not match the pool tokens",
+            };
+        }
+
+        // Validate position parameters
+        const liquidityBigInt = BigInt(liquidity || "0");
+        const paramsValid =
+            tickLower !== undefined &&
+            tickUpper !== undefined &&
+            !isNaN(tickLower) &&
+            !isNaN(tickUpper) &&
+            tickLower < tickUpper &&
+            liquidityBigInt > 0n;
+
+        if (!paramsValid) {
+            return {
+                isValid: false,
+                hasValidPool: true,
+                hasValidTokens: true,
+                hasValidParams: false,
+                error: "Position parameters are incomplete or invalid",
+            };
+        }
+
+        return {
+            isValid: true,
+            hasValidPool: true,
+            hasValidTokens: true,
+            hasValidParams: true,
+        };
+    }, [
+        isPoolLoading,
+        isPoolError,
+        pool,
+        baseToken,
+        quoteToken,
+        liquidity,
+        tickLower,
+        tickUpper,
+        poolError,
+    ]);
+
+    // Notify parent about position status
+    useEffect(() => {
+        props.onPositionCreated?.(positionStatus === 'completed');
+    }, [positionStatus, props]);
+
+    // Transaction handlers
+    const handleCowSwapClick = (tokenType: 'base' | 'quote') => {
+        if (!pool || !insufficientFunds) return;
+
+        // Clear previous buy token state first
+        setCowSwapBuyToken(undefined);
+
+        // Use setTimeout to ensure state is cleared before setting new value
+        setTimeout(() => {
+            if (tokenType === 'base' && insufficientFunds.needsBase) {
+                const baseTokenData = pool.token0.address.toLowerCase() === baseToken?.toLowerCase()
+                    ? pool.token0
+                    : pool.token1;
+
+                setCowSwapBuyToken({
+                    address: baseTokenData.address,
+                    symbol: baseTokenData.symbol,
+                    decimals: baseTokenData.decimals,
+                    amount: formatUnits(insufficientFunds.missingBase, baseTokenData.decimals)
+                });
+            } else if (tokenType === 'quote' && insufficientFunds.needsQuote) {
+                const quoteTokenData = pool.token0.address.toLowerCase() === quoteToken?.toLowerCase()
+                    ? pool.token0
+                    : pool.token1;
+
+                setCowSwapBuyToken({
+                    address: quoteTokenData.address,
+                    symbol: quoteTokenData.symbol,
+                    decimals: quoteTokenData.decimals,
+                    amount: formatUnits(insufficientFunds.missingQuote, quoteTokenData.decimals)
+                });
+            }
+
+            setShowCowSwapWidget(true);
+        }, 10);
+    };
+
+    const handleApproval = (token: 'base' | 'quote') => {
+        // TODO: Trigger approval transaction
+        console.log(`Approve ${token} token`);
+    };
+
+    const handleOpenPosition = () => {
+        // TODO: Trigger open position transaction
+        console.log('Open position');
+    };
+
+    // Show validation errors for missing parameters
+    if (!chain) {
+        return (
+            <div className="space-y-6">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                        <div>
+                            <h5 className="text-red-400 font-medium">
+                                Invalid Chain Selected
+                            </h5>
+                            <p className="text-red-200/80 text-sm mt-1">
+                                Please select a valid blockchain network to continue.
                             </p>
                         </div>
-                    );
-                })}
+                    </div>
+                    <button
+                        onClick={goToChainSelection}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                        Go to Chain Selection
+                    </button>
+                </div>
             </div>
+        );
+    }
+
+    if (!baseToken || !quoteToken) {
+        return (
+            <div className="space-y-6">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                        <div>
+                            <h5 className="text-red-400 font-medium">
+                                Token Pair Required
+                            </h5>
+                            <p className="text-red-200/80 text-sm mt-1">
+                                Please select both base and quote tokens to continue.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={goToTokenPairSelection}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                        Go to Token Pair Selection
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (
+        !poolAddress ||
+        (!isPoolLoading && !validation.hasValidPool) ||
+        (!isPoolLoading && !validation.hasValidTokens)
+    ) {
+        return (
+            <div className="space-y-6">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                        <div>
+                            <h5 className="text-red-400 font-medium">
+                                Pool Selection Required
+                            </h5>
+                            <p className="text-red-200/80 text-sm mt-1">
+                                Please select a pool to continue.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={goToPoolSelection}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                        Go to Pool Selection
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (!isPoolLoading && !validation.hasValidParams) {
+        return (
+            <div className="space-y-6">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                        <div>
+                            <h5 className="text-red-400 font-medium">
+                                Position Configuration Required
+                            </h5>
+                            <p className="text-red-200/80 text-sm mt-1">
+                                Please complete the position configuration to continue.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={goToPositionConfig}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                        Go to Position Configuration
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Loading State */}
+            {isPoolLoading && (
+                <div className="flex items-center justify-center py-12">
+                    <div className="flex items-center gap-3 text-slate-400">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Loading pool data...</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Pool Error */}
+            {validation.error && !validation.hasValidPool && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                    <div className="flex items-center gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                        <div>
+                            <h5 className="text-red-400 font-medium">
+                                Pool Loading Error
+                            </h5>
+                            <p className="text-red-200/80 text-sm mt-1">
+                                {validation.error}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Main Content */}
+            {!isPoolLoading && validation.hasValidPool && validation.hasValidTokens && validation.hasValidParams && pool && baseToken && quoteToken && (
+                <div className="space-y-6">
+                    {/* Position Size Configuration */}
+                    <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-lg p-4">
+                        <PositionSizeConfig
+                            pool={pool}
+                            baseToken={{
+                                address: baseToken,
+                                symbol: pool.token0.address.toLowerCase() === baseToken.toLowerCase()
+                                    ? pool.token0.symbol
+                                    : pool.token1.symbol,
+                                decimals: pool.token0.address.toLowerCase() === baseToken.toLowerCase()
+                                    ? pool.token0.decimals
+                                    : pool.token1.decimals,
+                                logoUrl: pool.token0.address.toLowerCase() === baseToken.toLowerCase()
+                                    ? pool.token0.logoUrl
+                                    : pool.token1.logoUrl,
+                            }}
+                            quoteToken={{
+                                address: quoteToken,
+                                symbol: pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
+                                    ? pool.token0.symbol
+                                    : pool.token1.symbol,
+                                decimals: pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
+                                    ? pool.token0.decimals
+                                    : pool.token1.decimals,
+                                logoUrl: pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
+                                    ? pool.token0.logoUrl
+                                    : pool.token1.logoUrl,
+                            }}
+                            tickLower={tickLower && !isNaN(tickLower) ? tickLower : TickMath.MIN_TICK}
+                            tickUpper={tickUpper && !isNaN(tickUpper) ? tickUpper : TickMath.MAX_TICK}
+                            liquidity={liquidity || 0n}
+                            onLiquidityChange={onLiquidityChange}
+                            chain={chain}
+                        />
+                    </div>
+
+                    {/* Wallet Balance Section */}
+                    <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-lg p-4">
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-slate-300 font-medium">
+                                {t("positionWizard.openPositionFinal.walletBalance")}
+                            </span>
+                            <div className="flex items-center gap-2">
+                                {isConnected ? (
+                                    <>
+                                        {baseBalanceLoading || quoteBalanceLoading ? (
+                                            <div className="flex items-center gap-2">
+                                                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                                                <span className="text-slate-400 text-sm">Loading...</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-white font-medium">
+                                                {formatCompactValue(baseBalance, pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.decimals : pool.token1.decimals)} {pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol} +{" "}
+                                                {formatCompactValue(quoteBalance, pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.decimals : pool.token1.decimals)} {pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol}
+                                            </span>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="text-slate-400 font-medium">-- {pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol} + -- {pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol}</span>
+                                        <button
+                                            onClick={() => openConnectModal?.()}
+                                            className="text-blue-400 hover:text-blue-300 text-xs font-medium transition-colors cursor-pointer ml-2"
+                                        >
+                                            {t("positionWizard.openPositionFinal.connectWallet")}
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Balance Loading State */}
+                    {isConnected && (baseBalanceLoading || quoteBalanceLoading) && requiredBaseAmount > 0n && requiredQuoteAmount > 0n && (
+                        <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-lg p-4">
+                            <div className="flex items-center gap-3">
+                                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                                <span className="text-slate-400 text-sm">Checking wallet balances...</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Insufficient Funds Information */}
+                    {insufficientFunds && (
+                        <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-lg p-4">
+                            <div className="text-slate-200 text-sm mb-4">
+                                {/* Case 1: Only base token insufficient */}
+                                {insufficientFunds.needsBase && !insufficientFunds.needsQuote && (
+                                    <span>
+                                        You need to{" "}
+                                        <span className="font-bold">
+                                            buy {formatCompactValue(insufficientFunds.missingBase, pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.decimals : pool.token1.decimals)} {pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol}
+                                        </span>
+                                        {" "}
+                                        <button
+                                            onClick={() => handleCowSwapClick('base')}
+                                            disabled={!isConnected}
+                                            className="text-amber-400 hover:text-amber-300 underline decoration-dashed decoration-amber-400 hover:decoration-amber-300 underline-offset-2 transition-colors disabled:text-slate-400 disabled:decoration-slate-400 cursor-pointer disabled:cursor-not-allowed"
+                                        >
+                                            (swap here)
+                                        </button>
+                                        {" "}to match your planned position size.
+                                    </span>
+                                )}
+
+                                {/* Case 2: Only quote token insufficient */}
+                                {!insufficientFunds.needsBase && insufficientFunds.needsQuote && (
+                                    <span>
+                                        You need to{" "}
+                                        <span className="font-bold">
+                                            buy {formatCompactValue(insufficientFunds.missingQuote, pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.decimals : pool.token1.decimals)} {pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol}
+                                        </span>
+                                        {" "}
+                                        <button
+                                            onClick={() => handleCowSwapClick('quote')}
+                                            disabled={!isConnected}
+                                            className="text-amber-400 hover:text-amber-300 underline decoration-dashed decoration-amber-400 hover:decoration-amber-300 underline-offset-2 transition-colors disabled:text-slate-400 disabled:decoration-slate-400 cursor-pointer disabled:cursor-not-allowed"
+                                        >
+                                            (swap here)
+                                        </button>
+                                        {" "}to match your planned position size.
+                                    </span>
+                                )}
+
+                                {/* Case 3: Both tokens insufficient */}
+                                {insufficientFunds.needsBase && insufficientFunds.needsQuote && (
+                                    <span>
+                                        You need to buy{" "}
+                                        <span className="font-bold">
+                                            {formatCompactValue(insufficientFunds.missingBase, pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.decimals : pool.token1.decimals)} {pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol}
+                                        </span>
+                                        {" "}
+                                        <button
+                                            onClick={() => handleCowSwapClick('base')}
+                                            disabled={!isConnected}
+                                            className="text-amber-400 hover:text-amber-300 underline decoration-dashed decoration-amber-400 hover:decoration-amber-300 underline-offset-2 transition-colors disabled:text-slate-400 disabled:decoration-slate-400 cursor-pointer disabled:cursor-not-allowed"
+                                        >
+                                            (swap here)
+                                        </button>
+                                        {" "}and{" "}
+                                        <span className="font-bold">
+                                            {formatCompactValue(insufficientFunds.missingQuote, pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.decimals : pool.token1.decimals)} {pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol}
+                                        </span>
+                                        {" "}
+                                        <button
+                                            onClick={() => handleCowSwapClick('quote')}
+                                            disabled={!isConnected}
+                                            className="text-amber-400 hover:text-amber-300 underline decoration-dashed decoration-amber-400 hover:decoration-amber-300 underline-offset-2 transition-colors disabled:text-slate-400 disabled:decoration-slate-400 cursor-pointer disabled:cursor-not-allowed"
+                                        >
+                                            (swap here)
+                                        </button>
+                                        {" "}to match your planned position size.
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* CowSwap Widget */}
+                            {showCowSwapWidget && cowSwapBuyToken && (
+                                <div className="mt-4 border-t border-slate-700/50 pt-4">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="text-lg font-semibold text-white">
+                                            Buy {cowSwapBuyToken.symbol}
+                                        </h4>
+                                        <button
+                                            onClick={() => setShowCowSwapWidget(false)}
+                                            className="text-slate-400 hover:text-white transition-colors"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                    <CowSwapWidget
+                                        buyToken={cowSwapBuyToken}
+                                        chain={chain}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Transaction Steps */}
+                    <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-lg p-4">
+                        <h4 className="text-lg font-semibold text-white mb-4">{t("positionWizard.openPositionFinal.transactionSteps")}</h4>
+
+                        <div className={`space-y-4 ${!isConnected ? 'opacity-50' : ''}`}>
+                            {/* Step 1: Base Token Approval */}
+                            <div className="flex items-center gap-3">
+                                {baseApprovalStatus === 'completed' ? (
+                                    <Check className="w-5 h-5 text-green-500" />
+                                ) : (
+                                    <Circle className="w-5 h-5 text-slate-400" />
+                                )}
+                                <span className="text-white flex-1">
+                                    {t("positionWizard.openPositionFinal.approveToken", {
+                                        amount: formatCompactValue(requiredBaseAmount, pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.decimals : pool.token1.decimals),
+                                        symbol: pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol
+                                    })}
+                                </span>
+                                {baseApprovalStatus === 'pending' && isConnected && (
+                                    <button
+                                        onClick={() => handleApproval('base')}
+                                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
+                                    >
+                                        {t("positionWizard.openPositionFinal.approve")}
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Step 2: Quote Token Approval */}
+                            <div className="flex items-center gap-3">
+                                {quoteApprovalStatus === 'completed' ? (
+                                    <Check className="w-5 h-5 text-green-500" />
+                                ) : (
+                                    <Circle className="w-5 h-5 text-slate-400" />
+                                )}
+                                <span className="text-white flex-1">
+                                    {t("positionWizard.openPositionFinal.approveToken", {
+                                        amount: formatCompactValue(requiredQuoteAmount, pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.decimals : pool.token1.decimals),
+                                        symbol: pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol
+                                    })}
+                                </span>
+                                {quoteApprovalStatus === 'pending' && isConnected && (
+                                    <button
+                                        onClick={() => handleApproval('quote')}
+                                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
+                                    >
+                                        {t("positionWizard.openPositionFinal.approve")}
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Step 3: Open Position */}
+                            <div className="flex items-center gap-3">
+                                {positionStatus === 'completed' ? (
+                                    <Check className="w-5 h-5 text-green-500" />
+                                ) : (
+                                    <Circle className="w-5 h-5 text-slate-400" />
+                                )}
+                                <span className="text-white flex-1">
+                                    {t("positionWizard.openPositionFinal.openPosition")}
+                                </span>
+                                {positionStatus === 'pending' && isConnected && (
+                                    <button
+                                        onClick={handleOpenPosition}
+                                        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
+                                    >
+                                        {t("positionWizard.openPositionFinal.execute")}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {!isConnected && (
+                            <div className="mt-4 text-center">
+                                <button
+                                    onClick={() => openConnectModal?.()}
+                                    className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                                >
+                                    {t("positionWizard.openPositionFinal.connectToContinue")}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
