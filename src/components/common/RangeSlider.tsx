@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ZoomIn, ZoomOut } from "lucide-react";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 
 interface SliderBounds {
@@ -21,8 +21,8 @@ interface RangeSliderProps {
     className?: string;
     sliderBounds?: SliderBounds;
     onBoundsChange?: (_bounds: SliderBounds) => void;
-    tickLowerPrice?: number;
-    tickUpperPrice?: number;
+    _tickLowerPrice?: number;
+    _tickUpperPrice?: number;
 }
 
 const PRESET_PERCENTAGES = [5, 10, 20, 30, 40, 50];
@@ -40,8 +40,8 @@ export function RangeSlider({
     className = "",
     sliderBounds: externalSliderBounds,
     onBoundsChange,
-    tickLowerPrice,
-    tickUpperPrice,
+    _tickLowerPrice,
+    _tickUpperPrice,
 }: RangeSliderProps) {
     const sliderRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState<'lower' | 'upper' | 'range' | null>(null);
@@ -194,57 +194,62 @@ export function RangeSlider({
         const newLowerPrice = currentPrice - range;
         const newUpperPrice = currentPrice + range;
 
-        // Check if current slider boundaries are too narrow for this preset
-        if (newLowerPrice < sliderBounds.min || newUpperPrice > sliderBounds.max) {
-            // Reset slider boundaries to accommodate the preset range with some margin
-            const marginPercent = Math.max(percentage * 0.2, 10); // 20% margin or minimum 10%
-            const margin = currentPrice * (marginPercent / 100);
+        // Clear any local drag state that might be overriding the props
+        setLocalDragState({ lowerPrice: null, upperPrice: null });
 
-            setSliderBounds({
-                min: newLowerPrice - margin,
-                max: newUpperPrice + margin
-            });
-        }
+        // Always reset slider boundaries to default setting (±50% of current price)
+        // But ensure they're at least wide enough to contain the preset range
+        const DEFAULT_RANGE_PERCENT = 50;
+        const minBoundaryPercent = Math.max(DEFAULT_RANGE_PERCENT, percentage + 10); // At least 10% margin around preset
 
+        const newSliderBounds = {
+            min: Math.max(0.01, currentPrice * (1 - minBoundaryPercent / 100)),
+            max: currentPrice * (1 + minBoundaryPercent / 100)
+        };
+
+        // Set bounds first to ensure they're ready when the range updates
+        setSliderBounds(newSliderBounds);
+
+        // Then update the position range
         onRangeChange(newLowerPrice, newUpperPrice);
-    }, [currentPrice, onRangeChange, sliderBounds, setSliderBounds]);
+    }, [currentPrice, onRangeChange, setSliderBounds]);
 
     const handleMaxClick = useCallback(() => {
         onRangeChange(sliderBounds.min, sliderBounds.max);
     }, [sliderBounds, onRangeChange]);
 
-    // Handle boundary adjustment buttons
-    const handleBoundaryAdjustment = useCallback((side: 'min' | 'max', direction: 'decrease' | 'increase', shiftKey: boolean = false) => {
-        const tickMultiplier = shiftKey ? 10 : 1;
-        const changePercent = 1 * tickMultiplier; // 1% per tick, 10% with shift
+    // Handle zoom in/out functionality
+    // TODO: BUGGY - Zoom logic fails in extreme cases (over-zooming in/out). Works for reasonable usage ranges.
+    // Needs revisit to handle edge cases properly.
+    const handleZoom = useCallback((direction: 'in' | 'out', shiftKey: boolean = false) => {
+        const zoomMultiplier = shiftKey ? 10 : 1;
+        const zoomPercent = 1 * zoomMultiplier; // 1% per step, 10% with shift
+        const expansion = currentPrice * (zoomPercent / 100);
 
-        let newMin = sliderBounds.min;
-        let newMax = sliderBounds.max;
-
-        if (side === 'min') {
-            if (direction === 'decrease') {
-                newMin = sliderBounds.min * (1 - changePercent / 100);
-            } else {
-                newMin = sliderBounds.min * (1 + changePercent / 100);
-                // Prevent min boundary from going above tickLowerPrice
-                if (tickLowerPrice && newMin > tickLowerPrice) {
-                    newMin = tickLowerPrice;
-                }
+        if (direction === 'out') {
+            // onZoomOut => Expand slider boundaries outward
+            let newSliderMin = sliderBounds.min - expansion;
+            if (newSliderMin <= 0) {
+                newSliderMin = 0.01; // Keep a small positive value to prevent PnL curve errors
             }
+            const newSliderMax = sliderBounds.max + expansion;
+
+            setSliderBounds({ min: newSliderMin, max: newSliderMax });
         } else {
-            if (direction === 'increase') {
-                newMax = sliderBounds.max * (1 + changePercent / 100);
-            } else {
-                newMax = sliderBounds.max * (1 - changePercent / 100);
-                // Prevent max boundary from going below tickUpperPrice
-                if (tickUpperPrice && newMax < tickUpperPrice) {
-                    newMax = tickUpperPrice;
-                }
+            // onZoomIn => Slider boundaries cannot shrink more than position range
+            let newSliderMin = sliderBounds.min + expansion;
+            if (newSliderMin > lowerPrice || zoomPercent > 100) {
+                newSliderMin = lowerPrice;
             }
-        }
 
-        setSliderBounds({ min: newMin, max: newMax });
-    }, [sliderBounds, setSliderBounds, tickLowerPrice, tickUpperPrice]);
+            let newSliderMax = sliderBounds.max - expansion;
+            if (newSliderMax < upperPrice) {
+                newSliderMax = upperPrice;
+            }
+
+            setSliderBounds({ min: newSliderMin, max: newSliderMax });
+        }
+    }, [currentPrice, sliderBounds, setSliderBounds, lowerPrice, upperPrice]);
 
     // Format prices for display
     const formatPrice = useCallback((price: number) => {
@@ -275,22 +280,14 @@ export function RangeSlider({
 
             {/* Slider Container */}
             <div className="flex items-center gap-3">
-                {/* Left Boundary Controls */}
-                <div className="flex flex-col gap-1">
+                {/* Zoom In Control */}
+                <div className="flex justify-center">
                     <button
-                        onClick={(e) => handleBoundaryAdjustment('min', 'decrease', e.shiftKey)}
-                        className="p-1 bg-slate-700/80 backdrop-blur-sm border border-slate-600 rounded text-slate-300 hover:text-white hover:bg-slate-600/80 transition-colors"
-                        title="Decrease lower bound (Shift: 10x)"
+                        onClick={(e) => handleZoom('in', e.shiftKey)}
+                        className="p-2 bg-slate-700/80 backdrop-blur-sm border border-slate-600 rounded text-slate-300 hover:text-white hover:bg-slate-600/80 transition-colors"
+                        title="Zoom in - shrink boundaries (Shift: 10x faster)"
                     >
-                        <ChevronLeft className="w-3 h-3" />
-                    </button>
-                    <button
-                        onClick={(e) => handleBoundaryAdjustment('min', 'increase', e.shiftKey)}
-                        className="p-1 bg-slate-700/80 backdrop-blur-sm border border-slate-600 rounded text-slate-300 hover:text-white hover:bg-slate-600/80 transition-colors"
-                        title="Increase lower bound (Shift: 10x)"
-                        disabled={Boolean(tickLowerPrice && sliderBounds.min >= tickLowerPrice)}
-                    >
-                        <ChevronRight className="w-3 h-3" />
+                        <ZoomIn className="w-4 h-4" />
                     </button>
                 </div>
 
@@ -339,28 +336,20 @@ export function RangeSlider({
                     </div>
                 </div>
 
-                {/* Right Boundary Controls */}
-                <div className="flex flex-col gap-1">
+                {/* Zoom Out Control */}
+                <div className="flex justify-center">
                     <button
-                        onClick={(e) => handleBoundaryAdjustment('max', 'decrease', e.shiftKey)}
-                        className="p-1 bg-slate-700/80 backdrop-blur-sm border border-slate-600 rounded text-slate-300 hover:text-white hover:bg-slate-600/80 transition-colors"
-                        title="Decrease upper bound (Shift: 10x)"
-                        disabled={Boolean(tickUpperPrice && sliderBounds.max <= tickUpperPrice)}
+                        onClick={(e) => handleZoom('out', e.shiftKey)}
+                        className="p-2 bg-slate-700/80 backdrop-blur-sm border border-slate-600 rounded text-slate-300 hover:text-white hover:bg-slate-600/80 transition-colors"
+                        title="Zoom out - expand boundaries (Shift: 10x faster)"
                     >
-                        <ChevronLeft className="w-3 h-3" />
-                    </button>
-                    <button
-                        onClick={(e) => handleBoundaryAdjustment('max', 'increase', e.shiftKey)}
-                        className="p-1 bg-slate-700/80 backdrop-blur-sm border border-slate-600 rounded text-slate-300 hover:text-white hover:bg-slate-600/80 transition-colors"
-                        title="Increase upper bound (Shift: 10x)"
-                    >
-                        <ChevronRight className="w-3 h-3" />
+                        <ZoomOut className="w-4 h-4" />
                     </button>
                 </div>
             </div>
 
             {/* Preset Buttons and APR - aligned with slider track */}
-            <div className="flex items-center justify-between" style={{ marginLeft: '52px', marginRight: '52px' }}>
+            <div className="flex items-center justify-between" style={{ marginLeft: '56px', marginRight: '56px' }}>
                 <div className="flex flex-wrap gap-2">
                     {PRESET_PERCENTAGES.map((percentage) => (
                         <button

@@ -97,7 +97,7 @@ export function PositionRangeConfig({
 
     // Initialize slider bounds when current price is available
     useEffect(() => {
-        if (currentPrice > 0 && (sliderBounds.min === 0 || sliderBounds.max === 0)) {
+        if (currentPrice > 0 && sliderBounds.min === 0 && sliderBounds.max === 0) {
             const DEFAULT_RANGE_PERCENT = 50; // ±50% default range
             setSliderBounds({
                 min: currentPrice * (1 - DEFAULT_RANGE_PERCENT / 100),
@@ -341,8 +341,8 @@ export function PositionRangeConfig({
                             aprLoading={isPoolFeeLoading}
                             sliderBounds={sliderBounds}
                             onBoundsChange={setSliderBounds}
-                            tickLowerPrice={convertTickToPriceSimple(tickLower)}
-                            tickUpperPrice={convertTickToPriceSimple(tickUpper)}
+                            _tickLowerPrice={convertTickToPriceSimple(tickLower)}
+                            _tickUpperPrice={convertTickToPriceSimple(tickUpper)}
                             className=""
                         />
 
