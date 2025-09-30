@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
     domains: [
       'static.alchemyapi.io',
       'assets.coingecko.com',
+      'coin-images.coingecko.com',
       'cdn.jsdelivr.net',
       'raw.githubusercontent.com',
       'tokens.1inch.io'

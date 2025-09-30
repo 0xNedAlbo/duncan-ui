@@ -17,10 +17,20 @@ import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { TickMath } from "@uniswap/v3-sdk";
 import { useTokenApproval } from "@/hooks/useTokenApproval";
+import { useMintPosition } from "@/hooks/useMintPosition";
+import { sortTokens } from "@/lib/utils/uniswap-v3/utils";
+
+interface CreatedPositionData {
+    chain: string;
+    nftId: bigint;
+    pool: any; // PoolData type
+    baseToken: string;
+    quoteToken: string;
+}
 
 interface OpenPositionStepProps {
     // eslint-disable-next-line no-unused-vars
-    onPositionCreated?: (isCreated: boolean) => void;
+    onPositionCreated?: (data: CreatedPositionData | null) => void;
 }
 
 export function OpenPositionStep(props: OpenPositionStepProps) {
@@ -40,9 +50,6 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
     const [poolAddress, setPoolAddress] = useState<string | undefined>();
     const [baseToken, setBaseToken] = useState<string | undefined>();
     const [quoteToken, setQuoteToken] = useState<string | undefined>();
-
-    // Position creation state
-    const [positionStatus, setPositionStatus] = useState<'pending' | 'completed'>('pending');
 
     // CowSwap widget state
     const [showCowSwapWidget, setShowCowSwapWidget] = useState<boolean>(false);
@@ -259,6 +266,55 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
         enabled: isConnected && !isWrongNetwork && !!normalizedQuoteToken && !!normalizedWalletAddress && requiredQuoteAmount > 0n,
     });
 
+    // Prepare mint position parameters
+    const mintPositionParams = useMemo(() => {
+        if (!pool || !baseToken || !quoteToken || !normalizedWalletAddress || !chain) {
+            return null;
+        }
+
+        if (requiredBaseAmount === 0n && requiredQuoteAmount === 0n) {
+            return null;
+        }
+
+        // Sort tokens to get token0 and token1 addresses
+        const { token0, token1 } = sortTokens(
+            { address: pool.token0.address },
+            { address: pool.token1.address }
+        );
+
+        // Determine which amounts correspond to token0 and token1
+        const isQuoteToken0 = pool.token0.address.toLowerCase() === quoteToken.toLowerCase();
+        const amount0Desired = isQuoteToken0 ? requiredQuoteAmount : requiredBaseAmount;
+        const amount1Desired = isQuoteToken0 ? requiredBaseAmount : requiredQuoteAmount;
+
+        return {
+            token0: token0.address as Address,
+            token1: token1.address as Address,
+            fee: pool.fee,
+            tickLower: tickLower && !isNaN(tickLower) ? tickLower : TickMath.MIN_TICK,
+            tickUpper: tickUpper && !isNaN(tickUpper) ? tickUpper : TickMath.MAX_TICK,
+            amount0Desired,
+            amount1Desired,
+            tickSpacing: pool.tickSpacing,
+            recipient: normalizedWalletAddress as Address,
+            chainId: getChainId(chain),
+            slippageBps: 50, // 0.5% slippage
+        };
+    }, [
+        pool,
+        baseToken,
+        quoteToken,
+        normalizedWalletAddress,
+        chain,
+        requiredBaseAmount,
+        requiredQuoteAmount,
+        tickLower,
+        tickUpper,
+    ]);
+
+    // Mint position hook
+    const mintPosition = useMintPosition(mintPositionParams);
+
     // Handle navigation to previous steps if invalid parameters
     const goToChainSelection = useCallback(() => {
         const params = new URLSearchParams(searchParams.toString());
@@ -443,11 +499,6 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
         poolError,
     ]);
 
-    // Notify parent about position status
-    useEffect(() => {
-        props.onPositionCreated?.(positionStatus === 'completed');
-    }, [positionStatus, props]);
-
     // Transaction handlers
     const handleCowSwapClick = (tokenType: 'base' | 'quote') => {
         if (!pool || !insufficientFunds) return;
@@ -494,8 +545,7 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
     };
 
     const handleOpenPosition = () => {
-        // TODO: Trigger open position transaction
-        console.log('Open position');
+        mintPosition.mint();
     };
 
     // Get block explorer URL for transaction
@@ -504,6 +554,22 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
         const config = getChainConfig(chain);
         return `${config.explorer}/tx/${txHash}`;
     };
+
+    // Notify parent about position creation status with full data
+    useEffect(() => {
+        if (mintPosition.isSuccess && mintPosition.tokenId !== undefined && chain && pool && baseToken && quoteToken) {
+            props.onPositionCreated?.({
+                chain,
+                nftId: mintPosition.tokenId,
+                pool,
+                baseToken,
+                quoteToken,
+            });
+        } else if (!mintPosition.isSuccess) {
+            props.onPositionCreated?.(null);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mintPosition.isSuccess, mintPosition.tokenId]);
 
     // Show validation errors for missing parameters
     if (!chain) {
@@ -871,6 +937,17 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                                             symbol: pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol
                                         })}
                                     </span>
+                                    {baseApproval.approvalTxHash && (
+                                        <a
+                                            href={getExplorerUrl(baseApproval.approvalTxHash) || '#'}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-400 hover:text-blue-300 transition-colors"
+                                            title="View transaction on block explorer"
+                                        >
+                                            <ExternalLink className="w-4 h-4" />
+                                        </a>
+                                    )}
                                     {!baseApproval.isApproved && canExecuteTransactions && !baseApproval.isLoadingAllowance && (
                                         <button
                                             onClick={() => handleApproval('base')}
@@ -884,16 +961,6 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                                         </button>
                                     )}
                                 </div>
-                                {baseApproval.approvalTxHash && (
-                                    <a
-                                        href={getExplorerUrl(baseApproval.approvalTxHash) || '#'}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 ml-8"
-                                    >
-                                        View transaction <ExternalLink className="w-3 h-3" />
-                                    </a>
-                                )}
                                 {baseApproval.approvalError && (
                                     <div className="text-xs text-red-400 ml-8">
                                         Error: {baseApproval.approvalError.message}
@@ -917,6 +984,17 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                                             symbol: pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol
                                         })}
                                     </span>
+                                    {quoteApproval.approvalTxHash && (
+                                        <a
+                                            href={getExplorerUrl(quoteApproval.approvalTxHash) || '#'}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-400 hover:text-blue-300 transition-colors"
+                                            title="View transaction on block explorer"
+                                        >
+                                            <ExternalLink className="w-4 h-4" />
+                                        </a>
+                                    )}
                                     {!quoteApproval.isApproved && canExecuteTransactions && !quoteApproval.isLoadingAllowance && (
                                         <button
                                             onClick={() => handleApproval('quote')}
@@ -930,16 +1008,6 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                                         </button>
                                     )}
                                 </div>
-                                {quoteApproval.approvalTxHash && (
-                                    <a
-                                        href={getExplorerUrl(quoteApproval.approvalTxHash) || '#'}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 ml-8"
-                                    >
-                                        View transaction <ExternalLink className="w-3 h-3" />
-                                    </a>
-                                )}
                                 {quoteApproval.approvalError && (
                                     <div className="text-xs text-red-400 ml-8">
                                         Error: {quoteApproval.approvalError.message}
@@ -948,22 +1016,49 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                             </div>
 
                             {/* Step 3: Open Position */}
-                            <div className="flex items-center gap-3">
-                                {positionStatus === 'completed' ? (
-                                    <Check className="w-5 h-5 text-green-500" />
-                                ) : (
-                                    <Circle className="w-5 h-5 text-slate-400" />
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-3">
+                                    {mintPosition.isSuccess ? (
+                                        <Check className="w-5 h-5 text-green-500" />
+                                    ) : (
+                                        <Circle className="w-5 h-5 text-slate-400" />
+                                    )}
+                                    <span className="text-white flex-1">
+                                        {t("positionWizard.openPositionFinal.openPosition")}
+                                    </span>
+                                    {mintPosition.mintTxHash && (
+                                        <a
+                                            href={getExplorerUrl(mintPosition.mintTxHash) || '#'}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-400 hover:text-blue-300 transition-colors"
+                                            title="View transaction on block explorer"
+                                        >
+                                            <ExternalLink className="w-4 h-4" />
+                                        </a>
+                                    )}
+                                    {!mintPosition.isSuccess && canExecuteTransactions && baseApproval.isApproved && quoteApproval.isApproved && (
+                                        <button
+                                            onClick={handleOpenPosition}
+                                            disabled={mintPosition.isMinting || mintPosition.isWaitingForConfirmation}
+                                            className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-green-600/50 text-white text-sm rounded transition-colors flex items-center gap-2"
+                                        >
+                                            {(mintPosition.isMinting || mintPosition.isWaitingForConfirmation) && (
+                                                <Loader2 className="w-3 h-3 animate-spin" />
+                                            )}
+                                            {mintPosition.isWaitingForConfirmation ? 'Confirming...' : mintPosition.isMinting ? 'Minting...' : t("positionWizard.openPositionFinal.execute")}
+                                        </button>
+                                    )}
+                                </div>
+                                {mintPosition.isSuccess && mintPosition.tokenId && (
+                                    <div className="text-xs text-green-400 ml-8">
+                                        Position NFT #{mintPosition.tokenId.toString()} created successfully!
+                                    </div>
                                 )}
-                                <span className="text-white flex-1">
-                                    {t("positionWizard.openPositionFinal.openPosition")}
-                                </span>
-                                {positionStatus === 'pending' && canExecuteTransactions && baseApproval.isApproved && quoteApproval.isApproved && (
-                                    <button
-                                        onClick={handleOpenPosition}
-                                        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
-                                    >
-                                        {t("positionWizard.openPositionFinal.execute")}
-                                    </button>
+                                {mintPosition.mintError && (
+                                    <div className="text-xs text-red-400 ml-8">
+                                        Error: {mintPosition.mintError.message}
+                                    </div>
                                 )}
                             </div>
                         </div>

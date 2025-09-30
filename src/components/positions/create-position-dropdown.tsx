@@ -283,10 +283,8 @@ export function CreatePositionDropdown({
                 isOpen={showWizardModal}
                 onClose={onWizardModalClose}
                 onPositionCreated={(position) => {
-                    // Invalidate positions list to refresh the data
-                    queryClient.invalidateQueries({
-                        queryKey: QUERY_KEYS.positions,
-                    });
+                    // No longer invalidate - wizard handles optimistic update
+                    // This prevents refetch that would apply filters
                     // Notify parent
                     onImportSuccess?.(position);
                 }}

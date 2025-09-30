@@ -4,8 +4,11 @@ import { useState, useCallback, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X, ArrowLeft, ArrowRight } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { isValidChainSlug, type SupportedChainsType } from "@/config/chains";
 import type { PoolData } from "@/hooks/api/usePool";
+import { useImportPositionByNftId } from "@/hooks/api/useImportPositionByNftId";
+import { QUERY_KEYS } from "@/types/api";
 
 import { IntroStep } from "./IntroStep";
 import { ChainSelectionStep } from "./ChainSelectionStep";
@@ -39,10 +42,43 @@ export function PositionWizard({
     const [isPoolSelected, setPoolSelected] = useState<boolean>(false);
     const [isPositionConfigured, setPositionConfigured] =
         useState<boolean>(false);
-    const [isPositionCreated] = useState<boolean>(false);
+    const [isPositionCreated, setPositionCreated] = useState<boolean>(false);
+    const [createdPositionData, setCreatedPositionData] = useState<any>(null);
 
     // Mock wizard state - to be replaced with proper state management later
     const [liquidity, setLiquidity] = useState<bigint>(0n);
+
+    // Query client for cache updates
+    const queryClient = useQueryClient();
+
+    // Import mutation with optimistic update
+    const importMutation = useImportPositionByNftId({
+        onSuccess: (response) => {
+            // Optimistically update ALL positionsList queries
+            queryClient.setQueriesData(
+                { queryKey: ['positions', 'list'] },
+                (oldData: any) => {
+                    if (!oldData?.data) return oldData;
+
+                    return {
+                        ...oldData,
+                        data: {
+                            positions: [response.data.position, ...oldData.data.positions],
+                            pagination: {
+                                ...oldData.data.pagination,
+                                total: oldData.data.pagination.total + 1
+                            }
+                        }
+                    };
+                }
+            );
+
+            // Notify parent
+            onPositionCreated?.(response.data.position);
+
+            // Don't close modal here - user clicks Finish button to close
+        }
+    });
 
     // Handle closing wizard - let parent handle URL clearing if available
     const handleClose = useCallback(() => {
@@ -155,11 +191,26 @@ export function PositionWizard({
             case 5:
                 return (
                     <OpenPositionStep
-                        onPositionCreated={(isCreated) => {
-                            // TODO: Handle position creation completion
-                            if (isCreated) {
-                                onPositionCreated?.(null);
-                                handleClose();
+                        onPositionCreated={(positionData) => {
+                            // Import position immediately when transaction succeeds
+                            if (positionData) {
+                                setPositionCreated(true);
+                                setCreatedPositionData(positionData);
+
+                                // Map chain name for local fork
+                                const chainForApi = positionData.chain === 'arbitrum-fork-local'
+                                    ? 'arbitrum'
+                                    : positionData.chain;
+
+                                // Trigger import immediately
+                                importMutation.mutate({
+                                    chain: chainForApi,
+                                    nftId: positionData.nftId.toString(),
+                                    protocol: 'uniswapv3'
+                                });
+                            } else {
+                                setPositionCreated(false);
+                                setCreatedPositionData(null);
                             }
                         }}
                     />
@@ -300,13 +351,13 @@ export function PositionWizard({
                         {currentStep === TOTAL_STEPS - 1 && (
                             <button
                                 onClick={() => {
-                                    onPositionCreated?.(null); // TODO: Pass actual wizard state
+                                    // Position already imported automatically, just close modal
                                     handleClose();
                                 }}
-                                disabled={!canGoNext()}
+                                disabled={!isPositionCreated}
                                 className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-600 disabled:text-slate-400 text-white rounded-lg transition-colors"
                             >
-                                {t("positionWizard.createPosition")}
+                                {isPositionCreated ? "Finish" : t("positionWizard.createPosition")}
                             </button>
                         )}
                     </div>
