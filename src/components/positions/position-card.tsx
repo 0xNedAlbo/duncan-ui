@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -216,6 +216,15 @@ export function PositionCard({
             console.error("Failed to refresh position:", error);
         }
     };
+
+    // Auto-refresh every 60 seconds
+    useEffect(() => {
+        const intervalId = setInterval(() => {
+            handleRefresh();
+        }, 60000); // 60 seconds
+
+        return () => clearInterval(intervalId);
+    }, [position.nftId, position.pool.chain]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Deletion state
     const isDeleting = useIsDeletingPosition(
@@ -478,7 +487,7 @@ export function PositionCard({
                         {aprData ? (
                             <div className="text-right">
                                 <div className="text-xs text-slate-400 mb-0.5">
-                                    APR (7d)
+                                    est. APR
                                 </div>
                                 <div className="text-lg font-semibold text-white">
                                     {aprData.totalApr !== null
@@ -491,7 +500,7 @@ export function PositionCard({
                         ) : pnlLoading ? (
                             <div className="text-right">
                                 <div className="text-xs text-slate-400 mb-0.5">
-                                    APR (7d)
+                                    est. APR
                                 </div>
                                 <div className="text-lg font-semibold text-slate-400">
                                     --

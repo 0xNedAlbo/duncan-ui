@@ -298,7 +298,7 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
             tickSpacing: pool.tickSpacing,
             recipient: normalizedWalletAddress as Address,
             chainId: getChainId(chain),
-            slippageBps: 50, // 0.5% slippage
+            slippageBps: 100, // 1% slippage
         };
     }, [
         pool,
@@ -921,99 +921,103 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                         <h4 className="text-lg font-semibold text-white mb-4">{t("positionWizard.openPositionFinal.transactionSteps")}</h4>
 
                         <div className={`space-y-4 ${!canExecuteTransactions ? 'opacity-50' : ''}`}>
-                            {/* Step 1: Base Token Approval */}
-                            <div className="flex flex-col gap-2">
-                                <div className="flex items-center gap-3">
-                                    {baseApproval.isLoadingAllowance ? (
-                                        <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
-                                    ) : baseApproval.isApproved ? (
-                                        <Check className="w-5 h-5 text-green-500" />
-                                    ) : (
-                                        <Circle className="w-5 h-5 text-slate-400" />
-                                    )}
-                                    <span className="text-white flex-1">
-                                        {t("positionWizard.openPositionFinal.approveToken", {
-                                            amount: formatCompactValue(requiredBaseAmount, pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.decimals : pool.token1.decimals),
-                                            symbol: pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol
-                                        })}
-                                    </span>
-                                    {baseApproval.approvalTxHash && (
-                                        <a
-                                            href={getExplorerUrl(baseApproval.approvalTxHash) || '#'}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-400 hover:text-blue-300 transition-colors"
-                                            title="View transaction on block explorer"
-                                        >
-                                            <ExternalLink className="w-4 h-4" />
-                                        </a>
-                                    )}
-                                    {!baseApproval.isApproved && canExecuteTransactions && !baseApproval.isLoadingAllowance && (
-                                        <button
-                                            onClick={() => handleApproval('base')}
-                                            disabled={baseApproval.isApproving || baseApproval.isWaitingForConfirmation}
-                                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white text-sm rounded transition-colors flex items-center gap-2"
-                                        >
-                                            {(baseApproval.isApproving || baseApproval.isWaitingForConfirmation) && (
-                                                <Loader2 className="w-3 h-3 animate-spin" />
-                                            )}
-                                            {baseApproval.isWaitingForConfirmation ? 'Confirming...' : baseApproval.isApproving ? 'Approving...' : t("positionWizard.openPositionFinal.approve")}
-                                        </button>
+                            {/* Step 1: Base Token Approval - Only show if required amount > 0 */}
+                            {requiredBaseAmount > 0n && (
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-3">
+                                        {baseApproval.isLoadingAllowance ? (
+                                            <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+                                        ) : baseApproval.isApproved ? (
+                                            <Check className="w-5 h-5 text-green-500" />
+                                        ) : (
+                                            <Circle className="w-5 h-5 text-slate-400" />
+                                        )}
+                                        <span className="text-white flex-1">
+                                            {t("positionWizard.openPositionFinal.approveToken", {
+                                                amount: formatCompactValue(requiredBaseAmount, pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.decimals : pool.token1.decimals),
+                                                symbol: pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol
+                                            })}
+                                        </span>
+                                        {baseApproval.approvalTxHash && (
+                                            <a
+                                                href={getExplorerUrl(baseApproval.approvalTxHash) || '#'}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-400 hover:text-blue-300 transition-colors"
+                                                title="View transaction on block explorer"
+                                            >
+                                                <ExternalLink className="w-4 h-4" />
+                                            </a>
+                                        )}
+                                        {!baseApproval.isApproved && canExecuteTransactions && !baseApproval.isLoadingAllowance && (
+                                            <button
+                                                onClick={() => handleApproval('base')}
+                                                disabled={baseApproval.isApproving || baseApproval.isWaitingForConfirmation}
+                                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white text-sm rounded transition-colors flex items-center gap-2"
+                                            >
+                                                {(baseApproval.isApproving || baseApproval.isWaitingForConfirmation) && (
+                                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                                )}
+                                                {baseApproval.isWaitingForConfirmation ? 'Confirming...' : baseApproval.isApproving ? 'Approving...' : t("positionWizard.openPositionFinal.approve")}
+                                            </button>
+                                        )}
+                                    </div>
+                                    {baseApproval.approvalError && (
+                                        <div className="text-xs text-red-400 ml-8">
+                                            Error: {baseApproval.approvalError.message}
+                                        </div>
                                     )}
                                 </div>
-                                {baseApproval.approvalError && (
-                                    <div className="text-xs text-red-400 ml-8">
-                                        Error: {baseApproval.approvalError.message}
-                                    </div>
-                                )}
-                            </div>
+                            )}
 
-                            {/* Step 2: Quote Token Approval */}
-                            <div className="flex flex-col gap-2">
-                                <div className="flex items-center gap-3">
-                                    {quoteApproval.isLoadingAllowance ? (
-                                        <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
-                                    ) : quoteApproval.isApproved ? (
-                                        <Check className="w-5 h-5 text-green-500" />
-                                    ) : (
-                                        <Circle className="w-5 h-5 text-slate-400" />
-                                    )}
-                                    <span className="text-white flex-1">
-                                        {t("positionWizard.openPositionFinal.approveToken", {
-                                            amount: formatCompactValue(requiredQuoteAmount, pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.decimals : pool.token1.decimals),
-                                            symbol: pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol
-                                        })}
-                                    </span>
-                                    {quoteApproval.approvalTxHash && (
-                                        <a
-                                            href={getExplorerUrl(quoteApproval.approvalTxHash) || '#'}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-400 hover:text-blue-300 transition-colors"
-                                            title="View transaction on block explorer"
-                                        >
-                                            <ExternalLink className="w-4 h-4" />
-                                        </a>
-                                    )}
-                                    {!quoteApproval.isApproved && canExecuteTransactions && !quoteApproval.isLoadingAllowance && (
-                                        <button
-                                            onClick={() => handleApproval('quote')}
-                                            disabled={quoteApproval.isApproving || quoteApproval.isWaitingForConfirmation}
-                                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white text-sm rounded transition-colors flex items-center gap-2"
-                                        >
-                                            {(quoteApproval.isApproving || quoteApproval.isWaitingForConfirmation) && (
-                                                <Loader2 className="w-3 h-3 animate-spin" />
-                                            )}
-                                            {quoteApproval.isWaitingForConfirmation ? 'Confirming...' : quoteApproval.isApproving ? 'Approving...' : t("positionWizard.openPositionFinal.approve")}
-                                        </button>
+                            {/* Step 2: Quote Token Approval - Only show if required amount > 0 */}
+                            {requiredQuoteAmount > 0n && (
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-3">
+                                        {quoteApproval.isLoadingAllowance ? (
+                                            <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+                                        ) : quoteApproval.isApproved ? (
+                                            <Check className="w-5 h-5 text-green-500" />
+                                        ) : (
+                                            <Circle className="w-5 h-5 text-slate-400" />
+                                        )}
+                                        <span className="text-white flex-1">
+                                            {t("positionWizard.openPositionFinal.approveToken", {
+                                                amount: formatCompactValue(requiredQuoteAmount, pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.decimals : pool.token1.decimals),
+                                                symbol: pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol
+                                            })}
+                                        </span>
+                                        {quoteApproval.approvalTxHash && (
+                                            <a
+                                                href={getExplorerUrl(quoteApproval.approvalTxHash) || '#'}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-400 hover:text-blue-300 transition-colors"
+                                                title="View transaction on block explorer"
+                                            >
+                                                <ExternalLink className="w-4 h-4" />
+                                            </a>
+                                        )}
+                                        {!quoteApproval.isApproved && canExecuteTransactions && !quoteApproval.isLoadingAllowance && (
+                                            <button
+                                                onClick={() => handleApproval('quote')}
+                                                disabled={quoteApproval.isApproving || quoteApproval.isWaitingForConfirmation}
+                                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white text-sm rounded transition-colors flex items-center gap-2"
+                                            >
+                                                {(quoteApproval.isApproving || quoteApproval.isWaitingForConfirmation) && (
+                                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                                )}
+                                                {quoteApproval.isWaitingForConfirmation ? 'Confirming...' : quoteApproval.isApproving ? 'Approving...' : t("positionWizard.openPositionFinal.approve")}
+                                            </button>
+                                        )}
+                                    </div>
+                                    {quoteApproval.approvalError && (
+                                        <div className="text-xs text-red-400 ml-8">
+                                            Error: {quoteApproval.approvalError.message}
+                                        </div>
                                     )}
                                 </div>
-                                {quoteApproval.approvalError && (
-                                    <div className="text-xs text-red-400 ml-8">
-                                        Error: {quoteApproval.approvalError.message}
-                                    </div>
-                                )}
-                            </div>
+                            )}
 
                             {/* Step 3: Open Position */}
                             <div className="flex flex-col gap-2">
@@ -1037,7 +1041,7 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                                             <ExternalLink className="w-4 h-4" />
                                         </a>
                                     )}
-                                    {!mintPosition.isSuccess && canExecuteTransactions && baseApproval.isApproved && quoteApproval.isApproved && (
+                                    {!mintPosition.isSuccess && canExecuteTransactions && (requiredBaseAmount === 0n || baseApproval.isApproved) && (requiredQuoteAmount === 0n || quoteApproval.isApproved) && (
                                         <button
                                             onClick={handleOpenPosition}
                                             disabled={mintPosition.isMinting || mintPosition.isWaitingForConfirmation}

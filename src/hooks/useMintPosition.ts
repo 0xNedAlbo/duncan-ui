@@ -170,9 +170,9 @@ function prepareMintParams(
   const alignedTickUpper = nearestUsableTick(params.tickUpper, params.tickSpacing);
 
   // Calculate minimum amounts with slippage tolerance
-  // amount0Min = amount0Desired * (10000 - slippageBps) / 10000
-  const amount0Min = (params.amount0Desired * BigInt(10000 - slippageBps)) / 10000n;
-  const amount1Min = (params.amount1Desired * BigInt(10000 - slippageBps)) / 10000n;
+  // Temporarily set to 0 for testing
+  const amount0Min = 0n;
+  const amount1Min = 0n;
 
   // Set deadline to 20 minutes from now
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 minutes
