@@ -778,7 +778,7 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                                                             {t("positionWizard.openPositionFinal.switching")}
                                                         </>
                                                     ) : (
-                                                        t("positionWizard.openPositionFinal.switchToNetwork", { chainName: expectedChainName })
+                                                        t("positionWizard.openPositionFinal.switchToNetwork", { chainName: expectedChainName || '' })
                                                     )}
                                                 </button>
                                             </div>

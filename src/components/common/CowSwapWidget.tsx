@@ -23,7 +23,7 @@ interface CowSwapWidgetProps {
 }
 
 // Map our chain types to CowSwap chain IDs
-function getChainIdForCowSwap(chain?: SupportedChainsType): number {
+function getChainIdForCowSwap(chain?: SupportedChainsType | 'arbitrum-fork-local'): number {
     switch (chain) {
         case "ethereum":
             return 1;
@@ -51,7 +51,8 @@ export function CowSwapWidget({
                 try {
                     const widgetLib = await import("@cowprotocol/widget-react");
                     CowSwapWidgetReact = widgetLib.CowSwapWidget;
-                    TradeType = widgetLib.TradeType;
+                    // TradeType might not be directly exported, using string literal instead
+                    TradeType = { SWAP: 'swap', LIMIT: 'limit', ADVANCED: 'advanced' };
                     setWidgetLoaded(true);
                 } catch (error) {
                     console.error(
@@ -84,7 +85,7 @@ export function CowSwapWidget({
     }
 
     // Prepare widget parameters
-    const params = {
+    const params: any = {
         appCode: "DUNCAN_LIQUIDITY_MANAGER",
         chainId: getChainIdForCowSwap(chain),
         theme: "dark",

@@ -5,10 +5,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X, ArrowLeft, ArrowRight } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { isValidChainSlug, type SupportedChainsType } from "@/config/chains";
-import type { PoolData } from "@/hooks/api/usePool";
+import { isValidChainSlug } from "@/config/chains";
 import { useImportPositionByNftId } from "@/hooks/api/useImportPositionByNftId";
-import { QUERY_KEYS } from "@/types/api";
 
 import { IntroStep } from "./IntroStep";
 import { ChainSelectionStep } from "./ChainSelectionStep";
@@ -43,10 +41,6 @@ export function PositionWizard({
     const [isPositionConfigured, setPositionConfigured] =
         useState<boolean>(false);
     const [isPositionCreated, setPositionCreated] = useState<boolean>(false);
-    const [createdPositionData, setCreatedPositionData] = useState<any>(null);
-
-    // Mock wizard state - to be replaced with proper state management later
-    const [liquidity, setLiquidity] = useState<bigint>(0n);
 
     // Query client for cache updates
     const queryClient = useQueryClient();
@@ -58,7 +52,7 @@ export function PositionWizard({
             queryClient.setQueriesData(
                 { queryKey: ['positions', 'list'] },
                 (oldData: any) => {
-                    if (!oldData?.data) return oldData;
+                    if (!oldData?.data || !response.data?.position) return oldData;
 
                     return {
                         ...oldData,
@@ -74,7 +68,9 @@ export function PositionWizard({
             );
 
             // Notify parent
-            onPositionCreated?.(response.data.position);
+            if (response.data?.position) {
+                onPositionCreated?.(response.data.position);
+            }
 
             // Don't close modal here - user clicks Finish button to close
         }
@@ -195,7 +191,6 @@ export function PositionWizard({
                             // Import position immediately when transaction succeeds
                             if (positionData) {
                                 setPositionCreated(true);
-                                setCreatedPositionData(positionData);
 
                                 // Map chain name for local fork
                                 const chainForApi = positionData.chain === 'arbitrum-fork-local'
@@ -205,12 +200,10 @@ export function PositionWizard({
                                 // Trigger import immediately
                                 importMutation.mutate({
                                     chain: chainForApi,
-                                    nftId: positionData.nftId.toString(),
-                                    protocol: 'uniswapv3'
+                                    nftId: positionData.nftId.toString()
                                 });
                             } else {
                                 setPositionCreated(false);
-                                setCreatedPositionData(null);
                             }
                         }}
                     />
