@@ -3,12 +3,12 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, Loader2, ArrowLeft, Check, Circle } from "lucide-react";
-import { useAccount, useReadContract, useWatchContractEvent } from "wagmi";
+import { useAccount, useReadContract, useWatchContractEvent, useSwitchChain } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { erc20Abi, formatUnits } from "viem";
 import { useTranslations } from "@/i18n/client";
 import type { SupportedChainsType } from "@/config/chains";
-import { isValidChainSlug, getChainConfig } from "@/config/chains";
+import { isValidChainSlug, getChainConfig, getChainId } from "@/config/chains";
 import { usePool } from "@/hooks/api/usePool";
 import { isValidAddress, normalizeAddress } from "@/lib/utils/evm";
 import { PositionSizeConfig } from "./PositionSizeConfig";
@@ -22,23 +22,14 @@ interface OpenPositionStepProps {
     onPositionCreated?: (isCreated: boolean) => void;
 }
 
-// Helper function to map chain names to chain IDs using centralized config
-function getChainId(chain: SupportedChainsType): number {
-    const chainConfig = getChainConfig(chain);
-    if (!chainConfig) {
-        console.error(`Unknown chain: ${chain}`);
-        return 1; // fallback to mainnet
-    }
-    return chainConfig.id;
-}
-
 export function OpenPositionStep(props: OpenPositionStepProps) {
     const t = useTranslations();
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
-    const { address: walletAddress, isConnected } = useAccount();
+    const { address: walletAddress, isConnected, chainId: connectedChainId } = useAccount();
     const { openConnectModal } = useConnectModal();
+    const { switchChain, isPending: isSwitchingNetwork } = useSwitchChain();
 
     // URL parameter state
     const [liquidity, setLiquidity] = useState<bigint | undefined>(0n);
@@ -124,6 +115,10 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
     const normalizedWalletAddress = walletAddress ? normalizeAddress(walletAddress) : null;
     const normalizedBaseToken = baseToken ? normalizeAddress(baseToken) : null;
     const normalizedQuoteToken = quoteToken ? normalizeAddress(quoteToken) : null;
+
+    // Check if wallet is connected to the wrong network
+    const isWrongNetwork = isConnected && chain && connectedChainId !== getChainId(chain);
+    const expectedChainName = chain ? getChainConfig(chain)?.shortName : undefined;
 
     // Fetch base token balance
     const {
@@ -320,6 +315,20 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
             missingQuote
         };
     }, [isConnected, baseBalance, quoteBalance, requiredBaseAmount, requiredQuoteAmount, baseBalanceLoading, quoteBalanceLoading]);
+
+    // Check if transaction steps should be enabled
+    const canExecuteTransactions = useMemo(() => {
+        // Must be connected
+        if (!isConnected) return false;
+
+        // Must be on correct network
+        if (isWrongNetwork) return false;
+
+        // Must have sufficient funds (no insufficient funds warning)
+        if (insufficientFunds) return false;
+
+        return true;
+    }, [isConnected, isWrongNetwork, insufficientFunds]);
 
     // Pool-token validation logic
     const validation = useMemo(() => {
@@ -657,7 +666,28 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                             <div className="flex items-center gap-2">
                                 {isConnected ? (
                                     <>
-                                        {baseBalanceLoading || quoteBalanceLoading ? (
+                                        {isWrongNetwork ? (
+                                            <div className="flex items-center gap-2">
+                                                <AlertCircle className="w-4 h-4 text-amber-400" />
+                                                <span className="text-amber-400 text-sm font-medium">
+                                                    {t("positionWizard.openPositionFinal.wrongNetwork")}
+                                                </span>
+                                                <button
+                                                    onClick={() => chain && switchChain({ chainId: getChainId(chain) })}
+                                                    disabled={isSwitchingNetwork}
+                                                    className="text-amber-400 hover:text-amber-300 disabled:text-amber-400/50 underline decoration-dashed underline-offset-2 text-sm font-medium transition-colors flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed"
+                                                >
+                                                    {isSwitchingNetwork ? (
+                                                        <>
+                                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                                            {t("positionWizard.openPositionFinal.switching")}
+                                                        </>
+                                                    ) : (
+                                                        t("positionWizard.openPositionFinal.switchToNetwork", { chainName: expectedChainName })
+                                                    )}
+                                                </button>
+                                            </div>
+                                        ) : baseBalanceLoading || quoteBalanceLoading ? (
                                             <div className="flex items-center gap-2">
                                                 <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
                                                 <span className="text-slate-400 text-sm">Loading...</span>
@@ -795,7 +825,7 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                     <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-lg p-4">
                         <h4 className="text-lg font-semibold text-white mb-4">{t("positionWizard.openPositionFinal.transactionSteps")}</h4>
 
-                        <div className={`space-y-4 ${!isConnected ? 'opacity-50' : ''}`}>
+                        <div className={`space-y-4 ${!canExecuteTransactions ? 'opacity-50' : ''}`}>
                             {/* Step 1: Base Token Approval */}
                             <div className="flex items-center gap-3">
                                 {baseApprovalStatus === 'completed' ? (
@@ -809,7 +839,7 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                                         symbol: pool.token0.address.toLowerCase() === baseToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol
                                     })}
                                 </span>
-                                {baseApprovalStatus === 'pending' && isConnected && (
+                                {baseApprovalStatus === 'pending' && canExecuteTransactions && (
                                     <button
                                         onClick={() => handleApproval('base')}
                                         className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
@@ -832,7 +862,7 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                                         symbol: pool.token0.address.toLowerCase() === quoteToken.toLowerCase() ? pool.token0.symbol : pool.token1.symbol
                                     })}
                                 </span>
-                                {quoteApprovalStatus === 'pending' && isConnected && (
+                                {quoteApprovalStatus === 'pending' && canExecuteTransactions && (
                                     <button
                                         onClick={() => handleApproval('quote')}
                                         className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
@@ -852,7 +882,7 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                                 <span className="text-white flex-1">
                                     {t("positionWizard.openPositionFinal.openPosition")}
                                 </span>
-                                {positionStatus === 'pending' && isConnected && (
+                                {positionStatus === 'pending' && canExecuteTransactions && (
                                     <button
                                         onClick={handleOpenPosition}
                                         className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"

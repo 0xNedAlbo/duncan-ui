@@ -465,6 +465,9 @@
     "openPositionFinal": {
       "walletBalance": "Wallet Balance:",
       "connectWallet": "Connect Wallet",
+      "wrongNetwork": "Wrong Network",
+      "switchToNetwork": "Switch to {chainName}",
+      "switching": "Switching...",
       "transactionSteps": "Transaction Steps",
       "connectToContinue": "Connect your wallet to continue",
       "insufficientBaseOnly": "You need to buy {amount} {symbol} to match your planned position size.",
