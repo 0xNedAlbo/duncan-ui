@@ -300,6 +300,9 @@ export class PositionService {
         const liquidity = positionData[7].toString(); // liquidity is at index 7
         const normalizedOwner = normalizeAddress(owner as string);
 
+        // Determine status from on-chain liquidity
+        const status = BigInt(liquidity) === 0n ? "closed" : "active";
+
         const position = await this.prisma.position.update({
             where: {
                 userId_chain_protocol_nftId: {
@@ -312,6 +315,7 @@ export class PositionService {
             data: {
                 liquidity,
                 owner: normalizedOwner,
+                status,
                 updatedAt: new Date(),
             },
             include: {

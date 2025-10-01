@@ -185,6 +185,10 @@ export class PositionImportService {
                 );
 
             // Step 9: Save position to database
+            // Determine status from actual on-chain liquidity, not from event calculation
+            const actualLiquidity = BigInt(importedData.liquidity);
+            const actualStatus = actualLiquidity === 0n ? "closed" : "active";
+
             const savedPosition = await this.positions.createPosition({
                 chain: chain,
                 protocol: "uniswapv3",
@@ -198,7 +202,7 @@ export class PositionImportService {
                 token0IsQuote: token0IsQuote,
                 owner: importedData.owner,
                 importType: "nft",
-                status: positionStatus.status === "closed" ? "closed" : "active",
+                status: actualStatus,
             });
 
             // Step 10: Sync position events
