@@ -3,6 +3,7 @@ import { withAuthAndLogging } from "@/lib/api/withAuth";
 import { logError } from "@/lib/api/withLogging";
 import { ApiServiceFactory } from "@/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
+import { normalizeAddress, isValidAddress } from "@/lib/utils/evm";
 import type { BasicPosition } from "@/services/positions/positionService";
 import type { ApiResponse } from "@/types/api";
 
@@ -118,6 +119,289 @@ export const GET = withAuthAndLogging<ApiResponse<BasicPosition>>(
 
             return NextResponse.json(
                 { success: false, error: "Internal server error" },
+                { status: 500 }
+            );
+        }
+    }
+);
+
+/**
+ * PUT /api/positions/uniswapv3/[chain]/[nft] - Create position optimistically
+ *
+ * Creates a Uniswap V3 position record in the database with minimal validation.
+ * Useful for optimistic UI updates when opening a position on-chain.
+ *
+ * Path parameters:
+ * - chain: Blockchain network (ethereum, arbitrum, base)
+ * - nft: NFT token ID of the position
+ *
+ * Request body:
+ * - poolAddress: Pool contract address (EIP-55 checksum format)
+ * - tickLower: Lower tick boundary (integer)
+ * - tickUpper: Upper tick boundary (integer)
+ * - liquidity: Position liquidity as string (BigInt compatible)
+ * - token0IsQuote: Whether token0 is the quote asset (boolean)
+ * - owner: (optional) Wallet address of position owner
+ */
+
+interface CreatePositionRequestBody {
+    poolAddress: string;
+    tickLower: number;
+    tickUpper: number;
+    liquidity: string;
+    token0IsQuote: boolean;
+    owner?: string;
+}
+
+export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
+    async (
+        request: NextRequest,
+        { user, log },
+        params?: { chain: string; nft: string }
+    ) => {
+        try {
+            // Extract path parameters
+            const chain = params?.chain as SupportedChainsType;
+            const nftId = params?.nft;
+
+            if (!chain || !nftId) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Chain and NFT ID are required in path"
+                    },
+                    { status: 400 }
+                );
+            }
+
+            // Validate chain parameter
+            if (!SUPPORTED_CHAINS.includes(chain)) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: `Invalid chain parameter. Supported chains: ${SUPPORTED_CHAINS.join(", ")}`
+                    },
+                    { status: 400 }
+                );
+            }
+
+            // Validate NFT ID format (should be numeric)
+            if (!/^\d+$/.test(nftId)) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Invalid NFT ID format. Must be a positive integer."
+                    },
+                    { status: 400 }
+                );
+            }
+
+            // Parse request body
+            let body: CreatePositionRequestBody;
+            try {
+                body = await request.json() as CreatePositionRequestBody;
+            } catch {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Invalid JSON in request body"
+                    },
+                    { status: 400 }
+                );
+            }
+
+            // Validate required fields
+            const { poolAddress, tickLower, tickUpper, liquidity, token0IsQuote, owner } = body;
+
+            if (!poolAddress || tickLower === undefined || tickUpper === undefined || !liquidity || token0IsQuote === undefined) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Missing required fields: poolAddress, tickLower, tickUpper, liquidity, token0IsQuote"
+                    },
+                    { status: 400 }
+                );
+            }
+
+            // Validate pool address
+            if (!isValidAddress(poolAddress)) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Invalid pool address format"
+                    },
+                    { status: 400 }
+                );
+            }
+
+            // Validate owner address if provided
+            if (owner && !isValidAddress(owner)) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Invalid owner address format"
+                    },
+                    { status: 400 }
+                );
+            }
+
+            // Validate tick values
+            if (!Number.isInteger(tickLower) || !Number.isInteger(tickUpper)) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Tick values must be integers"
+                    },
+                    { status: 400 }
+                );
+            }
+
+            if (tickLower >= tickUpper) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "tickLower must be less than tickUpper"
+                    },
+                    { status: 400 }
+                );
+            }
+
+            // Validate liquidity format (should be numeric string for BigInt)
+            if (!/^\d+$/.test(liquidity)) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Invalid liquidity format. Must be a positive integer string."
+                    },
+                    { status: 400 }
+                );
+            }
+
+            // Normalize addresses
+            const normalizedPoolAddress = normalizeAddress(poolAddress);
+            const normalizedOwner = owner ? normalizeAddress(owner) : undefined;
+
+            log.debug(
+                { chain, nftId, poolAddress: normalizedPoolAddress, userId: user.userId },
+                "Creating position optimistically"
+            );
+
+            // Get service instance
+            const apiFactory = ApiServiceFactory.getInstance();
+            const positionService = apiFactory.positionService;
+
+            // Check for duplicate position
+            const positionId = {
+                userId: user.userId,
+                chain,
+                protocol: "uniswapv3" as const,
+                nftId
+            };
+
+            const existingPosition = await positionService.getPosition(positionId);
+
+            if (existingPosition) {
+                log.debug(
+                    { chain, nftId, userId: user.userId },
+                    "Position already exists - returning existing position"
+                );
+
+                return NextResponse.json({
+                    success: true,
+                    data: existingPosition,
+                    meta: {
+                        requestedAt: new Date().toISOString(),
+                        chain,
+                        nftId,
+                        existed: true
+                    }
+                });
+            }
+
+            // Check if pool exists
+            const poolService = apiFactory.poolService;
+            let pool;
+            try {
+                pool = await poolService.getPool(chain, normalizedPoolAddress);
+            } catch (error) {
+                log.error({
+                    chain,
+                    poolAddress: normalizedPoolAddress,
+                    error: error instanceof Error ? error.message : "Unknown error"
+                }, "Failed to retrieve pool");
+
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Pool not found. Please ensure the pool exists in the database before creating a position."
+                    },
+                    { status: 404 }
+                );
+            }
+
+            if (!pool) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Pool not found. Please ensure the pool exists in the database before creating a position."
+                    },
+                    { status: 404 }
+                );
+            }
+
+            // Create the position optimistically
+            const createdPosition = await positionService.createPosition({
+                chain,
+                protocol: "uniswapv3",
+                nftId,
+                userId: user.userId,
+                poolChain: chain,
+                poolAddress: normalizedPoolAddress,
+                tickLower,
+                tickUpper,
+                liquidity,
+                token0IsQuote,
+                owner: normalizedOwner,
+                importType: "nft",
+                status: "active"
+            });
+
+            log.debug(
+                {
+                    chain: createdPosition.chain,
+                    protocol: createdPosition.protocol,
+                    nftId: createdPosition.nftId,
+                    poolAddress: createdPosition.pool.poolAddress,
+                    liquidity: createdPosition.liquidity,
+                    userId: user.userId
+                },
+                "Position created successfully"
+            );
+
+            return NextResponse.json({
+                success: true,
+                data: createdPosition,
+                meta: {
+                    requestedAt: new Date().toISOString(),
+                    chain,
+                    nftId,
+                    existed: false
+                }
+            });
+
+        } catch (error) {
+            logError(log, error, {
+                endpoint: "positions/uniswapv3/[chain]/[nft]",
+                method: "PUT",
+                chain: params?.chain,
+                nftId: params?.nft
+            });
+
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: "Internal server error"
+                },
                 { status: 500 }
             );
         }
