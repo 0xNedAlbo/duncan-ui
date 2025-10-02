@@ -6,16 +6,14 @@ import { X, Loader2, AlertCircle, Check } from "lucide-react";
 import { useAccount } from "wagmi";
 import type { Address } from "viem";
 import { useQueryClient } from "@tanstack/react-query";
-import { getChainId } from "@/config/chains";
+import { getChainId, type SupportedChainsType } from "@/config/chains";
 import { normalizeAddress } from "@/lib/utils/evm";
 import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { useTokenApproval } from "@/hooks/useTokenApproval";
 import { useIncreaseLiquidity } from "@/hooks/useIncreaseLiquidity";
-import { sortTokens } from "@/lib/utils/uniswap-v3/utils";
 import { usePool } from "@/hooks/api/usePool";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { usePositionValidation } from "@/hooks/positions/usePositionValidation";
-import { usePositionSizeCalculation } from "@/hooks/usePositionSizeCalculation";
 import { PositionSizeConfig } from "./wizard/PositionSizeConfig";
 import { InsufficientFundsAlert } from "./wizard/InsufficientFundsAlert";
 import type { BasicPosition } from "@/services/positions/positionService";
@@ -52,7 +50,7 @@ export function IncreasePositionModal({
         isLoading: isPoolLoading,
         refetch: refetchPool,
     } = usePool({
-        chain: position.pool.chain,
+        chain: position.pool.chain as SupportedChainsType,
         poolAddress: position.pool.poolAddress,
         enabled: isOpen && !!position.pool.poolAddress,
     });
@@ -74,7 +72,7 @@ export function IncreasePositionModal({
     const isWrongNetwork = !!(
         isConnected &&
         position.pool.chain &&
-        connectedChainId !== getChainId(position.pool.chain)
+        connectedChainId !== getChainId(position.pool.chain as SupportedChainsType)
     );
 
     // Token info for components
@@ -108,14 +106,14 @@ export function IncreasePositionModal({
     const baseBalanceHook = useTokenBalance({
         tokenAddress: normalizedBaseToken,
         walletAddress: normalizedWalletAddress,
-        chainId: position.pool.chain ? getChainId(position.pool.chain) : undefined,
+        chainId: position.pool.chain ? getChainId(position.pool.chain as SupportedChainsType) : undefined,
         enabled: isConnected && !!normalizedWalletAddress && isOpen,
     });
 
     const quoteBalanceHook = useTokenBalance({
         tokenAddress: normalizedQuoteToken,
         walletAddress: normalizedWalletAddress,
-        chainId: position.pool.chain ? getChainId(position.pool.chain) : undefined,
+        chainId: position.pool.chain ? getChainId(position.pool.chain as SupportedChainsType) : undefined,
         enabled: isConnected && !!normalizedWalletAddress && isOpen,
     });
 
@@ -161,7 +159,7 @@ export function IncreasePositionModal({
         tokenAddress: normalizedBaseToken as Address | null,
         ownerAddress: normalizedWalletAddress as Address | null,
         requiredAmount: requiredBaseAmount,
-        chainId: position.pool.chain ? getChainId(position.pool.chain) : undefined,
+        chainId: position.pool.chain ? getChainId(position.pool.chain as SupportedChainsType) : undefined,
         enabled:
             isConnected &&
             !isWrongNetwork &&
@@ -175,7 +173,7 @@ export function IncreasePositionModal({
         tokenAddress: normalizedQuoteToken as Address | null,
         ownerAddress: normalizedWalletAddress as Address | null,
         requiredAmount: requiredQuoteAmount,
-        chainId: position.pool.chain ? getChainId(position.pool.chain) : undefined,
+        chainId: position.pool.chain ? getChainId(position.pool.chain as SupportedChainsType) : undefined,
         enabled:
             isConnected &&
             !isWrongNetwork &&
@@ -224,10 +222,6 @@ export function IncreasePositionModal({
             return null;
         }
 
-        const { token0, token1 } = sortTokens(
-            { address: pool.token0.address },
-            { address: pool.token1.address }
-        );
 
         const isQuoteToken0 =
             pool.token0.address.toLowerCase() === quoteTokenAddress.toLowerCase();
@@ -242,7 +236,7 @@ export function IncreasePositionModal({
             tokenId: BigInt(position.nftId),
             amount0Desired,
             amount1Desired,
-            chainId: getChainId(position.pool.chain),
+            chainId: getChainId(position.pool.chain as SupportedChainsType),
             slippageBps: 1000,
         };
     }, [
@@ -380,7 +374,7 @@ export function IncreasePositionModal({
                                         tickUpper={position.tickUpper}
                                         liquidity={liquidity}
                                         onLiquidityChange={onLiquidityChange}
-                                        chain={position.pool.chain}
+                                        chain={position.pool.chain as SupportedChainsType}
                                         onRefreshPool={refetchPool}
                                         label="Increase position by:"
                                     />
@@ -394,7 +388,7 @@ export function IncreasePositionModal({
                                         baseToken={baseTokenAddress}
                                         quoteToken={quoteTokenAddress}
                                         isConnected={isConnected}
-                                        chain={position.pool.chain}
+                                        chain={position.pool.chain as SupportedChainsType}
                                     />
                                 )}
 

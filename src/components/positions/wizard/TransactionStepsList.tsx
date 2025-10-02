@@ -35,7 +35,7 @@ interface TransactionStepsListProps {
     canExecuteTransactions: boolean;
     isConnected: boolean;
     chain: SupportedChainsType;
-    onApproval: (token: 'base' | 'quote') => void;
+    onApproval: (_token: 'base' | 'quote') => void;
     onOpenPosition: () => void;
 }
 

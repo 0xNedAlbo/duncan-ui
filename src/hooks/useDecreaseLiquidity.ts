@@ -170,7 +170,7 @@ export function useDecreaseLiquidity(params: DecreaseLiquidityParams | null): Us
  */
 function prepareDecreaseParams(
   params: DecreaseLiquidityParams,
-  slippageBps: number
+  _slippageBps: number
 ) {
   // Set deadline to 20 minutes from now
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 minutes

@@ -82,9 +82,9 @@ export function PositionWizard({
             }
 
             // Trigger background refresh to sync events/PnL/APR/curve
-            if (response.data && user?.userId) {
+            if (response.data && user?.id) {
                 refreshMutation.mutate({
-                    userId: user.userId,
+                    userId: user.id,
                     chain: response.data.chain,
                     protocol: response.data.protocol,
                     nftId: response.data.nftId

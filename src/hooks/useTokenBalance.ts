@@ -1,5 +1,5 @@
 import { useReadContract, useWatchContractEvent } from "wagmi";
-import { erc20Abi, type Address } from "viem";
+import { erc20Abi } from "viem";
 import { normalizeAddress } from "@/lib/utils/evm";
 
 export interface UseTokenBalanceParams {
