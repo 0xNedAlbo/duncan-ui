@@ -318,34 +318,23 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
                 });
             }
 
-            // Check if pool exists
+            // Ensure pool exists (creates if not found, updates if exists)
             const poolService = apiFactory.poolService;
-            let pool;
             try {
-                pool = await poolService.getPool(chain, normalizedPoolAddress);
+                await poolService.createPool(chain, normalizedPoolAddress);
             } catch (error) {
                 log.error({
                     chain,
                     poolAddress: normalizedPoolAddress,
                     error: error instanceof Error ? error.message : "Unknown error"
-                }, "Failed to retrieve pool");
+                }, "Failed to create or update pool");
 
                 return NextResponse.json(
                     {
                         success: false,
-                        error: "Pool not found. Please ensure the pool exists in the database before creating a position."
+                        error: "Failed to load pool data from blockchain"
                     },
-                    { status: 404 }
-                );
-            }
-
-            if (!pool) {
-                return NextResponse.json(
-                    {
-                        success: false,
-                        error: "Pool not found. Please ensure the pool exists in the database before creating a position."
-                    },
-                    { status: 404 }
+                    { status: 500 }
                 );
             }
 

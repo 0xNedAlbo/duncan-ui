@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Address } from 'viem';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { nearestUsableTick } from '@uniswap/v3-sdk';
 import {
   NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
   NONFUNGIBLE_POSITION_MANAGER_ABI,
@@ -40,13 +39,18 @@ export interface UseMintPositionResult {
 /**
  * Hook to mint a new Uniswap V3 position NFT
  *
+ * IMPORTANT: tickLower and tickUpper must be pre-aligned to the pool's tickSpacing.
+ * Use the priceToTick() utility from '@/lib/utils/uniswap-v3/price' which automatically
+ * applies nearestUsableTick() to ensure proper alignment.
+ *
  * Handles:
- * - Aligning ticks to pool's tick spacing
+ * - Validating ticks are aligned to pool's tick spacing
  * - Calculating slippage-adjusted minimum amounts (default 0.5%)
  * - Setting transaction deadline (20 minutes from now)
  * - Minting the position NFT via NonfungiblePositionManager
  *
- * @param params - Position parameters including tokens, ticks, amounts, and chain
+ * @param params - Position parameters including tokens, pre-aligned ticks, amounts, and chain
+ * @throws Error if ticks are not aligned to tickSpacing
  */
 export function useMintPosition(params: MintPositionParams | null): UseMintPositionResult {
   const [mintError, setMintError] = useState<Error | null>(null);
@@ -159,20 +163,34 @@ export function useMintPosition(params: MintPositionParams | null): UseMintPosit
 }
 
 /**
- * Prepare mint parameters with tick alignment and slippage protection
+ * Prepare mint parameters with tick validation and slippage protection
+ *
+ * Note: Ticks must be pre-aligned to tickSpacing before calling this function.
+ * Use priceToTick() utility which automatically aligns ticks via nearestUsableTick().
  */
 function prepareMintParams(
   params: MintPositionParams,
   slippageBps: number
 ) {
-  // Align ticks to tick spacing
-  const alignedTickLower = nearestUsableTick(params.tickLower, params.tickSpacing);
-  const alignedTickUpper = nearestUsableTick(params.tickUpper, params.tickSpacing);
+  // Validate that ticks are pre-aligned to tick spacing
+  // This catches bugs early and ensures consistency with amount calculations
+  if (params.tickLower % params.tickSpacing !== 0) {
+    throw new Error(
+      `tickLower (${params.tickLower}) must be aligned to tickSpacing (${params.tickSpacing}). ` +
+      `Use priceToTick() to ensure proper alignment.`
+    );
+  }
+  if (params.tickUpper % params.tickSpacing !== 0) {
+    throw new Error(
+      `tickUpper (${params.tickUpper}) must be aligned to tickSpacing (${params.tickSpacing}). ` +
+      `Use priceToTick() to ensure proper alignment.`
+    );
+  }
 
-  // Calculate minimum amounts with slippage tolerance
-  // Temporarily set to 0 for testing
-  const amount0Min = 0n;
-  const amount1Min = 0n;
+  // Calculate slippage-adjusted minimum amounts
+  // Apply slippage tolerance: amountMin = amountDesired * (10000 - slippageBps) / 10000
+  const amount0Min = (params.amount0Desired * BigInt(10000 - slippageBps)) / 10000n;
+  const amount1Min = (params.amount1Desired * BigInt(10000 - slippageBps)) / 10000n;
 
   // Set deadline to 20 minutes from now
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 minutes
@@ -181,8 +199,8 @@ function prepareMintParams(
     token0: params.token0,
     token1: params.token1,
     fee: params.fee,
-    tickLower: alignedTickLower,
-    tickUpper: alignedTickUpper,
+    tickLower: params.tickLower,  // Use as-is (already validated as aligned)
+    tickUpper: params.tickUpper,  // Use as-is (already validated as aligned)
     amount0Desired: params.amount0Desired,
     amount1Desired: params.amount1Desired,
     amount0Min,
