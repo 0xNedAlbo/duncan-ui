@@ -68,8 +68,11 @@ export class PositionPnLService {
 
   /**
    * Calculate unclaimed fees for a position
+   *
+   * Returns pure fee amounts (excluding uncollected principal from decreased liquidity)
+   * and their value in quote token units.
    */
-  private async getUnclaimedFees(
+  async getUnclaimedFees(
     positionId: PositionId
   ): Promise<UnclaimedFeesWithMetadata> {
     // 1. Fetch position using PositionService

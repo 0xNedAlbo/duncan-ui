@@ -9,11 +9,27 @@ import type { CurveData } from "@/components/charts/mini-pnl-curve";
 import type { AprBreakdown } from "@/services/positions/positionAprService";
 import type { ApiResponse } from "@/types/api";
 
+/**
+ * Unclaimed fee amounts for fee collection
+ * Excludes uncollected principal from decreased liquidity
+ */
+export interface UnclaimedFeeAmounts {
+    /** Fee amount in base token (BigInt as string) */
+    baseTokenAmount: string;
+    /** Fee amount in quote token (BigInt as string) */
+    quoteTokenAmount: string;
+    /** Fee amount in token0 (BigInt as string, for contract call) */
+    token0Amount: string;
+    /** Fee amount in token1 (BigInt as string, for contract call) */
+    token1Amount: string;
+}
+
 export interface PositionDetailsData {
     basicData: BasicPosition;
     pnlBreakdown: PnlBreakdown | null;
     aprBreakdown: AprBreakdown | null;
     curveData: CurveData | null;
+    unclaimedFeesAmounts: UnclaimedFeeAmounts | null;
 }
 
 export interface PositionDetailsResponse extends ApiResponse<PositionDetailsData> {
@@ -153,15 +169,17 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
                 "Loading complete position data (PnL + APR + curve)"
             );
 
+            // Position ID for service calls
+            const positionId = {
+                userId: user.userId,
+                chain: position.chain,
+                protocol: position.protocol,
+                nftId: position.nftId
+            };
+
             // First, load PnL data since APR breakdown depends on unclaimed fees
             let pnlBreakdown = null;
             try {
-                const positionId = {
-                    userId: user.userId,
-                    chain: position.chain,
-                    protocol: position.protocol,
-                    nftId: position.nftId
-                };
                 pnlBreakdown = await positionPnLService.getPnlBreakdown(positionId);
                 log.debug(
                     { chain: position.chain, protocol: position.protocol, nftId: position.nftId, pnlBreakdown },
@@ -171,6 +189,43 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
                 log.debug(
                     { chain: position.chain, protocol: position.protocol, nftId: position.nftId, error: error instanceof Error ? error.message : String(error) },
                     "PnL calculation failed"
+                );
+            }
+
+            // Load unclaimed fee amounts (pure fees excluding uncollected principal)
+            let unclaimedFeesAmounts: UnclaimedFeeAmounts | null = null;
+            try {
+                const unclaimedFeesData = await positionPnLService.getUnclaimedFees(positionId);
+
+                // Convert to token0/token1 amounts for contract call
+                const token0Amount = position.token0IsQuote
+                    ? unclaimedFeesData.quoteTokenAmount
+                    : unclaimedFeesData.baseTokenAmount;
+                const token1Amount = position.token0IsQuote
+                    ? unclaimedFeesData.baseTokenAmount
+                    : unclaimedFeesData.quoteTokenAmount;
+
+                unclaimedFeesAmounts = {
+                    baseTokenAmount: unclaimedFeesData.baseTokenAmount.toString(),
+                    quoteTokenAmount: unclaimedFeesData.quoteTokenAmount.toString(),
+                    token0Amount: token0Amount.toString(),
+                    token1Amount: token1Amount.toString(),
+                };
+
+                log.debug(
+                    {
+                        chain: position.chain,
+                        protocol: position.protocol,
+                        nftId: position.nftId,
+                        baseAmount: unclaimedFeesAmounts.baseTokenAmount,
+                        quoteAmount: unclaimedFeesAmounts.quoteTokenAmount
+                    },
+                    "Unclaimed fees amounts calculated"
+                );
+            } catch (error) {
+                log.debug(
+                    { chain: position.chain, protocol: position.protocol, nftId: position.nftId, error: error instanceof Error ? error.message : String(error) },
+                    "Unclaimed fees calculation failed"
                 );
             }
 
@@ -243,7 +298,8 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
                 basicData: position,
                 pnlBreakdown,
                 aprBreakdown,
-                curveData
+                curveData,
+                unclaimedFeesAmounts
             };
 
             return NextResponse.json({

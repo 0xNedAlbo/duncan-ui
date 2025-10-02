@@ -36,6 +36,7 @@ import { PositionActionsMenu } from "./position-actions-menu";
 import { DeletePositionModal } from "./delete-position-modal";
 import { IncreasePositionModal } from "./IncreasePositionModal";
 import { WithdrawPositionModal } from "./WithdrawPositionModal";
+import { CollectFeesModal } from "./CollectFeesModal";
 
 interface PositionCardProps {
     position: BasicPosition;
@@ -57,6 +58,7 @@ export function PositionCard({
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showIncreaseModal, setShowIncreaseModal] = useState(false);
     const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+    const [showCollectFeesModal, setShowCollectFeesModal] = useState(false);
     const [copied, setCopied] = useState(false);
     const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
@@ -590,6 +592,7 @@ export function PositionCard({
                             {t("dashboard.positions.actions.withdraw")}
                         </button>
                         <button
+                            onClick={() => setShowCollectFeesModal(true)}
                             className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
                                 pnlDisplayValues.unclaimedFees && pnlDisplayValues.unclaimedFees > 0n
                                     ? "text-amber-300 bg-amber-900/20 hover:bg-amber-800/30 border-amber-600/50 cursor-pointer"
@@ -624,6 +627,15 @@ export function PositionCard({
                 isOpen={showWithdrawModal}
                 onClose={() => setShowWithdrawModal(false)}
                 position={currentPosition}
+            />
+
+            {/* Collect Fees Modal */}
+            <CollectFeesModal
+                isOpen={showCollectFeesModal}
+                onClose={() => setShowCollectFeesModal(false)}
+                position={currentPosition}
+                unclaimedFeesQuoteValue={pnlDisplayValues.unclaimedFees || 0n}
+                unclaimedFeesAmounts={positionDetails?.unclaimedFeesAmounts || null}
             />
         </>
     );

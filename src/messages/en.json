@@ -218,6 +218,15 @@
         "increaseDeposit": "Increase Position",
         "withdraw": "Withdraw",
         "collectFees": "Collect Fees"
+      },
+      "collectFees": {
+        "title": "Collect Fees",
+        "description": "Collect unclaimed trading fees",
+        "preview": "You will receive:",
+        "totalValue": "Total value:",
+        "execute": "Collect Fees",
+        "success": "Fees collected successfully!",
+        "error": "Transaction Error"
       }
     }
   },

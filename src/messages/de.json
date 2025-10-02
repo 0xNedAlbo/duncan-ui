@@ -221,6 +221,15 @@
         "increaseDeposit": "Position erhöhen",
         "withdraw": "Abheben",
         "collectFees": "Gebühren einsammeln"
+      },
+      "collectFees": {
+        "title": "Gebühren einsammeln",
+        "description": "Nicht abgeholte Handelsgebühren einsammeln",
+        "preview": "Du erhältst:",
+        "totalValue": "Gesamtwert:",
+        "execute": "Gebühren einsammeln",
+        "success": "Gebühren erfolgreich eingesammelt!",
+        "error": "Transaktionsfehler"
       }
     }
   },
