@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { PencilLine, PencilOff } from "lucide-react";
+import { PencilLine, PencilOff, RefreshCw } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useTranslations } from "@/i18n/client";
@@ -30,6 +30,7 @@ interface PositionSizeConfigProps {
     onLiquidityChange: (liquidity: bigint) => void;
     initialMode?: "quote" | "base" | "custom";
     chain?: SupportedChainsType;
+    onRefreshPool?: () => Promise<any>;
 }
 
 type InputMode = "quote" | "base" | "custom";
@@ -44,6 +45,7 @@ export function PositionSizeConfig({
     onLiquidityChange,
     initialMode = "custom",
     chain,
+    onRefreshPool,
 }: PositionSizeConfigProps) {
     const t = useTranslations();
     const { isConnected } = useAccount();
@@ -55,6 +57,7 @@ export function PositionSizeConfig({
     const [quoteAmountBigInt, setQuoteAmountBigInt] = useState<bigint>(0n);
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
+    const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
     // Use the position size calculation hook
     const positionCalculation = usePositionSizeCalculation({
@@ -170,6 +173,20 @@ export function PositionSizeConfig({
         }
     }, []);
 
+    // Refresh pool data handler
+    const handleRefreshPool = useCallback(async () => {
+        if (!onRefreshPool || isRefreshing) return;
+
+        setIsRefreshing(true);
+        try {
+            await onRefreshPool();
+        } catch (error) {
+            console.error("Error refreshing pool data:", error);
+        } finally {
+            setIsRefreshing(false);
+        }
+    }, [onRefreshPool, isRefreshing]);
+
     // Calculate resulting token amounts for display from liquidity prop
     const displayAmounts = useMemo(() => {
         if (liquidity === 0n || pool.currentTick === null) {
@@ -221,6 +238,16 @@ export function PositionSizeConfig({
                     Position Size:
                 </span>
                 <div className="flex items-center gap-2">
+                    {onRefreshPool && (
+                        <button
+                            onClick={handleRefreshPool}
+                            disabled={isRefreshing}
+                            className="p-1 hover:bg-slate-700 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Refresh pool price"
+                        >
+                            <RefreshCw className={`w-4 h-4 text-slate-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        </button>
+                    )}
                     <span className="text-white font-medium">
                         {displayAmounts.baseDisplay} {baseToken.symbol} +{" "}
                         {displayAmounts.quoteDisplay} {quoteToken.symbol}

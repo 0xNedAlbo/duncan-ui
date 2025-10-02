@@ -1,6 +1,4 @@
-"use client"
-
-;
+"use client";
 
 import { useEffect, useMemo, useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -45,13 +43,30 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
-    const { address: walletAddress, isConnected, chainId: connectedChainId } = useAccount();
+    const {
+        address: walletAddress,
+        isConnected,
+        chainId: connectedChainId,
+    } = useAccount();
 
     // Extract URL parameters
-    const { chain, poolAddress, baseToken, quoteToken, tickLower, tickUpper, liquidity } = usePositionParams();
+    const {
+        chain,
+        poolAddress,
+        baseToken,
+        quoteToken,
+        tickLower,
+        tickUpper,
+        liquidity,
+    } = usePositionParams();
 
     // Navigation callbacks
-    const { goToChainSelection, goToTokenPairSelection, goToPoolSelection, goToPositionConfig } = usePositionNavigation();
+    const {
+        goToChainSelection,
+        goToTokenPairSelection,
+        goToPoolSelection,
+        goToPositionConfig,
+    } = usePositionNavigation();
 
     // Load pool data
     const {
@@ -59,6 +74,7 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
         isLoading: isPoolLoading,
         isError: isPoolError,
         error: poolError,
+        refetch: refetchPool,
     } = usePool({
         chain,
         poolAddress,
@@ -66,31 +82,48 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
     });
 
     // Normalize addresses
-    const normalizedWalletAddress = walletAddress ? normalizeAddress(walletAddress) : null;
+    const normalizedWalletAddress = walletAddress
+        ? normalizeAddress(walletAddress)
+        : null;
     const normalizedBaseToken = baseToken ? normalizeAddress(baseToken) : null;
-    const normalizedQuoteToken = quoteToken ? normalizeAddress(quoteToken) : null;
+    const normalizedQuoteToken = quoteToken
+        ? normalizeAddress(quoteToken)
+        : null;
 
     // Check if wallet is connected to the wrong network
-    const isWrongNetwork = !!(isConnected && chain && connectedChainId !== getChainId(chain));
+    const isWrongNetwork = !!(
+        isConnected &&
+        chain &&
+        connectedChainId !== getChainId(chain)
+    );
 
     // Fetch token balances using the reusable hook
     const baseBalanceHook = useTokenBalance({
         tokenAddress: normalizedBaseToken,
         walletAddress: normalizedWalletAddress,
         chainId: chain ? getChainId(chain) : undefined,
-        enabled: isConnected && !!normalizedWalletAddress && !!normalizedBaseToken,
+        enabled:
+            isConnected && !!normalizedWalletAddress && !!normalizedBaseToken,
     });
 
     const quoteBalanceHook = useTokenBalance({
         tokenAddress: normalizedQuoteToken,
         walletAddress: normalizedWalletAddress,
         chainId: chain ? getChainId(chain) : undefined,
-        enabled: isConnected && !!normalizedWalletAddress && !!normalizedQuoteToken,
+        enabled:
+            isConnected && !!normalizedWalletAddress && !!normalizedQuoteToken,
     });
 
     // Calculate required token amounts from liquidity
     const requiredAmounts = useMemo(() => {
-        if (!pool || !liquidity || liquidity === 0n || pool.currentTick === null || !baseToken || !quoteToken) {
+        if (
+            !pool ||
+            !liquidity ||
+            liquidity === 0n ||
+            pool.currentTick === null ||
+            !baseToken ||
+            !quoteToken
+        ) {
             return { baseAmount: 0n, quoteAmount: 0n };
         }
 
@@ -102,13 +135,17 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                 tickUpper && !isNaN(tickUpper) ? tickUpper : TickMath.MAX_TICK
             );
 
-            const isQuoteToken0 = pool.token0.address.toLowerCase() === quoteToken.toLowerCase();
+            const isQuoteToken0 =
+                pool.token0.address.toLowerCase() === quoteToken.toLowerCase();
             const baseAmount = isQuoteToken0 ? token1Amount : token0Amount;
             const quoteAmount = isQuoteToken0 ? token0Amount : token1Amount;
 
             return { baseAmount, quoteAmount };
         } catch (error) {
-            console.error("Error calculating required amounts from liquidity:", error);
+            console.error(
+                "Error calculating required amounts from liquidity:",
+                error
+            );
             return { baseAmount: 0n, quoteAmount: 0n };
         }
     }, [pool, liquidity, tickLower, tickUpper, baseToken, quoteToken]);
@@ -122,7 +159,12 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
         ownerAddress: normalizedWalletAddress as Address | null,
         requiredAmount: requiredBaseAmount,
         chainId: chain ? getChainId(chain) : undefined,
-        enabled: isConnected && !isWrongNetwork && !!normalizedBaseToken && !!normalizedWalletAddress && requiredBaseAmount > 0n,
+        enabled:
+            isConnected &&
+            !isWrongNetwork &&
+            !!normalizedBaseToken &&
+            !!normalizedWalletAddress &&
+            requiredBaseAmount > 0n,
     });
 
     const quoteApproval = useTokenApproval({
@@ -130,35 +172,47 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
         ownerAddress: normalizedWalletAddress as Address | null,
         requiredAmount: requiredQuoteAmount,
         chainId: chain ? getChainId(chain) : undefined,
-        enabled: isConnected && !isWrongNetwork && !!normalizedQuoteToken && !!normalizedWalletAddress && requiredQuoteAmount > 0n,
+        enabled:
+            isConnected &&
+            !isWrongNetwork &&
+            !!normalizedQuoteToken &&
+            !!normalizedWalletAddress &&
+            requiredQuoteAmount > 0n,
     });
 
     // Validation
-    const { validation, insufficientFunds, canExecuteTransactions } = usePositionValidation({
-        isPoolLoading,
-        isPoolError,
-        pool,
-        baseToken,
-        quoteToken,
-        liquidity,
-        tickLower,
-        tickUpper,
-        poolError,
-        isConnected,
-        isWrongNetwork,
-        baseBalance: baseBalanceHook.balance,
-        quoteBalance: quoteBalanceHook.balance,
-        requiredBaseAmount,
-        requiredQuoteAmount,
-        baseBalanceLoading: baseBalanceHook.isLoading,
-        quoteBalanceLoading: quoteBalanceHook.isLoading,
-        baseApproval,
-        quoteApproval,
-    });
+    const { validation, insufficientFunds, canExecuteTransactions } =
+        usePositionValidation({
+            isPoolLoading,
+            isPoolError,
+            pool,
+            baseToken,
+            quoteToken,
+            liquidity,
+            tickLower,
+            tickUpper,
+            poolError,
+            isConnected,
+            isWrongNetwork,
+            baseBalance: baseBalanceHook.balance,
+            quoteBalance: quoteBalanceHook.balance,
+            requiredBaseAmount,
+            requiredQuoteAmount,
+            baseBalanceLoading: baseBalanceHook.isLoading,
+            quoteBalanceLoading: quoteBalanceHook.isLoading,
+            baseApproval,
+            quoteApproval,
+        });
 
     // Prepare mint position parameters
     const mintPositionParams = useMemo(() => {
-        if (!pool || !baseToken || !quoteToken || !normalizedWalletAddress || !chain) {
+        if (
+            !pool ||
+            !baseToken ||
+            !quoteToken ||
+            !normalizedWalletAddress ||
+            !chain
+        ) {
             return null;
         }
 
@@ -171,22 +225,29 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
             { address: pool.token1.address }
         );
 
-        const isQuoteToken0 = pool.token0.address.toLowerCase() === quoteToken.toLowerCase();
-        const amount0Desired = isQuoteToken0 ? requiredQuoteAmount : requiredBaseAmount;
-        const amount1Desired = isQuoteToken0 ? requiredBaseAmount : requiredQuoteAmount;
+        const isQuoteToken0 =
+            pool.token0.address.toLowerCase() === quoteToken.toLowerCase();
+        const amount0Desired = isQuoteToken0
+            ? requiredQuoteAmount
+            : requiredBaseAmount;
+        const amount1Desired = isQuoteToken0
+            ? requiredBaseAmount
+            : requiredQuoteAmount;
 
         return {
             token0: token0.address as Address,
             token1: token1.address as Address,
             fee: pool.fee,
-            tickLower: tickLower && !isNaN(tickLower) ? tickLower : TickMath.MIN_TICK,
-            tickUpper: tickUpper && !isNaN(tickUpper) ? tickUpper : TickMath.MAX_TICK,
+            tickLower:
+                tickLower && !isNaN(tickLower) ? tickLower : TickMath.MIN_TICK,
+            tickUpper:
+                tickUpper && !isNaN(tickUpper) ? tickUpper : TickMath.MAX_TICK,
             amount0Desired,
             amount1Desired,
             tickSpacing: pool.tickSpacing,
             recipient: normalizedWalletAddress as Address,
             chainId: getChainId(chain),
-            slippageBps: 100,
+            slippageBps: 1000,
         };
     }, [
         pool,
@@ -204,15 +265,18 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
     const mintPosition = useMintPosition(mintPositionParams);
 
     // Handle liquidity changes
-    const onLiquidityChange = useCallback((newLiquidity: bigint) => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("liquidity", newLiquidity.toString());
-        router.replace(pathname + "?" + params.toString());
-    }, [router, pathname, searchParams]);
+    const onLiquidityChange = useCallback(
+        (newLiquidity: bigint) => {
+            const params = new URLSearchParams(searchParams.toString());
+            params.set("liquidity", newLiquidity.toString());
+            router.replace(pathname + "?" + params.toString());
+        },
+        [router, pathname, searchParams]
+    );
 
     // Transaction handlers
-    const handleApproval = (token: 'base' | 'quote') => {
-        if (token === 'base') {
+    const handleApproval = (token: "base" | "quote") => {
+        if (token === "base") {
             baseApproval.approve();
         } else {
             quoteApproval.approve();
@@ -225,15 +289,28 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
 
     // Notify parent about position creation status
     useEffect(() => {
-        if (mintPosition.isSuccess && mintPosition.tokenId !== undefined && chain && pool && baseToken && quoteToken) {
+        if (
+            mintPosition.isSuccess &&
+            mintPosition.tokenId !== undefined &&
+            chain &&
+            pool &&
+            baseToken &&
+            quoteToken
+        ) {
             props.onPositionCreated?.({
                 chain,
                 nftId: mintPosition.tokenId,
                 pool,
                 baseToken,
                 quoteToken,
-                tickLower: tickLower && !isNaN(tickLower) ? tickLower : TickMath.MIN_TICK,
-                tickUpper: tickUpper && !isNaN(tickUpper) ? tickUpper : TickMath.MAX_TICK,
+                tickLower:
+                    tickLower && !isNaN(tickLower)
+                        ? tickLower
+                        : TickMath.MIN_TICK,
+                tickUpper:
+                    tickUpper && !isNaN(tickUpper)
+                        ? tickUpper
+                        : TickMath.MAX_TICK,
                 liquidity: (liquidity || 0n).toString(),
             });
         } else if (!mintPosition.isSuccess) {
@@ -244,11 +321,18 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
 
     // Validation error states
     if (!chain) {
-        return <ValidationErrorCard type="chain" onNavigate={goToChainSelection} />;
+        return (
+            <ValidationErrorCard type="chain" onNavigate={goToChainSelection} />
+        );
     }
 
     if (!baseToken || !quoteToken) {
-        return <ValidationErrorCard type="tokens" onNavigate={goToTokenPairSelection} />;
+        return (
+            <ValidationErrorCard
+                type="tokens"
+                onNavigate={goToTokenPairSelection}
+            />
+        );
     }
 
     if (
@@ -256,11 +340,18 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
         (!isPoolLoading && !validation.hasValidPool) ||
         (!isPoolLoading && !validation.hasValidTokens)
     ) {
-        return <ValidationErrorCard type="pool" onNavigate={goToPoolSelection} />;
+        return (
+            <ValidationErrorCard type="pool" onNavigate={goToPoolSelection} />
+        );
     }
 
     if (!isPoolLoading && !validation.hasValidParams) {
-        return <ValidationErrorCard type="params" onNavigate={goToPositionConfig} />;
+        return (
+            <ValidationErrorCard
+                type="params"
+                onNavigate={goToPositionConfig}
+            />
+        );
     }
 
     return (
@@ -281,106 +372,143 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                     <div className="flex items-center gap-3">
                         <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
                         <div>
-                            <h5 className="text-red-400 font-medium">Pool Loading Error</h5>
-                            <p className="text-red-200/80 text-sm mt-1">{validation.error}</p>
+                            <h5 className="text-red-400 font-medium">
+                                Pool Loading Error
+                            </h5>
+                            <p className="text-red-200/80 text-sm mt-1">
+                                {validation.error}
+                            </p>
                         </div>
                     </div>
                 </div>
             )}
 
             {/* Main Content */}
-            {!isPoolLoading && validation.hasValidPool && validation.hasValidTokens && validation.hasValidParams && pool && baseToken && quoteToken && (
-                <div className="space-y-6">
-                    {/* Position Size Configuration */}
-                    <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-lg p-4">
-                        <PositionSizeConfig
-                            pool={pool}
-                            baseToken={{
-                                address: baseToken,
-                                symbol: pool.token0.address.toLowerCase() === baseToken.toLowerCase()
-                                    ? pool.token0.symbol
-                                    : pool.token1.symbol,
-                                decimals: pool.token0.address.toLowerCase() === baseToken.toLowerCase()
-                                    ? pool.token0.decimals
-                                    : pool.token1.decimals,
-                                logoUrl: pool.token0.address.toLowerCase() === baseToken.toLowerCase()
-                                    ? pool.token0.logoUrl
-                                    : pool.token1.logoUrl,
-                            }}
-                            quoteToken={{
-                                address: quoteToken,
-                                symbol: pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
-                                    ? pool.token0.symbol
-                                    : pool.token1.symbol,
-                                decimals: pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
-                                    ? pool.token0.decimals
-                                    : pool.token1.decimals,
-                                logoUrl: pool.token0.address.toLowerCase() === quoteToken.toLowerCase()
-                                    ? pool.token0.logoUrl
-                                    : pool.token1.logoUrl,
-                            }}
-                            tickLower={tickLower && !isNaN(tickLower) ? tickLower : TickMath.MIN_TICK}
-                            tickUpper={tickUpper && !isNaN(tickUpper) ? tickUpper : TickMath.MAX_TICK}
-                            liquidity={liquidity || 0n}
-                            onLiquidityChange={onLiquidityChange}
-                            chain={chain}
-                        />
-                    </div>
-
-                    {/* Wallet Balance Section */}
-                    <WalletBalanceSection
-                        pool={pool}
-                        baseToken={baseToken}
-                        quoteToken={quoteToken}
-                        baseBalance={baseBalanceHook.balance}
-                        quoteBalance={quoteBalanceHook.balance}
-                        baseBalanceLoading={baseBalanceHook.isLoading}
-                        quoteBalanceLoading={quoteBalanceHook.isLoading}
-                        isConnected={isConnected}
-                        isWrongNetwork={isWrongNetwork}
-                        chain={chain}
-                    />
-
-                    {/* Balance Loading State */}
-                    {isConnected && (baseBalanceHook.isLoading || quoteBalanceHook.isLoading) && requiredBaseAmount > 0n && requiredQuoteAmount > 0n && (
+            {!isPoolLoading &&
+                validation.hasValidPool &&
+                validation.hasValidTokens &&
+                validation.hasValidParams &&
+                pool &&
+                baseToken &&
+                quoteToken && (
+                    <div className="space-y-6">
+                        {/* Position Size Configuration */}
                         <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-lg p-4">
-                            <div className="flex items-center gap-3">
-                                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-                                <span className="text-slate-400 text-sm">Checking wallet balances...</span>
-                            </div>
+                            <PositionSizeConfig
+                                pool={pool}
+                                baseToken={{
+                                    address: baseToken,
+                                    symbol:
+                                        pool.token0.address.toLowerCase() ===
+                                        baseToken.toLowerCase()
+                                            ? pool.token0.symbol
+                                            : pool.token1.symbol,
+                                    decimals:
+                                        pool.token0.address.toLowerCase() ===
+                                        baseToken.toLowerCase()
+                                            ? pool.token0.decimals
+                                            : pool.token1.decimals,
+                                    logoUrl:
+                                        pool.token0.address.toLowerCase() ===
+                                        baseToken.toLowerCase()
+                                            ? pool.token0.logoUrl
+                                            : pool.token1.logoUrl,
+                                }}
+                                quoteToken={{
+                                    address: quoteToken,
+                                    symbol:
+                                        pool.token0.address.toLowerCase() ===
+                                        quoteToken.toLowerCase()
+                                            ? pool.token0.symbol
+                                            : pool.token1.symbol,
+                                    decimals:
+                                        pool.token0.address.toLowerCase() ===
+                                        quoteToken.toLowerCase()
+                                            ? pool.token0.decimals
+                                            : pool.token1.decimals,
+                                    logoUrl:
+                                        pool.token0.address.toLowerCase() ===
+                                        quoteToken.toLowerCase()
+                                            ? pool.token0.logoUrl
+                                            : pool.token1.logoUrl,
+                                }}
+                                tickLower={
+                                    tickLower && !isNaN(tickLower)
+                                        ? tickLower
+                                        : TickMath.MIN_TICK
+                                }
+                                tickUpper={
+                                    tickUpper && !isNaN(tickUpper)
+                                        ? tickUpper
+                                        : TickMath.MAX_TICK
+                                }
+                                liquidity={liquidity || 0n}
+                                onLiquidityChange={onLiquidityChange}
+                                chain={chain}
+                                onRefreshPool={refetchPool}
+                            />
                         </div>
-                    )}
 
-                    {/* Insufficient Funds Information */}
-                    {insufficientFunds && (
-                        <InsufficientFundsAlert
-                            insufficientFunds={insufficientFunds}
+                        {/* Wallet Balance Section */}
+                        <WalletBalanceSection
                             pool={pool}
                             baseToken={baseToken}
                             quoteToken={quoteToken}
+                            baseBalance={baseBalanceHook.balance}
+                            quoteBalance={quoteBalanceHook.balance}
+                            baseBalanceLoading={baseBalanceHook.isLoading}
+                            quoteBalanceLoading={quoteBalanceHook.isLoading}
                             isConnected={isConnected}
+                            isWrongNetwork={isWrongNetwork}
                             chain={chain}
                         />
-                    )}
 
-                    {/* Transaction Steps */}
-                    <TransactionStepsList
-                        pool={pool}
-                        baseToken={baseToken}
-                        quoteToken={quoteToken}
-                        requiredBaseAmount={requiredBaseAmount}
-                        requiredQuoteAmount={requiredQuoteAmount}
-                        baseApproval={baseApproval}
-                        quoteApproval={quoteApproval}
-                        mintPosition={mintPosition}
-                        canExecuteTransactions={canExecuteTransactions}
-                        isConnected={isConnected}
-                        chain={chain}
-                        onApproval={handleApproval}
-                        onOpenPosition={handleOpenPosition}
-                    />
-                </div>
-            )}
+                        {/* Balance Loading State */}
+                        {isConnected &&
+                            (baseBalanceHook.isLoading ||
+                                quoteBalanceHook.isLoading) &&
+                            requiredBaseAmount > 0n &&
+                            requiredQuoteAmount > 0n && (
+                                <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-lg p-4">
+                                    <div className="flex items-center gap-3">
+                                        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                                        <span className="text-slate-400 text-sm">
+                                            Checking wallet balances...
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                        {/* Insufficient Funds Information */}
+                        {insufficientFunds && (
+                            <InsufficientFundsAlert
+                                insufficientFunds={insufficientFunds}
+                                pool={pool}
+                                baseToken={baseToken}
+                                quoteToken={quoteToken}
+                                isConnected={isConnected}
+                                chain={chain}
+                            />
+                        )}
+
+                        {/* Transaction Steps */}
+                        <TransactionStepsList
+                            pool={pool}
+                            baseToken={baseToken}
+                            quoteToken={quoteToken}
+                            requiredBaseAmount={requiredBaseAmount}
+                            requiredQuoteAmount={requiredQuoteAmount}
+                            baseApproval={baseApproval}
+                            quoteApproval={quoteApproval}
+                            mintPosition={mintPosition}
+                            canExecuteTransactions={canExecuteTransactions}
+                            isConnected={isConnected}
+                            chain={chain}
+                            onApproval={handleApproval}
+                            onOpenPosition={handleOpenPosition}
+                        />
+                    </div>
+                )}
         </div>
     );
 }

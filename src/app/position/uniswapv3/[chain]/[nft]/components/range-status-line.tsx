@@ -118,6 +118,17 @@ export function RangeStatusLine({ position }: RangeStatusLineProps) {
         }
     }
 
+    // Helper function to determine label alignment based on position
+    const getLabelAlignment = (position: number): 'left' | 'center' | 'right' => {
+        if (position <= 15) return 'left';
+        if (position >= 85) return 'right';
+        return 'center';
+    };
+
+    const lowerAlignment = getLabelAlignment(lowerPosition);
+    const upperAlignment = getLabelAlignment(upperPosition);
+    const currentAlignment = getLabelAlignment(currentPosition);
+
     return (
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
             <div className="relative h-28 py-4">
@@ -126,15 +137,30 @@ export function RangeStatusLine({ position }: RangeStatusLineProps) {
 
                 {/* Lower Price - Below Line */}
                 <div
-                    className="absolute top-1/2 -translate-x-1/2"
-                    style={{ left: `${lowerPosition}%` }}
+                    className="absolute top-1/2"
+                    style={{
+                        left: `${lowerPosition}%`,
+                        transform: lowerAlignment === 'left' ? 'translateX(0)' : lowerAlignment === 'right' ? 'translateX(-100%)' : 'translateX(-50%)'
+                    }}
                 >
                     {/* Scale Marker */}
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-white text-lg font-bold">
+                    <div
+                        className="absolute -top-3 text-white text-lg font-bold"
+                        style={{
+                            left: lowerAlignment === 'left' ? '0' : lowerAlignment === 'right' ? 'auto' : '50%',
+                            right: lowerAlignment === 'right' ? '0' : 'auto',
+                            transform: lowerAlignment === 'center' ? 'translateX(-50%)' : 'none'
+                        }}
+                    >
                         |
                     </div>
                     {/* Label Below */}
-                    <div className="flex flex-col items-center px-2 pt-3">
+                    <div
+                        className="flex flex-col px-2 pt-3"
+                        style={{
+                            alignItems: lowerAlignment === 'left' ? 'flex-start' : lowerAlignment === 'right' ? 'flex-end' : 'center'
+                        }}
+                    >
                         <div className="text-sm font-medium text-white whitespace-nowrap">
                             {formattedLowerPrice} {quoteToken.symbol}
                         </div>
@@ -144,15 +170,30 @@ export function RangeStatusLine({ position }: RangeStatusLineProps) {
 
                 {/* Upper Price - Below Line */}
                 <div
-                    className="absolute top-1/2 -translate-x-1/2"
-                    style={{ left: `${upperPosition}%` }}
+                    className="absolute top-1/2"
+                    style={{
+                        left: `${upperPosition}%`,
+                        transform: upperAlignment === 'left' ? 'translateX(0)' : upperAlignment === 'right' ? 'translateX(-100%)' : 'translateX(-50%)'
+                    }}
                 >
                     {/* Scale Marker */}
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-white text-lg font-bold">
+                    <div
+                        className="absolute -top-3 text-white text-lg font-bold"
+                        style={{
+                            left: upperAlignment === 'left' ? '0' : upperAlignment === 'right' ? 'auto' : '50%',
+                            right: upperAlignment === 'right' ? '0' : 'auto',
+                            transform: upperAlignment === 'center' ? 'translateX(-50%)' : 'none'
+                        }}
+                    >
                         |
                     </div>
                     {/* Label Below */}
-                    <div className="flex flex-col items-center px-2 pt-3">
+                    <div
+                        className="flex flex-col px-2 pt-3"
+                        style={{
+                            alignItems: upperAlignment === 'left' ? 'flex-start' : upperAlignment === 'right' ? 'flex-end' : 'center'
+                        }}
+                    >
                         <div className="text-sm font-medium text-white whitespace-nowrap">
                             {formattedUpperPrice} {quoteToken.symbol}
                         </div>
@@ -162,11 +203,22 @@ export function RangeStatusLine({ position }: RangeStatusLineProps) {
 
                 {/* Current Price - Above Line */}
                 <div
-                    className="absolute top-1/2 -translate-x-1/2"
-                    style={{ left: `${currentPosition}%` }}
+                    className="absolute top-1/2"
+                    style={{
+                        left: `${currentPosition}%`,
+                        transform: currentAlignment === 'left' ? 'translateX(0)' : currentAlignment === 'right' ? 'translateX(-100%)' : 'translateX(-50%)'
+                    }}
                 >
                     {/* Label Above */}
-                    <div className="flex flex-col items-center px-3 absolute bottom-3 left-1/2 -translate-x-1/2">
+                    <div
+                        className="flex flex-col px-3 absolute bottom-3"
+                        style={{
+                            left: currentAlignment === 'left' ? '0' : currentAlignment === 'right' ? 'auto' : '50%',
+                            right: currentAlignment === 'right' ? '0' : 'auto',
+                            transform: currentAlignment === 'center' ? 'translateX(-50%)' : 'none',
+                            alignItems: currentAlignment === 'left' ? 'flex-start' : currentAlignment === 'right' ? 'flex-end' : 'center'
+                        }}
+                    >
                         <div className={`text-sm font-medium whitespace-nowrap ${isInRange ? 'text-green-400' : 'text-red-400'}`}>
                             {formattedCurrentPrice} {quoteToken.symbol}
                         </div>
@@ -182,7 +234,14 @@ export function RangeStatusLine({ position }: RangeStatusLineProps) {
                         </div>
                     </div>
                     {/* Scale Marker - Colored */}
-                    <div className={`absolute -top-3 left-1/2 -translate-x-1/2 text-lg font-bold ${isInRange ? 'text-green-400' : 'text-red-400'}`}>
+                    <div
+                        className={`absolute -top-3 text-lg font-bold ${isInRange ? 'text-green-400' : 'text-red-400'}`}
+                        style={{
+                            left: currentAlignment === 'left' ? '0' : currentAlignment === 'right' ? 'auto' : '50%',
+                            right: currentAlignment === 'right' ? '0' : 'auto',
+                            transform: currentAlignment === 'center' ? 'translateX(-50%)' : 'none'
+                        }}
+                    >
                         |
                     </div>
                 </div>
