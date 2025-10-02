@@ -21,6 +21,7 @@ import type { CurveData } from "@/components/charts/mini-pnl-curve";
 import { calculatePositionStates, calculateBreakEvenPrice } from "@/lib/utils/position-states";
 import { MiniPnLCurve } from "@/components/charts/mini-pnl-curve";
 import { tickToPrice } from "@/lib/utils/uniswap-v3/price";
+import { RangeStatusLine } from "./range-status-line";
 
 interface OverviewTabProps {
     position: BasicPosition;
@@ -97,6 +98,9 @@ export function OverviewTab({ position, pnlBreakdown, curveData }: OverviewTabPr
 
     return (
         <div className="space-y-6">
+            {/* Range Status Line */}
+            <RangeStatusLine position={position} />
+
             {/* Position Values Overview */}
             <div className={`grid grid-cols-1 gap-6 ${breakEvenPrice !== null ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
                 {/* Current Value */}
