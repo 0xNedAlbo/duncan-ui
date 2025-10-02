@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { SiweMessage } from "siwe"
 import { prisma } from "@/lib/prisma"
 import { normalizeAddress } from "@/lib/utils/evm"
+import { isAddressWhitelisted } from "@/lib/utils/whitelist"
 
 declare module "next-auth" {
   interface Session {
@@ -51,6 +52,12 @@ export const authOptions: NextAuthOptions = {
           })
 
           if (!user) {
+            // Check whitelist before creating new user
+            if (!isAddressWhitelisted(address)) {
+              console.error('Registration blocked: Address not whitelisted:', address)
+              return null
+            }
+
             // Auto-create user on first SIWE login
             user = await prisma.user.create({
               data: {
