@@ -382,6 +382,7 @@ export function IncreasePositionModal({
                                         onLiquidityChange={onLiquidityChange}
                                         chain={position.pool.chain}
                                         onRefreshPool={refetchPool}
+                                        label="Increase position by:"
                                     />
                                 </div>
 

@@ -31,6 +31,7 @@ interface PositionSizeConfigProps {
     initialMode?: "quote" | "base" | "custom";
     chain?: SupportedChainsType;
     onRefreshPool?: () => Promise<any>;
+    label?: string; // Custom label for the header (default: "Position Size:")
 }
 
 type InputMode = "quote" | "base" | "custom";
@@ -46,6 +47,7 @@ export function PositionSizeConfig({
     initialMode = "custom",
     chain,
     onRefreshPool,
+    label = "Position Size:",
 }: PositionSizeConfigProps) {
     const t = useTranslations();
     const { isConnected } = useAccount();
@@ -235,7 +237,7 @@ export function PositionSizeConfig({
             {/* Header with Position Size display */}
             <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-300 font-medium">
-                    Position Size:
+                    {label}
                 </span>
                 <div className="flex items-center gap-2">
                     {onRefreshPool && (
