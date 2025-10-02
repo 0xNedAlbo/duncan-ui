@@ -15,7 +15,7 @@
     "test:run": "vitest run",
     "db:seed": "npx tsx prisma/seed.ts",
     "postinstall": "prisma generate",
-    "deploy": "prisma generate && next build"
+    "deploy": "prisma generate && prisma migrate deploy && next build"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
