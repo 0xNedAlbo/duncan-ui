@@ -31,6 +31,9 @@ interface CreatedPositionData {
     pool: any;
     baseToken: string;
     quoteToken: string;
+    tickLower: number;
+    tickUpper: number;
+    liquidity: string; // BigInt as string
 }
 
 interface OpenPositionStepProps {
@@ -229,6 +232,9 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                 pool,
                 baseToken,
                 quoteToken,
+                tickLower: tickLower && !isNaN(tickLower) ? tickLower : TickMath.MIN_TICK,
+                tickUpper: tickUpper && !isNaN(tickUpper) ? tickUpper : TickMath.MAX_TICK,
+                liquidity: (liquidity || 0n).toString(),
             });
         } else if (!mintPosition.isSuccess) {
             props.onPositionCreated?.(null);

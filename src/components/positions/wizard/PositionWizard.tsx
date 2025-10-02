@@ -5,8 +5,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X, ArrowLeft, ArrowRight } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAccount } from "wagmi";
 import { isValidChainSlug } from "@/config/chains";
-import { useImportPositionByNftId } from "@/hooks/api/useImportPositionByNftId";
+import { useCreatePositionOptimistic } from "@/hooks/api/useCreatePositionOptimistic";
+import { usePositionRefresh } from "@/hooks/api/usePositionRefresh";
+import { useSession } from "next-auth/react";
+import { compareAddresses } from "@/lib/utils/evm";
 
 import { IntroStep } from "./IntroStep";
 import { ChainSelectionStep } from "./ChainSelectionStep";
@@ -45,19 +49,24 @@ export function PositionWizard({
     // Query client for cache updates
     const queryClient = useQueryClient();
 
-    // Import mutation with optimistic update
-    const importMutation = useImportPositionByNftId({
+    // Get wallet address and user session
+    const { address: walletAddress } = useAccount();
+    const { data: session } = useSession();
+    const user = session?.user;
+
+    // Optimistic position creation mutation
+    const createOptimisticMutation = useCreatePositionOptimistic({
         onSuccess: (response) => {
-            // Optimistically update ALL positionsList queries
+            // Optimistically update positions list
             queryClient.setQueriesData(
                 { queryKey: ['positions', 'list'] },
                 (oldData: any) => {
-                    if (!oldData?.data || !response.data?.position) return oldData;
+                    if (!oldData?.data || !response.data) return oldData;
 
                     return {
                         ...oldData,
                         data: {
-                            positions: [response.data.position, ...oldData.data.positions],
+                            positions: [response.data, ...oldData.data.positions],
                             pagination: {
                                 ...oldData.data.pagination,
                                 total: oldData.data.pagination.total + 1
@@ -67,14 +76,25 @@ export function PositionWizard({
                 }
             );
 
-            // Notify parent
-            if (response.data?.position) {
-                onPositionCreated?.(response.data.position);
+            // Notify parent immediately
+            if (response.data) {
+                onPositionCreated?.(response.data);
             }
 
-            // Don't close modal here - user clicks Finish button to close
+            // Trigger background refresh to sync events/PnL/APR/curve
+            if (response.data && user?.userId) {
+                refreshMutation.mutate({
+                    userId: user.userId,
+                    chain: response.data.chain,
+                    protocol: response.data.protocol,
+                    nftId: response.data.nftId
+                });
+            }
         }
     });
+
+    // Background refresh mutation
+    const refreshMutation = usePositionRefresh();
 
     // Handle closing wizard - let parent handle URL clearing if available
     const handleClose = useCallback(() => {
@@ -188,7 +208,7 @@ export function PositionWizard({
                 return (
                     <OpenPositionStep
                         onPositionCreated={(positionData) => {
-                            // Import position immediately when transaction succeeds
+                            // Create position optimistically when transaction succeeds
                             if (positionData) {
                                 setPositionCreated(true);
 
@@ -197,10 +217,23 @@ export function PositionWizard({
                                     ? 'arbitrum'
                                     : positionData.chain;
 
-                                // Trigger import immediately
-                                importMutation.mutate({
+                                // Determine token0IsQuote based on address ordering
+                                // token0 < token1 by address, so if baseToken > quoteToken, then token0 is quote
+                                const token0IsQuote = compareAddresses(
+                                    positionData.baseToken,
+                                    positionData.quoteToken
+                                ) > 0;
+
+                                // Create position optimistically (fast - returns immediately)
+                                createOptimisticMutation.mutate({
                                     chain: chainForApi,
-                                    nftId: positionData.nftId.toString()
+                                    nftId: positionData.nftId.toString(),
+                                    poolAddress: positionData.pool.poolAddress,
+                                    tickLower: positionData.tickLower,
+                                    tickUpper: positionData.tickUpper,
+                                    liquidity: positionData.liquidity,
+                                    token0IsQuote,
+                                    owner: walletAddress
                                 });
                             } else {
                                 setPositionCreated(false);
