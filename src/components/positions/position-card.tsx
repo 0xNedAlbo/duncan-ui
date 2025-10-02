@@ -35,6 +35,7 @@ import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy";
 import { PositionActionsMenu } from "./position-actions-menu";
 import { DeletePositionModal } from "./delete-position-modal";
 import { IncreasePositionModal } from "./IncreasePositionModal";
+import { WithdrawPositionModal } from "./WithdrawPositionModal";
 
 interface PositionCardProps {
     position: BasicPosition;
@@ -55,6 +56,7 @@ export function PositionCard({
     const queryClient = useQueryClient();
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showIncreaseModal, setShowIncreaseModal] = useState(false);
+    const [showWithdrawModal, setShowWithdrawModal] = useState(false);
     const [copied, setCopied] = useState(false);
     const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
@@ -576,6 +578,7 @@ export function PositionCard({
                             {t("dashboard.positions.actions.increaseDeposit")}
                         </button>
                         <button
+                            onClick={() => setShowWithdrawModal(true)}
                             className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
                                 currentPosition.status === "closed"
                                     ? "text-slate-500 bg-slate-800/30 border-slate-600/30 cursor-not-allowed"
@@ -614,6 +617,13 @@ export function PositionCard({
                 isOpen={showIncreaseModal}
                 onClose={() => setShowIncreaseModal(false)}
                 position={position}
+            />
+
+            {/* Withdraw Position Modal */}
+            <WithdrawPositionModal
+                isOpen={showWithdrawModal}
+                onClose={() => setShowWithdrawModal(false)}
+                position={currentPosition}
             />
         </>
     );
