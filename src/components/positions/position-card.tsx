@@ -115,20 +115,20 @@ export function PositionCard({
         }
     };
 
-    const getRangeStatus = () => {
-        if (position.status !== "active") {
+    const getRangeStatus = (pos: typeof position) => {
+        if (pos.status !== "active") {
             return null;
         }
 
         // Check if position is in range based on current tick
         if (
-            position.pool.currentTick !== undefined &&
-            position.pool.currentTick !== null
+            pos.pool.currentTick !== undefined &&
+            pos.pool.currentTick !== null
         ) {
-            const currentTick = position.pool.currentTick;
+            const currentTick = pos.pool.currentTick;
             if (
-                currentTick >= position.tickLower &&
-                currentTick <= position.tickUpper
+                currentTick >= pos.tickLower &&
+                currentTick <= pos.tickUpper
             ) {
                 return "in-range";
             } else {
@@ -187,6 +187,10 @@ export function PositionCard({
     const pnlData = positionDetails?.pnlBreakdown;
     const aprData = positionDetails?.aprBreakdown;
     const curveData = positionDetails?.curveData || null;
+
+    // Use fresh position data from details query if available, otherwise fall back to prop
+    // This ensures status badges update when position is refreshed
+    const currentPosition = positionDetails?.basicData || position;
 
     // Loading states
     const pnlLoading = detailsLoading && Boolean(position.nftId);
@@ -311,19 +315,19 @@ export function PositionCard({
                                     {/* Status Badge */}
                                     <span
                                         className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(
-                                            position.status || "active"
+                                            currentPosition.status || "active"
                                         )}`}
                                     >
-                                        {getStatusText(position.status || "active")}
+                                        {getStatusText(currentPosition.status || "active")}
                                     </span>
                                     {/* Range Status Badge - only for active positions */}
-                                    {position.status === "active" && (
+                                    {currentPosition.status === "active" && (
                                         <span
                                             className={`px-2 py-0.5 rounded text-xs font-medium border ${getRangeStatusColor(
-                                                getRangeStatus()
+                                                getRangeStatus(currentPosition)
                                             )}`}
                                         >
-                                            {getRangeStatusText(getRangeStatus())}
+                                            {getRangeStatusText(getRangeStatus(currentPosition))}
                                         </span>
                                     )}
                                 </div>
@@ -562,22 +566,22 @@ export function PositionCard({
                         <button
                             onClick={() => setShowIncreaseModal(true)}
                             className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
-                                position.status === "closed"
+                                currentPosition.status === "closed"
                                     ? "text-slate-500 bg-slate-800/30 border-slate-600/30 cursor-not-allowed"
                                     : "text-green-300 bg-green-900/20 hover:bg-green-800/30 border-green-600/50 cursor-pointer"
                             }`}
-                            disabled={position.status === "closed"}
+                            disabled={currentPosition.status === "closed"}
                         >
                             <Plus className="w-3 h-3" />
                             {t("dashboard.positions.actions.increaseDeposit")}
                         </button>
                         <button
                             className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
-                                position.status === "closed"
+                                currentPosition.status === "closed"
                                     ? "text-slate-500 bg-slate-800/30 border-slate-600/30 cursor-not-allowed"
                                     : "text-green-300 bg-green-900/20 hover:bg-green-800/30 border-green-600/50 cursor-pointer"
                             }`}
-                            disabled={position.status === "closed"}
+                            disabled={currentPosition.status === "closed"}
                         >
                             <Minus className="w-3 h-3" />
                             {t("dashboard.positions.actions.withdraw")}
