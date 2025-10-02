@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, Loader2, ArrowLeft } from "lucide-react";
-import type { SupportedChainsType } from "@/config/chains";
-import { isValidChainSlug } from "@/config/chains";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { usePool } from "@/hooks/api/usePool";
-import { isValidAddress, normalizeAddress } from "@/lib/utils/evm";
+import { normalizeAddress } from "@/lib/utils/evm";
+import { usePositionParams } from "@/hooks/positions/usePositionParams";
+import { usePositionNavigation } from "@/hooks/positions/usePositionNavigation";
+import { ValidationErrorCard } from "./ValidationErrorCard";
 import { PositionSizeConfig } from "./PositionSizeConfig";
 import { PositionAprPreview } from "./PositionAprPreview";
 import { PositionRangeConfig } from "./PositionRangeConfig";
@@ -23,57 +24,11 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    // Get URL parameters and validate
+    // Extract URL parameters using reusable hook
+    const { chain, poolAddress, baseToken, quoteToken, tickLower, tickUpper, liquidity } = usePositionParams();
 
-    const [liquidity, setLiquidity] = useState<bigint | undefined>(0n);
-    const [tickLower, setTickLower] = useState<number>(NaN);
-    const [tickUpper, setTickUpper] = useState<number>(NaN);
-    const [chain, setChain] = useState<SupportedChainsType | undefined>();
-    const [poolAddress, setPoolAddress] = useState<string | undefined>();
-    const [baseToken, setBaseToken] = useState<string | undefined>();
-    const [quoteToken, setQuoteToken] = useState<string | undefined>();
-
-    useEffect(() => {
-        const chainParam = searchParams.get("chain") || "";
-        const isValidChain = chainParam && isValidChainSlug(chainParam);
-        setChain(
-            isValidChain ? (chainParam as SupportedChainsType) : undefined
-        );
-
-        const tickLowerParam = parseInt(searchParams.get("tickLower") || "");
-        setTickLower(tickLowerParam);
-        const tickUpperParam = parseInt(searchParams.get("tickUpper") || "");
-        setTickUpper(tickUpperParam);
-
-        const liquidityParam = searchParams.get("liquidity");
-        if (liquidityParam) {
-            try {
-                setLiquidity(BigInt(liquidityParam));
-            } catch {
-                setLiquidity(undefined);
-            }
-        } else {
-            setLiquidity(undefined);
-        }
-        const poolAddressParam = searchParams.get("poolAddress");
-        if (poolAddressParam && isValidAddress(poolAddressParam)) {
-            setPoolAddress(normalizeAddress(poolAddressParam));
-        } else {
-            setPoolAddress(undefined);
-        }
-        const baseTokenParam = searchParams.get("baseToken");
-        if (baseTokenParam && isValidAddress(baseTokenParam)) {
-            setBaseToken(normalizeAddress(baseTokenParam));
-        } else {
-            setBaseToken(undefined);
-        }
-        const quoteTokenParam = searchParams.get("quoteToken");
-        if (quoteTokenParam && isValidAddress(quoteTokenParam)) {
-            setQuoteToken(normalizeAddress(quoteTokenParam));
-        } else {
-            setQuoteToken(undefined);
-        }
-    }, [searchParams]);
+    // Navigation callbacks using reusable hook
+    const { goToChainSelection, goToTokenPairSelection, goToPoolSelection } = usePositionNavigation();
 
     // Use pool hook to load and validate pool
     const {
@@ -166,42 +121,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         }
     }, [isPoolLoading, isPoolError, pool, tickLower, tickUpper, baseToken, quoteToken, router, pathname, searchParams]);
 
-    // Handle navigation to previous steps if invalid parameters
-    const goToChainSelection = useCallback(() => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("step", "1");
-        params.delete("chain");
-        params.delete("baseToken");
-        params.delete("quoteToken");
-        params.delete("poolAddress");
-        params.delete("tickLower");
-        params.delete("tickUpper");
-        params.delete("liquidity");
-        router.push(pathname + "?" + params.toString());
-    }, [router, pathname, searchParams]);
-
-    const goToTokenPairSelection = useCallback(() => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("step", "2");
-        params.delete("baseToken");
-        params.delete("quoteToken");
-        params.delete("poolAddress");
-        params.delete("tickLower");
-        params.delete("tickUpper");
-        params.delete("liquidity");
-        router.push(pathname + "?" + params.toString());
-    }, [router, pathname, searchParams]);
-
-    const goToPoolSelection = useCallback(() => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("step", "3");
-        params.delete("poolAddress");
-        params.delete("tickLower");
-        params.delete("tickUpper");
-        params.delete("liquidity");
-        router.push(pathname + "?" + params.toString());
-    }, [router, pathname, searchParams]);
-
+    // URL parameter update handlers
     function onLiquidityChange(newLiquidity: bigint) {
         const params = new URLSearchParams(searchParams.toString());
         params.set("liquidity", newLiquidity.toString());
@@ -326,61 +246,13 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         props.onConfigSelect?.(validation.isValid);
     }, [validation.isValid, props]);
 
-    // Show validation errors for missing parameters
+    // Validation error states using reusable component
     if (!chain) {
-        return (
-            <div className="space-y-6">
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                        <div>
-                            <h5 className="text-red-400 font-medium">
-                                Invalid Chain Selected
-                            </h5>
-                            <p className="text-red-200/80 text-sm mt-1">
-                                Please select a valid blockchain network to
-                                continue with position configuration.
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={goToChainSelection}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        Go to Chain Selection
-                    </button>
-                </div>
-            </div>
-        );
+        return <ValidationErrorCard type="chain" onNavigate={goToChainSelection} />;
     }
 
     if (!baseToken || !quoteToken) {
-        return (
-            <div className="space-y-6">
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                        <div>
-                            <h5 className="text-red-400 font-medium">
-                                Token Pair Required
-                            </h5>
-                            <p className="text-red-200/80 text-sm mt-1">
-                                Please select both base and quote tokens to
-                                continue with position configuration.
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={goToTokenPairSelection}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        Go to Token Pair Selection
-                    </button>
-                </div>
-            </div>
-        );
+        return <ValidationErrorCard type="tokens" onNavigate={goToTokenPairSelection} />;
     }
 
     if (
@@ -388,31 +260,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         (!isPoolLoading && !validation.hasValidPool) ||
         (!isPoolLoading && !validation.hasValidTokens)
     ) {
-        return (
-            <div className="space-y-6">
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                        <div>
-                            <h5 className="text-red-400 font-medium">
-                                Pool Selection Required
-                            </h5>
-                            <p className="text-red-200/80 text-sm mt-1">
-                                Please select a pool to continue with position
-                                configuration.
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={goToPoolSelection}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        Go to Pool Selection
-                    </button>
-                </div>
-            </div>
-        );
+        return <ValidationErrorCard type="pool" onNavigate={goToPoolSelection} />;
     }
 
     return (

@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
     Loader2,
     AlertCircle,
     Zap,
     ExternalLink,
-    ArrowLeft,
 } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import {
@@ -20,6 +19,8 @@ import type { SupportedChainsType } from "@/config/chains";
 import { isValidChainSlug } from "@/config/chains";
 import { getExplorerAddressUrl } from "@/lib/utils/evm";
 import { formatFeePercentage } from "@/lib/contracts/uniswapV3Factory";
+import { usePositionNavigation } from "@/hooks/positions/usePositionNavigation";
+import { ValidationErrorCard } from "./ValidationErrorCard";
 
 interface PoolSelectionStepProps {
     // eslint-disable-next-line no-unused-vars
@@ -41,25 +42,8 @@ export function PoolSelectionStep(props: PoolSelectionStepProps) {
     const quoteTokenParam = searchParams.get("quoteToken");
     const selectedPoolParam = searchParams.get("poolAddress");
 
-    // Handle navigation to previous steps if invalid parameters
-    const goToChainSelection = useCallback(() => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("step", "1");
-        params.delete("chain");
-        params.delete("baseToken");
-        params.delete("quoteToken");
-        params.delete("poolAddress");
-        router.push(pathname + "?" + params.toString());
-    }, [router, pathname, searchParams]);
-
-    const goToTokenPairSelection = useCallback(() => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("step", "2");
-        params.delete("baseToken");
-        params.delete("quoteToken");
-        params.delete("poolAddress");
-        router.push(pathname + "?" + params.toString());
-    }, [router, pathname, searchParams]);
+    // Navigation callbacks using reusable hook
+    const { goToChainSelection, goToTokenPairSelection } = usePositionNavigation();
 
     // State for selected pool address
     const [selectedPoolAddress, setSelectedPoolAddress] = useState<
@@ -116,61 +100,13 @@ export function PoolSelectionStep(props: PoolSelectionStepProps) {
         router.push(pathname + "?" + params.toString());
     };
 
-    // Show validation errors for missing parameters
+    // Show validation errors for missing parameters using reusable component
     if (!isValidChain) {
-        return (
-            <div className="space-y-6">
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                        <div>
-                            <h5 className="text-red-400 font-medium">
-                                Invalid Chain Selected
-                            </h5>
-                            <p className="text-red-200/80 text-sm mt-1">
-                                Please select a valid blockchain network to
-                                continue with pool selection.
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={goToChainSelection}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        Go to Chain Selection
-                    </button>
-                </div>
-            </div>
-        );
+        return <ValidationErrorCard type="chain" onNavigate={goToChainSelection} />;
     }
 
     if (!baseTokenParam || !quoteTokenParam) {
-        return (
-            <div className="space-y-6">
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                        <div>
-                            <h5 className="text-red-400 font-medium">
-                                Token Pair Required
-                            </h5>
-                            <p className="text-red-200/80 text-sm mt-1">
-                                Please select both base and quote tokens to
-                                continue with pool selection.
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={goToTokenPairSelection}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        Go to Token Pair Selection
-                    </button>
-                </div>
-            </div>
-        );
+        return <ValidationErrorCard type="tokens" onNavigate={goToTokenPairSelection} />;
     }
 
     return (

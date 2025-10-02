@@ -8,12 +8,13 @@ import {
     Loader2,
     Copy,
     ExternalLink,
-    ArrowLeft,
 } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import type { SupportedChainsType } from "@/config/chains";
 import { isValidChainSlug } from "@/config/chains";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePositionNavigation } from "@/hooks/positions/usePositionNavigation";
+import { ValidationErrorCard } from "./ValidationErrorCard";
 import {
     useTokenSearch,
     type TokenSearchResult,
@@ -304,16 +305,8 @@ export function TokenPairStep(props: TokenPairStepProps) {
     // Track if we've already notified parent about current token pair
     const lastNotifiedPairRef = useRef<string | null>(null);
 
-    // Handle navigation to chain selection if invalid chain
-    const goToChainSelection = useCallback(() => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("step", "1");
-        params.delete("chain");
-        params.delete("baseToken");
-        params.delete("quoteToken");
-        params.delete("poolAddress");
-        router.push(pathname + "?" + params.toString());
-    }, [router, pathname, searchParams]);
+    // Navigation callbacks using reusable hook
+    const { goToChainSelection } = usePositionNavigation();
 
     // Token selection state - initialized from URL params
     const [baseSelection, setBaseSelection] = useState<TokenSelection>({
@@ -531,31 +524,7 @@ export function TokenPairStep(props: TokenPairStepProps) {
 
     // Show chain validation error if chain is invalid
     if (!isValidChain) {
-        return (
-            <div className="space-y-6">
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                        <div>
-                            <h5 className="text-red-400 font-medium">
-                                Invalid Chain Selected
-                            </h5>
-                            <p className="text-red-200/80 text-sm mt-1">
-                                Please select a valid blockchain network to
-                                continue with token pair selection.
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={goToChainSelection}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        Go to Chain Selection
-                    </button>
-                </div>
-            </div>
-        );
+        return <ValidationErrorCard type="chain" onNavigate={goToChainSelection} />;
     }
 
     return (
