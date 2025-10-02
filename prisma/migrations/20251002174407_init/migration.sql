@@ -30,9 +30,8 @@ CREATE TABLE "public"."sessions" (
 CREATE TABLE "public"."users" (
     "id" TEXT NOT NULL,
     "name" TEXT,
-    "email" TEXT NOT NULL,
-    "password" TEXT NOT NULL,
-    "emailVerified" TIMESTAMP(3),
+    "address" TEXT NOT NULL,
+    "nonce" TEXT,
     "image" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -72,14 +71,11 @@ CREATE TABLE "public"."tokens" (
     "name" TEXT NOT NULL,
     "decimals" INTEGER NOT NULL,
     "logoUrl" TEXT,
+    "marketCap" TEXT,
+    "coinGeckoId" TEXT,
+    "lastEnrichedAt" TIMESTAMP(3),
     "source" TEXT NOT NULL,
     "verified" BOOLEAN NOT NULL DEFAULT false,
-    "userId" TEXT,
-    "userLabel" TEXT,
-    "notes" TEXT,
-    "lastUpdatedAt" TIMESTAMP(3),
-    "addedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "lastUsedAt" TIMESTAMP(3) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -88,12 +84,10 @@ CREATE TABLE "public"."tokens" (
 
 -- CreateTable
 CREATE TABLE "public"."pools" (
-    "id" TEXT NOT NULL,
     "chain" TEXT NOT NULL,
     "poolAddress" TEXT NOT NULL,
-    "token0Chain" TEXT NOT NULL,
+    "protocol" TEXT NOT NULL DEFAULT 'uniswapv3',
     "token0Address" TEXT NOT NULL,
-    "token1Chain" TEXT NOT NULL,
     "token1Address" TEXT NOT NULL,
     "fee" INTEGER NOT NULL,
     "tickSpacing" INTEGER NOT NULL,
@@ -102,39 +96,39 @@ CREATE TABLE "public"."pools" (
     "sqrtPriceX96" TEXT,
     "feeGrowthGlobal0X128" TEXT NOT NULL DEFAULT '0',
     "feeGrowthGlobal1X128" TEXT NOT NULL DEFAULT '0',
-    "tvl" TEXT,
-    "volume24h" TEXT,
-    "apr" DOUBLE PRECISION,
-    "ownerId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "pools_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "pools_pkey" PRIMARY KEY ("chain","poolAddress")
 );
 
 -- CreateTable
 CREATE TABLE "public"."positions" (
-    "id" TEXT NOT NULL,
+    "chain" TEXT NOT NULL,
+    "protocol" TEXT NOT NULL DEFAULT 'uniswapv3',
+    "nftId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "poolId" TEXT NOT NULL,
+    "poolAddress" TEXT NOT NULL,
     "tickLower" INTEGER NOT NULL,
     "tickUpper" INTEGER NOT NULL,
     "liquidity" TEXT NOT NULL,
     "token0IsQuote" BOOLEAN NOT NULL,
     "owner" TEXT,
     "importType" TEXT NOT NULL,
-    "nftId" TEXT,
     "status" TEXT NOT NULL DEFAULT 'active',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "positions_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "positions_pkey" PRIMARY KEY ("userId","chain","protocol","nftId")
 );
 
 -- CreateTable
 CREATE TABLE "public"."position_events" (
     "id" TEXT NOT NULL,
-    "positionId" TEXT NOT NULL,
+    "positionUserId" TEXT NOT NULL,
+    "positionChain" TEXT NOT NULL,
+    "positionProtocol" TEXT NOT NULL,
+    "positionNftId" TEXT NOT NULL,
     "ledgerIgnore" BOOLEAN NOT NULL,
     "blockNumber" BIGINT NOT NULL,
     "transactionIndex" INTEGER NOT NULL,
@@ -202,7 +196,10 @@ CREATE TABLE "public"."pool_price_cache" (
 -- CreateTable
 CREATE TABLE "public"."position_pnl_cache" (
     "id" TEXT NOT NULL,
-    "positionId" TEXT NOT NULL,
+    "positionUserId" TEXT NOT NULL,
+    "positionChain" TEXT NOT NULL,
+    "positionProtocol" TEXT NOT NULL,
+    "positionNftId" TEXT NOT NULL,
     "currentValue" TEXT NOT NULL,
     "currentCostBasis" TEXT NOT NULL,
     "collectedFees" TEXT NOT NULL,
@@ -222,7 +219,10 @@ CREATE TABLE "public"."position_pnl_cache" (
 -- CreateTable
 CREATE TABLE "public"."position_curve_cache" (
     "id" TEXT NOT NULL,
-    "positionId" TEXT NOT NULL,
+    "positionUserId" TEXT NOT NULL,
+    "positionChain" TEXT NOT NULL,
+    "positionProtocol" TEXT NOT NULL,
+    "positionNftId" TEXT NOT NULL,
     "curveData" JSONB NOT NULL,
     "calculatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -241,7 +241,7 @@ CREATE UNIQUE INDEX "accounts_provider_providerAccountId_key" ON "public"."accou
 CREATE UNIQUE INDEX "sessions_sessionToken_key" ON "public"."sessions"("sessionToken");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_email_key" ON "public"."users"("email");
+CREATE UNIQUE INDEX "users_address_key" ON "public"."users"("address");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "verificationtokens_token_key" ON "public"."verificationtokens"("token");
@@ -259,22 +259,19 @@ CREATE INDEX "api_keys_prefix_idx" ON "public"."api_keys"("prefix");
 CREATE INDEX "tokens_chain_symbol_idx" ON "public"."tokens"("chain", "symbol");
 
 -- CreateIndex
-CREATE INDEX "tokens_userId_chain_idx" ON "public"."tokens"("userId", "chain");
-
--- CreateIndex
 CREATE INDEX "tokens_verified_source_idx" ON "public"."tokens"("verified", "source");
 
 -- CreateIndex
-CREATE INDEX "pools_chain_token0Chain_token0Address_token1Chain_token1Add_idx" ON "public"."pools"("chain", "token0Chain", "token0Address", "token1Chain", "token1Address");
+CREATE INDEX "tokens_chain_marketCap_idx" ON "public"."tokens"("chain", "marketCap" DESC);
 
 -- CreateIndex
-CREATE INDEX "pools_ownerId_idx" ON "public"."pools"("ownerId");
+CREATE INDEX "pools_chain_protocol_token0Address_token1Address_idx" ON "public"."pools"("chain", "protocol", "token0Address", "token1Address");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "pools_chain_poolAddress_key" ON "public"."pools"("chain", "poolAddress");
+CREATE INDEX "pools_protocol_idx" ON "public"."pools"("protocol");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "pools_chain_token0Chain_token0Address_token1Chain_token1Add_key" ON "public"."pools"("chain", "token0Chain", "token0Address", "token1Chain", "token1Address", "fee");
+CREATE UNIQUE INDEX "pools_chain_protocol_token0Address_token1Address_fee_key" ON "public"."pools"("chain", "protocol", "token0Address", "token1Address", "fee");
 
 -- CreateIndex
 CREATE INDEX "positions_userId_status_idx" ON "public"."positions"("userId", "status");
@@ -283,10 +280,13 @@ CREATE INDEX "positions_userId_status_idx" ON "public"."positions"("userId", "st
 CREATE INDEX "positions_owner_idx" ON "public"."positions"("owner");
 
 -- CreateIndex
-CREATE INDEX "position_events_positionId_blockNumber_transactionIndex_log_idx" ON "public"."position_events"("positionId", "blockNumber", "transactionIndex", "logIndex");
+CREATE INDEX "positions_chain_poolAddress_idx" ON "public"."positions"("chain", "poolAddress");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "position_events_transactionHash_logIndex_positionId_key" ON "public"."position_events"("transactionHash", "logIndex", "positionId");
+CREATE INDEX "position_events_positionUserId_positionChain_positionProtoc_idx" ON "public"."position_events"("positionUserId", "positionChain", "positionProtocol", "positionNftId", "blockNumber", "transactionIndex", "logIndex");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "position_events_transactionHash_logIndex_positionUserId_pos_key" ON "public"."position_events"("transactionHash", "logIndex", "positionUserId", "positionChain", "positionProtocol", "positionNftId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "position_events_inputHash_key" ON "public"."position_events"("inputHash");
@@ -307,22 +307,22 @@ CREATE INDEX "pool_price_cache_expiresAt_idx" ON "public"."pool_price_cache"("ex
 CREATE UNIQUE INDEX "pool_price_cache_chain_poolAddress_blockNumber_key" ON "public"."pool_price_cache"("chain", "poolAddress", "blockNumber");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "position_pnl_cache_positionId_key" ON "public"."position_pnl_cache"("positionId");
-
--- CreateIndex
-CREATE INDEX "position_pnl_cache_positionId_isValid_idx" ON "public"."position_pnl_cache"("positionId", "isValid");
+CREATE INDEX "position_pnl_cache_positionUserId_positionChain_positionPro_idx" ON "public"."position_pnl_cache"("positionUserId", "positionChain", "positionProtocol", "positionNftId", "isValid");
 
 -- CreateIndex
 CREATE INDEX "position_pnl_cache_calculatedAt_idx" ON "public"."position_pnl_cache"("calculatedAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "position_curve_cache_positionId_key" ON "public"."position_curve_cache"("positionId");
+CREATE UNIQUE INDEX "position_pnl_cache_positionUserId_positionChain_positionPro_key" ON "public"."position_pnl_cache"("positionUserId", "positionChain", "positionProtocol", "positionNftId");
 
 -- CreateIndex
-CREATE INDEX "position_curve_cache_positionId_isValid_idx" ON "public"."position_curve_cache"("positionId", "isValid");
+CREATE INDEX "position_curve_cache_positionUserId_positionChain_positionP_idx" ON "public"."position_curve_cache"("positionUserId", "positionChain", "positionProtocol", "positionNftId", "isValid");
 
 -- CreateIndex
 CREATE INDEX "position_curve_cache_calculatedAt_idx" ON "public"."position_curve_cache"("calculatedAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "position_curve_cache_positionUserId_positionChain_positionP_key" ON "public"."position_curve_cache"("positionUserId", "positionChain", "positionProtocol", "positionNftId");
 
 -- AddForeignKey
 ALTER TABLE "public"."accounts" ADD CONSTRAINT "accounts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -334,31 +334,25 @@ ALTER TABLE "public"."sessions" ADD CONSTRAINT "sessions_userId_fkey" FOREIGN KE
 ALTER TABLE "public"."api_keys" ADD CONSTRAINT "api_keys_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."tokens" ADD CONSTRAINT "tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."pools" ADD CONSTRAINT "pools_chain_token0Address_fkey" FOREIGN KEY ("chain", "token0Address") REFERENCES "public"."tokens"("chain", "address") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."pools" ADD CONSTRAINT "pools_token0Chain_token0Address_fkey" FOREIGN KEY ("token0Chain", "token0Address") REFERENCES "public"."tokens"("chain", "address") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."pools" ADD CONSTRAINT "pools_token1Chain_token1Address_fkey" FOREIGN KEY ("token1Chain", "token1Address") REFERENCES "public"."tokens"("chain", "address") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."pools" ADD CONSTRAINT "pools_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."pools" ADD CONSTRAINT "pools_chain_token1Address_fkey" FOREIGN KEY ("chain", "token1Address") REFERENCES "public"."tokens"("chain", "address") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."positions" ADD CONSTRAINT "positions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."positions" ADD CONSTRAINT "positions_poolId_fkey" FOREIGN KEY ("poolId") REFERENCES "public"."pools"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."positions" ADD CONSTRAINT "positions_chain_poolAddress_fkey" FOREIGN KEY ("chain", "poolAddress") REFERENCES "public"."pools"("chain", "poolAddress") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."position_events" ADD CONSTRAINT "position_events_positionId_fkey" FOREIGN KEY ("positionId") REFERENCES "public"."positions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."position_events" ADD CONSTRAINT "position_events_positionUserId_positionChain_positionProto_fkey" FOREIGN KEY ("positionUserId", "positionChain", "positionProtocol", "positionNftId") REFERENCES "public"."positions"("userId", "chain", "protocol", "nftId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."position_event_apr" ADD CONSTRAINT "position_event_apr_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "public"."position_events"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."position_pnl_cache" ADD CONSTRAINT "position_pnl_cache_positionId_fkey" FOREIGN KEY ("positionId") REFERENCES "public"."positions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."position_pnl_cache" ADD CONSTRAINT "position_pnl_cache_positionUserId_positionChain_positionPr_fkey" FOREIGN KEY ("positionUserId", "positionChain", "positionProtocol", "positionNftId") REFERENCES "public"."positions"("userId", "chain", "protocol", "nftId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."position_curve_cache" ADD CONSTRAINT "position_curve_cache_positionId_fkey" FOREIGN KEY ("positionId") REFERENCES "public"."positions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."position_curve_cache" ADD CONSTRAINT "position_curve_cache_positionUserId_positionChain_position_fkey" FOREIGN KEY ("positionUserId", "positionChain", "positionProtocol", "positionNftId") REFERENCES "public"."positions"("userId", "chain", "protocol", "nftId") ON DELETE CASCADE ON UPDATE CASCADE;

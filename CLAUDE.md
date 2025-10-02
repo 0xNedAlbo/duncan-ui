@@ -229,6 +229,12 @@ export const GET = withAuth<ResponseType>(
   - API calls: `await TokenService.getPrice(tokenAddress, amount)`
   - API returns: `{"price": "1500000"}` (1.5 USDC as 1500000 scaled)
 
+**Git Commit Policy:**
+- **NEVER commit changes to git unless explicitly requested by the user**
+- **Wait for explicit instruction** before running `git add`, `git commit`, or `git push` commands
+- **User must request commits** - do not assume commits should be made after completing tasks
+- **Exception:** Only when user uses the `/git-commit` slash command or directly asks to commit changes
+
 **Additional Coding Guidelines for Claude:**
 - use formatCompactValue() from fraction-formats.ts when displaying bigint values (not formatFractionHuman which requires Fraction objects)
 - use scripts/api-debug.ts when testing API behaviour because it contains proper authentication
