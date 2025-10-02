@@ -34,6 +34,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy";
 import { PositionActionsMenu } from "./position-actions-menu";
 import { DeletePositionModal } from "./delete-position-modal";
+import { IncreasePositionModal } from "./IncreasePositionModal";
 
 interface PositionCardProps {
     position: BasicPosition;
@@ -53,6 +54,7 @@ export function PositionCard({
     const t = useTranslations();
     const queryClient = useQueryClient();
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showIncreaseModal, setShowIncreaseModal] = useState(false);
     const [copied, setCopied] = useState(false);
     const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
@@ -558,6 +560,7 @@ export function PositionCard({
                 {canPerformActions() && (
                     <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-700/50">
                         <button
+                            onClick={() => setShowIncreaseModal(true)}
                             className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
                                 position.status === "closed"
                                     ? "text-slate-500 bg-slate-800/30 border-slate-600/30 cursor-not-allowed"
@@ -600,6 +603,13 @@ export function PositionCard({
                 onClose={() => setShowDeleteModal(false)}
                 position={position}
                 onDeleteSuccess={handleDeleteSuccess}
+            />
+
+            {/* Increase Position Modal */}
+            <IncreasePositionModal
+                isOpen={showIncreaseModal}
+                onClose={() => setShowIncreaseModal(false)}
+                position={position}
             />
         </>
     );
