@@ -144,7 +144,9 @@ export class EtherscanClient {
                 if (data.message === "No records found") {
                     return []; // Normal case - no events for this filter
                 }
-                throw new Error(`Etherscan API error: ${data.message}`);
+                throw new Error(
+                    `Etherscan API error: ${data.message} ${data.result}`
+                );
             }
 
             return Array.isArray(data.result) ? data.result : [];
@@ -222,14 +224,15 @@ export class EtherscanClient {
             if (data.status !== "1") {
                 if (data.message.includes("Invalid timestamp")) {
                     throw new Error(
-                        `Timestamp too old or too new: ${new Date(timestamp * 1000).toISOString()}`
+                        `Timestamp too old or too new: ${new Date(
+                            timestamp * 1000
+                        ).toISOString()}`
                     );
                 }
-                throw new Error(`Etherscan API error: ${data.message}`);
+                throw new Error(`Etherscan API error: ${data.message} ${data.result}`);
             }
 
             return data.result;
-
         } catch (error) {
             if (error instanceof Error) {
                 throw error;
