@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { RotateCcw, Plus } from "lucide-react";
 import { useTranslations } from "@/i18n/client";
 import type { BasicPosition } from "@/services/positions/positionService";
 import type { PositionListParams } from "@/types/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/types/api";
+import { useAccount } from "wagmi";
+import { SUPPORTED_CHAINS, type SupportedChainsType } from "@/config/chains";
+import { useDiscoverPositions, useImportDiscoveredPositions } from "@/hooks/api/useDiscoverPositions";
 
 // New ReactQuery-only hooks
 import { usePositionsList } from "@/hooks/api/usePositionsList";
@@ -20,13 +23,20 @@ interface PositionListProps {
 export function PositionList({ className }: PositionListProps) {
   const t = useTranslations();
   const queryClient = useQueryClient();
+  const { address: connectedAddress } = useAccount();
 
   // UI state (not stored globally anymore)
   const [sortBy, setSortBy] = useState("createdAt");
-  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "closed" | "archived">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "closed" | "archived">("active");
   const [filterChain, setFilterChain] = useState("all");
   const [offset, setOffset] = useState(0);
   const limit = 20;
+
+  // Multi-chain discovery state
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [discoveredCount, setDiscoveredCount] = useState(0);
+  const hasRunInitialDiscovery = useRef(false);
 
   // Build query parameters - memoized to prevent unnecessary re-renders
   const queryParams = useMemo<PositionListParams>(() => ({
@@ -49,6 +59,10 @@ export function PositionList({ className }: PositionListProps) {
   const pagination = positionsData?.pagination;
   const hasMore = pagination ? pagination.total > offset + limit : false;
 
+  // Discovery mutations
+  const discoverPositions = useDiscoverPositions();
+  const importPositions = useImportDiscoveredPositions();
+
   // Load more positions
   const loadMore = useCallback(() => {
     if (!hasMore || isLoading) return;
@@ -63,11 +77,97 @@ export function PositionList({ className }: PositionListProps) {
     if (newFilters.chain) setFilterChain(newFilters.chain);
   }, []);
 
-  // Handle external refresh trigger
+  // Handle multi-chain position discovery
+  const handleDiscoverNewPositions = useCallback(async () => {
+    // Validate wallet connection
+    if (!connectedAddress) {
+      setDiscoveryError("Please connect your wallet first");
+      return;
+    }
+
+    setIsDiscovering(true);
+    setDiscoveryError(null);
+    setDiscoveredCount(0);
+
+    try {
+      const allDiscoveredPositions: BasicPosition[] = [];
+
+      // Discover positions on all supported chains (excluding dev chains)
+      const productionChains = SUPPORTED_CHAINS.filter(
+        chain => !chain.includes('local') && !chain.includes('fork')
+      ) as SupportedChainsType[];
+
+      for (const chain of productionChains) {
+        try {
+          const result = await discoverPositions.mutateAsync({
+            address: connectedAddress,
+            chain,
+            limit: 10,
+          });
+
+          if (result.data?.positions) {
+            // Filter for active positions only
+            const activePositions = result.data.positions.filter(
+              p => p.status === "active"
+            );
+            allDiscoveredPositions.push(...activePositions);
+          }
+        } catch (error) {
+          console.warn(`Failed to discover positions on ${chain}:`, error);
+          // Continue with other chains even if one fails
+        }
+      }
+
+      // Import all discovered active positions
+      if (allDiscoveredPositions.length > 0) {
+        // Group positions by chain for import
+        const positionsByChain = allDiscoveredPositions.reduce((acc, position) => {
+          const chain = position.pool.chain;
+          if (!acc[chain]) acc[chain] = [];
+          acc[chain].push(position);
+          return acc;
+        }, {} as Record<string, BasicPosition[]>);
+
+        // Import positions for each chain
+        for (const [chain, chainPositions] of Object.entries(positionsByChain)) {
+          try {
+            await importPositions.mutateAsync({
+              positions: chainPositions,
+              chain,
+            });
+            setDiscoveredCount(prev => prev + chainPositions.length);
+          } catch (error) {
+            console.error(`Failed to import positions on ${chain}:`, error);
+          }
+        }
+
+        // Invalidate position list to refresh
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.positions });
+        setOffset(0);
+        refetch();
+      }
+      // Don't show error feedback when no new positions found - just silently complete
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to discover positions";
+      setDiscoveryError(errorMessage);
+    } finally {
+      setIsDiscovering(false);
+    }
+  }, [connectedAddress, discoverPositions, importPositions, queryClient, refetch]);
+
+  // Handle external refresh trigger (old behavior for non-active filters)
   const handleRefresh = useCallback(() => {
     setOffset(0);
     refetch();
   }, [refetch]);
+
+  // Run discovery once on initial load if wallet is connected
+  useEffect(() => {
+    if (connectedAddress && !hasRunInitialDiscovery.current) {
+      hasRunInitialDiscovery.current = true;
+      handleDiscoverNewPositions();
+    }
+  }, [connectedAddress, handleDiscoverNewPositions]);
 
   // Handle successful position deletion - update cache with correct key
   const handleDeleteSuccess = useCallback((deletedPosition: BasicPosition) => {
@@ -157,15 +257,31 @@ export function PositionList({ className }: PositionListProps) {
           <option value="createdAt">{t("dashboard.positions.filters.sortBy.createdAt")}</option>
         </select>
 
-        {/* Refresh Button */}
-        <button
-          onClick={handleRefresh}
-          disabled={isLoading}
-          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-200 transition-colors disabled:opacity-50"
-        >
-          <RotateCcw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-        </button>
+        {/* Refresh Button - Only visible when "active" filter is selected */}
+        {filterStatus === "active" && (
+          <button
+            onClick={handleDiscoverNewPositions}
+            disabled={isDiscovering}
+            className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-200 transition-colors disabled:opacity-50"
+            title="Search for new active positions on all chains"
+          >
+            <RotateCcw className={`w-4 h-4 ${isDiscovering ? 'animate-spin' : ''}`} />
+          </button>
+        )}
       </div>
+
+      {/* Discovery Feedback */}
+      {discoveryError && (
+        <div className="mb-4 px-4 py-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-sm text-yellow-400">
+          {discoveryError}
+        </div>
+      )}
+
+      {discoveredCount > 0 && (
+        <div className="mb-4 px-4 py-3 bg-green-500/10 border border-green-500/20 rounded-lg text-sm text-green-400">
+          Successfully imported {discoveredCount} new position{discoveredCount > 1 ? 's' : ''}
+        </div>
+      )}
 
       {/* Positions Grid */}
       {isLoading && positions.length === 0 ? (
