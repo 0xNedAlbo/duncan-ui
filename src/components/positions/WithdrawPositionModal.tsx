@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, AlertCircle, Check } from "lucide-react";
+import { X, Loader2, AlertCircle, Check, RefreshCw } from "lucide-react";
 import { useAccount } from "wagmi";
 import type { Address } from "viem";
 import { formatUnits } from "viem";
@@ -13,6 +13,8 @@ import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { useDecreaseLiquidity } from "@/hooks/useDecreaseLiquidity";
 import { usePool } from "@/hooks/api/usePool";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
+import { NetworkSwitchStep } from "./NetworkSwitchStep";
+import { TransactionStep } from "./TransactionStep";
 import type { BasicPosition } from "@/services/positions/positionService";
 
 interface WithdrawPositionModalProps {
@@ -29,6 +31,7 @@ export function WithdrawPositionModal({
     const [mounted, setMounted] = useState(false);
     const [withdrawPercent, setWithdrawPercent] = useState<number>(0);
     const [quoteValueInput, setQuoteValueInput] = useState<string>("");
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const queryClient = useQueryClient();
 
     const {
@@ -43,7 +46,11 @@ export function WithdrawPositionModal({
     }, []);
 
     // Load pool data to get current price
-    const { pool, isLoading: isPoolLoading } = usePool({
+    const {
+        pool,
+        isLoading: isPoolLoading,
+        refetch: refetchPool,
+    } = usePool({
         chain: position.pool.chain as SupportedChainsType,
         poolAddress: position.pool.poolAddress,
         enabled: isOpen && !!position.pool.poolAddress,
@@ -296,6 +303,20 @@ export function WithdrawPositionModal({
         decreaseLiquidity.withdraw();
     };
 
+    // Refresh pool data handler
+    const handleRefreshPool = useCallback(async () => {
+        if (isRefreshing) return;
+
+        setIsRefreshing(true);
+        try {
+            await refetchPool();
+        } catch (error) {
+            console.error("Error refreshing pool data:", error);
+        } finally {
+            setIsRefreshing(false);
+        }
+    }, [refetchPool, isRefreshing]);
+
     // Handle successful withdrawal - optimistically update liquidity
     useEffect(() => {
         if (decreaseLiquidity.isSuccess) {
@@ -418,9 +439,20 @@ export function WithdrawPositionModal({
                             <>
                                 {/* Withdrawal Amount Input with Percentage Slider */}
                                 <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-lg p-4 space-y-3">
-                                    <label className="text-sm text-slate-300 font-medium">
-                                        Withdrawal Amount ({quoteToken.symbol})
-                                    </label>
+                                    {/* Header with refresh button */}
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-slate-300 font-medium">
+                                            Withdrawal Amount ({quoteToken.symbol})
+                                        </span>
+                                        <button
+                                            onClick={handleRefreshPool}
+                                            disabled={isRefreshing}
+                                            className="p-1 hover:bg-slate-700 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                            title="Refresh pool price"
+                                        >
+                                            <RefreshCw className={`w-4 h-4 text-slate-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                        </button>
+                                    </div>
                                     <input
                                         type="text"
                                         value={quoteValueInput}
@@ -489,6 +521,12 @@ export function WithdrawPositionModal({
                                             Transaction
                                         </h3>
                                         <div className="space-y-3">
+                                            {/* Network Switch Step */}
+                                            <NetworkSwitchStep
+                                                chain={position.pool.chain as SupportedChainsType}
+                                                isWrongNetwork={isWrongNetwork}
+                                            />
+
                                             {/* Withdraw (Multicall: Decrease + Collect) */}
                                             <TransactionStep
                                                 title="Withdraw Liquidity"
@@ -555,57 +593,4 @@ export function WithdrawPositionModal({
     );
 
     return createPortal(modalContent, document.body);
-}
-
-interface TransactionStepProps {
-    title: string;
-    description: string;
-    isLoading: boolean;
-    isComplete: boolean;
-    isDisabled: boolean;
-    onExecute: () => void;
-    showExecute: boolean;
-}
-
-function TransactionStep({
-    title,
-    description,
-    isLoading,
-    isComplete,
-    isDisabled,
-    onExecute,
-    showExecute,
-}: TransactionStepProps) {
-    return (
-        <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
-            <div className="flex items-center gap-3">
-                {isComplete ? (
-                    <div className="w-8 h-8 rounded-full bg-green-500/20 border border-green-500/50 flex items-center justify-center">
-                        <Check className="w-4 h-4 text-green-400" />
-                    </div>
-                ) : (
-                    <div className="w-8 h-8 rounded-full bg-slate-600/50 border border-slate-500/50 flex items-center justify-center">
-                        {isLoading ? (
-                            <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
-                        ) : (
-                            <span className="text-slate-400 text-sm">•</span>
-                        )}
-                    </div>
-                )}
-                <div>
-                    <p className="text-white font-medium text-sm">{title}</p>
-                    <p className="text-slate-400 text-xs">{description}</p>
-                </div>
-            </div>
-            {!isComplete && showExecute && (
-                <button
-                    onClick={onExecute}
-                    disabled={isDisabled || isLoading}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:text-slate-400 text-white text-sm rounded-lg transition-colors"
-                >
-                    {isLoading ? "Processing..." : "Execute"}
-                </button>
-            )}
-        </div>
-    );
 }

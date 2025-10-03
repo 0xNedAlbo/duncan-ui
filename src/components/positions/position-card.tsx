@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -66,7 +66,7 @@ export function PositionCard({
     const { address: connectedAddress, isConnected } = useAccount();
 
     // Check if user can perform actions (wallet matches position owner)
-    const canPerformActions = () => {
+    const canPerformActions = useMemo(() => {
         if (!isConnected || !connectedAddress || !position.owner) {
             return false;
         }
@@ -77,7 +77,7 @@ export function PositionCard({
         } catch {
             return false;
         }
-    };
+    }, [isConnected, connectedAddress, position.owner]);
 
     // Helper function to build block explorer URL
     const getBlockExplorerUrl = (chain: string, nftId: string) => {
@@ -565,7 +565,7 @@ export function PositionCard({
                 </div>
 
                 {/* Action Buttons Row */}
-                {canPerformActions() && (
+                {canPerformActions && (
                     <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-700/50">
                         <button
                             onClick={() => setShowIncreaseModal(true)}
