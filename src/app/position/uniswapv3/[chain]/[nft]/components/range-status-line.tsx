@@ -57,66 +57,29 @@ export function RangeStatusLine({ position }: RangeStatusLineProps) {
     const formattedUpperPrice = formatCompactValue(upperPrice, quoteToken.decimals);
     const formattedCurrentPrice = formatCompactValue(currentPrice, quoteToken.decimals);
 
-    // Calculate positions for proportional display
-    let lowerPosition = 0; // percentage from left
-    let upperPosition = 100; // percentage from left
-    let currentPosition = 50; // percentage from left
+    // Calculate positions using linear price scale
+    // Range always occupies center 60% (20%-80%)
+    // Full display width represents: lower - 1/3*range to upper + 1/3*range
 
-    if (isInRange) {
-        // In range: lower at 0%, upper at 100%, current proportional between them
-        lowerPosition = 0;
-        upperPosition = 100;
+    const rangeWidth = upperPrice - lowerPrice;
+    const fullDisplayRange = (rangeWidth * 5n) / 3n; // range / 0.6 = range * 5/3
+    const leftEdgePrice = lowerPrice - (rangeWidth / 3n);
 
-        const rangeWidth = upperPrice - lowerPrice;
-        if (rangeWidth > 0n) {
-            const currentOffset = currentPrice - lowerPrice;
-            currentPosition = (Number(currentOffset) * 100) / Number(rangeWidth);
-            // Clamp to 0-100 range
-            currentPosition = Math.max(0, Math.min(100, currentPosition));
-        }
-    } else if (isBelowRange) {
-        // Below range: range takes left 50%, current price in left section
-        lowerPosition = 0;
-        upperPosition = 50;
+    // Calculate position on linear scale
+    const calculatePosition = (price: bigint): number => {
+        if (fullDisplayRange === 0n) return 50; // fallback to center
 
-        // Calculate how far below lower price (as percentage of lower price)
-        const distanceFromLower = lowerPrice - currentPrice;
-        const percentBelow = (Number(distanceFromLower) * 100) / Number(lowerPrice);
+        const offset = price - leftEdgePrice;
+        const position = (Number(offset) * 100) / Number(fullDisplayRange);
 
-        // Map to right 50% of space: 0% below = just left of lower (0%), 50% below = far left edge (0%)
-        // Since we're below, the further below we are, the more left we position
-        // Position should be left of the range (which starts at 0%)
-        // Scale: If 50% or more below, position at far left (0%), otherwise proportional
-        if (percentBelow >= 50) {
-            currentPosition = 0;
-        } else {
-            // Linear interpolation: 0% below -> position 0%, 50% below -> position -50% (but we can't go negative, so we adjust)
-            // Actually, we want current price to appear LEFT of the range
-            // Since range is at 0-50%, we need to position current before 0%
-            // But we can't position before 0%, so we squeeze everything
-            // New approach: shift everything right
-            // Range: 25% to 75%, Current: 0% to 25%
-            lowerPosition = 25 + (percentBelow / 50) * 25;
-            upperPosition = 75;
-            currentPosition = (percentBelow / 50) * 25;
-        }
-    } else if (isAboveRange) {
-        // Above range: range takes left 50%, current price in right section
-        lowerPosition = 0;
-        upperPosition = 50;
+        // Clamp to 0-100% range (stick to borders if outside)
+        return Math.max(0, Math.min(100, position));
+    };
 
-        // Calculate how far above upper price (as percentage of upper price)
-        const distanceFromUpper = currentPrice - upperPrice;
-        const percentAbove = (Number(distanceFromUpper) * 100) / Number(upperPrice);
-
-        // Map to right 50% of space: 0% above = just right of upper (50%), 50% above = far right (100%)
-        if (percentAbove >= 50) {
-            currentPosition = 100;
-        } else {
-            // Linear interpolation: 0% above -> 50%, 50% above -> 100%
-            currentPosition = 50 + (percentAbove / 50) * 50;
-        }
-    }
+    // Fixed positions for range boundaries
+    const lowerPosition = 20; // Always at 20%
+    const upperPosition = 80; // Always at 80%
+    const currentPosition = calculatePosition(currentPrice);
 
     // Helper function to determine label alignment based on position
     const getLabelAlignment = (position: number): 'left' | 'center' | 'right' => {
