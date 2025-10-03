@@ -227,14 +227,18 @@ export function PositionCard({
         }
     };
 
-    // Auto-refresh every 60 seconds
+    // Auto-refresh every 60 seconds - only for active positions
     useEffect(() => {
+        if (currentPosition.status !== "active") {
+            return;
+        }
+
         const intervalId = setInterval(() => {
             handleRefresh();
         }, 60000); // 60 seconds
 
         return () => clearInterval(intervalId);
-    }, [position.nftId, position.pool.chain]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [position.nftId, position.pool.chain, currentPosition.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Deletion state
     const isDeleting = useIsDeletingPosition(
