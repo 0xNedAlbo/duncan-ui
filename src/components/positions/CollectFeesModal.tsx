@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, AlertCircle, Check } from "lucide-react";
+import { X, AlertCircle, Check } from "lucide-react";
 import { useAccount } from "wagmi";
 import type { Address } from "viem";
 import { useQueryClient } from "@tanstack/react-query";

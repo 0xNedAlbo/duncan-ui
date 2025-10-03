@@ -36,7 +36,6 @@ export function RangeStatusLine({ position }: RangeStatusLineProps) {
     // Determine if position is in range
     const isInRange = currentTick >= position.tickLower && currentTick <= position.tickUpper;
     const isBelowRange = currentTick < position.tickLower;
-    const isAboveRange = currentTick > position.tickUpper;
 
     // Calculate percentage distance from current price to other prices
     const calculatePercentageDistance = (fromPrice: bigint, toPrice: bigint): string => {
