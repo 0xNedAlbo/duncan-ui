@@ -6,6 +6,8 @@
  */
 
 import { SupportedChainsType } from "@/config/chains";
+import { globalScheduler } from "@/lib/utils/request-scheduler";
+import { withRetries } from "@/lib/utils/http-retry";
 
 // Etherscan v2 unified API base URL
 const API_BASE_URL = "https://api.etherscan.io/v2/api";
@@ -56,24 +58,36 @@ export interface LogOptions {
     topic3?: string; // Third indexed parameter
 }
 
-// Rate limiting state
-interface RateLimitState {
-    lastRequestTime: number;
-    requestCount: number;
-    resetTime: number;
-}
-
 export class EtherscanClient {
-    private rateLimitState: RateLimitState = {
-        lastRequestTime: 0,
-        requestCount: 0,
-        resetTime: 0,
-    };
-
-    private readonly rateLimitDelay = 200; // 200ms between requests (5 req/sec)
-
     constructor() {
         this.validateApiKey();
+    }
+
+    /**
+     * Execute HTTP fetch with global rate limiting and retry logic
+     */
+    private async doFetch<T>(url: string): Promise<T> {
+        const call = async () => {
+            const response = await fetch(url, {
+                headers: {
+                    "User-Agent": "Duncan-UI/1.0",
+                },
+            });
+
+            if (!response.ok) {
+                const error: any = new Error(
+                    `HTTP ${response.status}: ${response.statusText}`
+                );
+                error.status = response.status;
+                throw error;
+            }
+
+            return response.json() as Promise<T>;
+        };
+
+        // 1) Process-wide serialization + spacing via global scheduler
+        // 2) Automatic retries with exponential backoff on rate limit errors
+        return globalScheduler.schedule(() => withRetries(call));
     }
 
     /**
@@ -84,19 +98,11 @@ export class EtherscanClient {
         contractAddress: string,
         options: LogOptions = {}
     ): Promise<EtherscanLog[]> {
+        this.validateApiKey();
         const config = CHAIN_CONFIG[chain];
         if (!config) {
             throw new Error(`Unsupported chain: ${chain}`);
         }
-
-        const apiKey = process.env.ETHERSCAN_API_KEY;
-        if (!apiKey) {
-            throw new Error(
-                "Missing API key: ETHERSCAN_API_KEY not found in environment"
-            );
-        }
-
-        await this.enforceRateLimit();
 
         const {
             fromBlock = "earliest",
@@ -114,7 +120,7 @@ export class EtherscanClient {
             address: contractAddress,
             fromBlock: fromBlock.toString(),
             toBlock: toBlock.toString(),
-            apikey: apiKey,
+            apikey: process.env.ETHERSCAN_API_KEY!,
         });
 
         // Add topic filters if provided
@@ -124,35 +130,20 @@ export class EtherscanClient {
         if (topic3) params.append("topic3", topic3);
 
         const url = `${API_BASE_URL}?${params.toString()}`;
+        const data = await this.doFetch<EtherscanResponse>(url);
 
-        try {
-            const response = await fetch(url, {
-                headers: {
-                    "User-Agent": "Duncan-UI/1.0",
-                },
-            });
-
-            if (!response.ok) {
-                throw new Error(
-                    `HTTP ${response.status}: ${response.statusText}`
-                );
+        if (data.status !== "1") {
+            if (data.message === "No records found") {
+                return []; // Normal case - no events for this filter
             }
-
-            const data: EtherscanResponse = await response.json();
-
-            if (data.status !== "1") {
-                if (data.message === "No records found") {
-                    return []; // Normal case - no events for this filter
-                }
-                throw new Error(
-                    `Etherscan API error: ${data.message} ${data.result}`
-                );
-            }
-
-            return Array.isArray(data.result) ? data.result : [];
-        } catch (error) {
-            throw error;
+            throw new Error(
+                `Etherscan API error: ${data.message} ${
+                    Array.isArray(data.result) ? "" : data.result
+                }`
+            );
         }
+
+        return Array.isArray(data.result) ? data.result : [];
     }
 
     /**
@@ -181,19 +172,11 @@ export class EtherscanClient {
         timestamp: number,
         closest: "before" | "after" = "before"
     ): Promise<string> {
+        this.validateApiKey();
         const config = CHAIN_CONFIG[chain];
         if (!config) {
             throw new Error(`Unsupported chain: ${chain}`);
         }
-
-        const apiKey = process.env.ETHERSCAN_API_KEY;
-        if (!apiKey) {
-            throw new Error(
-                "Missing API key: ETHERSCAN_API_KEY not found in environment"
-            );
-        }
-
-        await this.enforceRateLimit();
 
         const params = new URLSearchParams({
             chainid: config.chainId.toString(),
@@ -201,46 +184,26 @@ export class EtherscanClient {
             action: "getblocknobytime",
             timestamp: timestamp.toString(),
             closest: closest,
-            apikey: apiKey,
+            apikey: process.env.ETHERSCAN_API_KEY!,
         });
 
         const url = `${API_BASE_URL}?${params.toString()}`;
+        const data = await this.doFetch<BlockNumberResponse>(url);
 
-        try {
-            const response = await fetch(url, {
-                headers: {
-                    "User-Agent": "Duncan-UI/1.0",
-                },
-            });
-
-            if (!response.ok) {
+        if (data.status !== "1") {
+            if (data.message?.includes("Invalid timestamp")) {
                 throw new Error(
-                    `HTTP ${response.status}: ${response.statusText}`
+                    `Timestamp too old or too new: ${new Date(
+                        timestamp * 1000
+                    ).toISOString()}`
                 );
             }
-
-            const data: BlockNumberResponse = await response.json();
-
-            if (data.status !== "1") {
-                if (data.message.includes("Invalid timestamp")) {
-                    throw new Error(
-                        `Timestamp too old or too new: ${new Date(
-                            timestamp * 1000
-                        ).toISOString()}`
-                    );
-                }
-                throw new Error(
-                    `Etherscan API error: ${data.message} ${data.result}`
-                );
-            }
-
-            return data.result;
-        } catch (error) {
-            if (error instanceof Error) {
-                throw error;
-            }
-            throw new Error(`Unknown error during block lookup: ${error}`);
+            throw new Error(
+                `Etherscan API error: ${data.message} ${data.result}`
+            );
         }
+
+        return data.result;
     }
 
     /**
@@ -252,33 +215,5 @@ export class EtherscanClient {
                 "ETHERSCAN_API_KEY environment variable is not set"
             );
         }
-    }
-
-    /**
-     * Enforce rate limiting per Etherscan API limits (5 requests per second)
-     * Uses consistent spacing between requests to avoid bursts
-     */
-    private async enforceRateLimit(): Promise<void> {
-        const now = Date.now();
-        const timeSinceLastRequest = now - this.rateLimitState.lastRequestTime;
-
-        // Ensure minimum 200ms delay between requests (5 req/sec = 200ms spacing)
-        // Add small buffer to be conservative
-        const minDelay = 210; // 210ms = ~4.76 req/sec to stay under limit
-
-        if (timeSinceLastRequest < minDelay) {
-            const waitTime = minDelay - timeSinceLastRequest;
-            await this.delay(waitTime);
-        }
-
-        this.rateLimitState.lastRequestTime = Date.now();
-        this.rateLimitState.requestCount++;
-    }
-
-    /**
-     * Utility delay function for rate limiting
-     */
-    private delay(ms: number): Promise<void> {
-        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 }
