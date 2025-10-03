@@ -8,6 +8,7 @@
 import { SupportedChainsType } from "@/config/chains";
 import { globalScheduler } from "@/lib/utils/request-scheduler";
 import { withRetries } from "@/lib/utils/http-retry";
+import { createServiceLogger } from "@/lib/logging/loggerFactory";
 
 // Etherscan v2 unified API base URL
 const API_BASE_URL = "https://api.etherscan.io/v2/api";
@@ -58,13 +59,27 @@ export interface LogOptions {
     topic3?: string; // Third indexed parameter
 }
 
+const logger = createServiceLogger("EtherscanClient");
+
 export class EtherscanClient {
     constructor() {
         this.validateApiKey();
     }
 
     /**
-     * Execute HTTP fetch with global rate limiting and retry logic
+     * Check if Etherscan API response indicates rate limiting
+     */
+    private isEtherscanRateLimited(data: any): boolean {
+        return (
+            data.status !== "1" &&
+            data.message === "NOTOK" &&
+            typeof data.result === "string" &&
+            data.result.toLowerCase().includes("max calls per sec")
+        );
+    }
+
+    /**
+     * Execute HTTP fetch with Etherscan-specific rate limit detection and retry
      */
     private async doFetch<T>(url: string): Promise<T> {
         const call = async () => {
@@ -82,11 +97,30 @@ export class EtherscanClient {
                 throw error;
             }
 
-            return response.json() as Promise<T>;
+            const data = await response.json();
+
+            // Check for Etherscan-specific rate limit response
+            if (this.isEtherscanRateLimited(data)) {
+                logger.debug(
+                    {
+                        status: data.status,
+                        message: data.message,
+                        result: data.result,
+                    },
+                    "Etherscan API rate limit detected, will retry with backoff"
+                );
+                const error: any = new Error(
+                    `Etherscan API error: ${data.message} ${data.result}`
+                );
+                error.status = 429; // Mark as rate limit error for retry logic
+                throw error;
+            }
+
+            return data as T;
         };
 
         // 1) Process-wide serialization + spacing via global scheduler
-        // 2) Automatic retries with exponential backoff on rate limit errors
+        // 2) Automatic retries with exponential backoff on rate limit errors (HTTP 429 or Etherscan NOTOK)
         return globalScheduler.schedule(() => withRetries(call));
     }
 
