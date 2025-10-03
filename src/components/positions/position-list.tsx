@@ -169,6 +169,18 @@ export function PositionList({ className }: PositionListProps) {
     }
   }, [connectedAddress, handleDiscoverNewPositions]);
 
+  // Auto-hide feedback messages after 5 seconds
+  useEffect(() => {
+    if (discoveryError || discoveredCount > 0) {
+      const timer = setTimeout(() => {
+        setDiscoveryError(null);
+        setDiscoveredCount(0);
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [discoveryError, discoveredCount]);
+
   // Handle successful position deletion - update cache with correct key
   const handleDeleteSuccess = useCallback((deletedPosition: BasicPosition) => {
     // Update the cache with the correct query key that includes parameters
