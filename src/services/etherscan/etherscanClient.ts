@@ -229,7 +229,9 @@ export class EtherscanClient {
                         ).toISOString()}`
                     );
                 }
-                throw new Error(`Etherscan API error: ${data.message} ${data.result}`);
+                throw new Error(
+                    `Etherscan API error: ${data.message} ${data.result}`
+                );
             }
 
             return data.result;
@@ -254,27 +256,23 @@ export class EtherscanClient {
 
     /**
      * Enforce rate limiting per Etherscan API limits (5 requests per second)
+     * Uses consistent spacing between requests to avoid bursts
      */
     private async enforceRateLimit(): Promise<void> {
         const now = Date.now();
+        const timeSinceLastRequest = now - this.rateLimitState.lastRequestTime;
 
-        // Reset counter every second
-        if (now >= this.rateLimitState.resetTime) {
-            this.rateLimitState.requestCount = 0;
-            this.rateLimitState.resetTime = now + 1000;
+        // Ensure minimum 200ms delay between requests (5 req/sec = 200ms spacing)
+        // Add small buffer to be conservative
+        const minDelay = 210; // 210ms = ~4.76 req/sec to stay under limit
+
+        if (timeSinceLastRequest < minDelay) {
+            const waitTime = minDelay - timeSinceLastRequest;
+            await this.delay(waitTime);
         }
 
-        // Check if we need to wait
-        if (this.rateLimitState.requestCount >= 5) {
-            // 5 requests per second
-            const waitTime = this.rateLimitState.resetTime - now;
-            if (waitTime > 0) {
-                await this.delay(waitTime);
-            }
-        }
-
+        this.rateLimitState.lastRequestTime = Date.now();
         this.rateLimitState.requestCount++;
-        this.rateLimitState.lastRequestTime = now;
     }
 
     /**
