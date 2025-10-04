@@ -6,7 +6,6 @@ import { X, Loader2, AlertCircle, Check, RefreshCw } from "lucide-react";
 import { useAccount } from "wagmi";
 import type { Address } from "viem";
 import { formatUnits } from "viem";
-import { useQueryClient } from "@tanstack/react-query";
 import { getChainId, SupportedChainsType } from "@/config/chains";
 import { normalizeAddress } from "@/lib/utils/evm";
 import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
@@ -16,6 +15,7 @@ import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { NetworkSwitchStep } from "./NetworkSwitchStep";
 import { TransactionStep } from "./TransactionStep";
 import type { BasicPosition } from "@/services/positions/positionService";
+import { usePositionRefresh } from "@/hooks/api/usePositionRefresh";
 
 interface WithdrawPositionModalProps {
     isOpen: boolean;
@@ -32,7 +32,10 @@ export function WithdrawPositionModal({
     const [withdrawPercent, setWithdrawPercent] = useState<number>(0);
     const [quoteValueInput, setQuoteValueInput] = useState<string>("");
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const queryClient = useQueryClient();
+
+    // TODO: Get userId from auth context once available
+    const userId = "temp-user-id"; // Placeholder - matches PositionCard
+    const protocol = "uniswapv3";
 
     const {
         address: walletAddress,
@@ -248,6 +251,9 @@ export function WithdrawPositionModal({
     // Decrease liquidity hook
     const decreaseLiquidity = useDecreaseLiquidity(decreaseParams);
 
+    // Position refresh hook
+    const refreshMutation = usePositionRefresh();
+
     // Handle percentage slider change
     const handlePercentChange = useCallback(
         (percent: number) => {
@@ -317,65 +323,42 @@ export function WithdrawPositionModal({
         }
     }, [refetchPool, isRefreshing]);
 
-    // Handle successful withdrawal - optimistically update liquidity
+    // Handle successful withdrawal - trigger refresh to get fresh blockchain data
     useEffect(() => {
         if (decreaseLiquidity.isSuccess) {
-            // Optimistically update the position cache with new liquidity value
-            const newLiquidity = BigInt(position.liquidity) - liquidityToRemove;
-
-            queryClient.setQueriesData(
-                {
-                    queryKey: [
-                        "position",
-                        undefined,
-                        position.pool.chain,
-                        "uniswapv3",
-                        position.nftId,
-                    ],
-                },
-                (oldData: any) => {
-                    if (!oldData?.basicData) {
-                        return oldData;
-                    }
-
-                    return {
-                        ...oldData,
-                        basicData: {
-                            ...oldData.basicData,
-                            liquidity: newLiquidity.toString(),
-                        },
-                    };
+            // Trigger explicit position refresh to fetch fresh blockchain data
+            // This will:
+            // - Read fresh liquidity from NFT contract
+            // - Update status (closed if liquidity === 0)
+            // - Recalculate position value, PnL, APR with current pool state
+            // - Update all caches with fresh data
+            const refreshPosition = async () => {
+                try {
+                    await refreshMutation.mutateAsync({
+                        userId,
+                        chain: position.pool.chain,
+                        protocol,
+                        nftId: position.nftId || "",
+                    });
+                } catch (error) {
+                    console.error("Failed to refresh position after withdrawal:", error);
                 }
-            );
 
-            // Invalidate position cache to refresh data from server
-            queryClient.invalidateQueries({
-                queryKey: [
-                    "position",
-                    undefined,
-                    position.pool.chain,
-                    "uniswapv3",
-                    position.nftId,
-                ],
-            });
+                // Close modal after refresh completes
+                setTimeout(() => {
+                    onClose();
+                }, 1000);
+            };
 
-            // Also invalidate positions list
-            queryClient.invalidateQueries({
-                queryKey: ["positions", "list"],
-            });
-
-            // Close modal after short delay
-            setTimeout(() => {
-                onClose();
-            }, 2000);
+            refreshPosition();
         }
     }, [
         decreaseLiquidity.isSuccess,
+        userId,
         position.pool.chain,
         position.nftId,
-        position.liquidity,
-        liquidityToRemove,
-        queryClient,
+        protocol,
+        refreshMutation,
         onClose,
     ]);
 

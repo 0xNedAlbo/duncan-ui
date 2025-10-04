@@ -143,8 +143,9 @@ export function getChainConfig(chain: string): ChainConfig {
                 default:
                     throw new Error("Unknown chain name: " + chainName);
             }
-            // Skip RPC URL validation for local development chain (always has fallback)
-            if (chainName !== "arbitrum-fork-local" && !CHAIN_CONFIG[chainName].rpcUrl) {
+            // Skip RPC URL validation during build time or for local development chain
+            const isBuildTime = typeof window === 'undefined' && !process.env.VERCEL;
+            if (chainName !== "arbitrum-fork-local" && !CHAIN_CONFIG[chainName].rpcUrl && !isBuildTime) {
                 throw new Error(
                     `Missing NEXT_PUBLIC_${chainName.toUpperCase()}_RPC_URL for chain: ${chainName}`
                 );
