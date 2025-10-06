@@ -2,7 +2,7 @@
 
 import { useTranslations } from "@/app-shared/i18n/client";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
-import type { PnlBreakdown } from "@/services/positions/positionPnLService";
+import type { PnlBreakdown } from "@/types/pnl";
 
 interface PnLBreakdownProps {
     pnlData: PnlBreakdown;

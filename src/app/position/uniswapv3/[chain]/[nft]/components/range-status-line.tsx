@@ -2,7 +2,7 @@
 
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { tickToPrice } from "@/lib/utils/uniswap-v3/price";
-import type { BasicPosition } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/types/positions";
 
 interface RangeStatusLineProps {
     position: BasicPosition;

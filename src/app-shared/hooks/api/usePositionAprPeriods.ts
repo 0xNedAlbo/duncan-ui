@@ -7,8 +7,7 @@
 import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import { apiClient } from '@/lib/app/apiClient';
 import { ApiError } from '@/lib/app/apiError';
-import type { AprApiResponse } from '@/types/apr';
-import { QUERY_OPTIONS } from '@/types/api';
+import { QUERY_OPTIONS, type AprApiResponse } from '@/types/api';
 
 /**
  * Hook to fetch position APR periods by position identifiers

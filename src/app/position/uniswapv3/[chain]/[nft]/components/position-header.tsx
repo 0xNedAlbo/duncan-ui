@@ -6,7 +6,7 @@ import { ArrowLeft, RefreshCw, Copy, ExternalLink } from "lucide-react";
 import { useTranslations } from "@/app-shared/i18n/client";
 import Link from "next/link";
 import type { ChainConfig } from "@/config/chains";
-import type { BasicPosition } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/types/positions";
 interface PositionHeaderProps {
     position: BasicPosition;
     chainSlug: string;

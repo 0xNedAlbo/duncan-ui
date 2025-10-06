@@ -1,15 +1,14 @@
 /**
  * API Types Definition
- * 
+ *
  * Shared types for API requests and responses across the application
  */
 
-import type { BasicPosition } from '@/services/positions/positionService';
+import type { BasicPosition, DiscoveredPositionSummary } from '@/types/positions';
 import type { NFTPosition } from '@/lib/contracts/nonfungiblePositionManager';
-import type { PnlBreakdown } from '@/services/positions/positionPnLService';
-import type { AprBreakdown } from '@/services/positions/positionAprService';
+import type { PnlBreakdown } from '@/types/pnl';
+import type { AprBreakdown, PositionAprSummary } from '@/types/apr';
 import type { CurveData } from '@/app-shared/components/charts/mini-pnl-curve';
-import type { DiscoveredPositionSummary } from '@/services/positions/positionLookupService';
 
 // Enhanced position interface for API responses (includes PnL data)
 export interface PositionWithPnL extends BasicPosition {
@@ -142,6 +141,16 @@ export interface PositionRefreshResponse extends ApiResponse<{ position: BasicPo
 }
 
 export interface PositionPnlResponse extends ApiResponse<PnlBreakdown> {
+  meta: {
+    requestedAt: string;
+    chain: string;
+    protocol: string;
+    nftId: string;
+  };
+}
+
+// APR API Response (types imported from @/types/apr)
+export interface AprApiResponse extends ApiResponse<PositionAprSummary> {
   meta: {
     requestedAt: string;
     chain: string;

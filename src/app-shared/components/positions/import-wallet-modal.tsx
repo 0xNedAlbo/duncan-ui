@@ -9,7 +9,7 @@ import { handleApiError } from "@/lib/app/apiError";
 import { normalizeAddress, isValidAddress } from "@/lib/utils/evm";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { calculatePositionValueAtPrice } from "@/lib/utils/uniswap-v3/position";
-import type { BasicPosition } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/types/positions";
 import type { SupportedChainsType } from "@/config/chains";
 
 interface ImportWalletModalProps {

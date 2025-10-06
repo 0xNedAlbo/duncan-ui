@@ -1,7 +1,7 @@
 'use client'
 
 import { createTranslator } from 'next-intl'
-import { useSettingsStore } from '@/store/settings-store'
+import { useSettingsStore } from "@/app-shared/store/settings-store"
 import { useMemo } from 'react'
 
 import enMessages from '../messages/en.json'

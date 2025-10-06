@@ -18,7 +18,7 @@ import { PositionSizeConfig } from "./wizard/PositionSizeConfig";
 import { InsufficientFundsAlert } from "./wizard/InsufficientFundsAlert";
 import { NetworkSwitchStep } from "./NetworkSwitchStep";
 import { TransactionStep } from "./TransactionStep";
-import type { BasicPosition } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/types/positions";
 
 interface IncreasePositionModalProps {
     isOpen: boolean;

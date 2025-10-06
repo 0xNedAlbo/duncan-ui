@@ -9,7 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/types/api";
 import { ImportWalletModal } from "@/app-shared/components/positions/import-wallet-modal";
 import { PositionWizard } from "@/app-shared/components/positions/wizard/PositionWizard";
-import type { BasicPosition } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/types/positions";
 
 interface CreatePositionDropdownProps {
     // eslint-disable-next-line no-unused-vars

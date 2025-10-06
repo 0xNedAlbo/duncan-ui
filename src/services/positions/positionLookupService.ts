@@ -19,18 +19,10 @@ import type { Services } from "../ServiceFactory";
 import type { Clients } from "../ClientsFactory";
 import { normalizeAddress, isValidAddress } from "@/lib/utils/evm";
 import { createServiceLogger, type ServiceLogger } from "@/lib/logging/loggerFactory";
+import type { DiscoveredPositionSummary } from "@/types/positions";
 
-export interface DiscoveredPositionSummary {
-    nftId: string;
-    poolAddress: string;
-    token0Symbol: string;
-    token1Symbol: string;
-    fee: number;
-    tickLower: number;
-    tickUpper: number;
-    liquidity: string;
-    status: "active" | "closed";
-}
+// Re-export for backward compatibility
+export type { DiscoveredPositionSummary };
 
 export interface PositionLookupResult {
     address: string;

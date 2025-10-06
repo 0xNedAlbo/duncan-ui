@@ -1,5 +1,5 @@
 import { getRequestConfig } from 'next-intl/server'
-import { SupportedLocale } from '@/store/settings-store'
+import { SupportedLocale } from "@/app-shared/store/settings-store"
 
 export default getRequestConfig(async () => {
   // In a client-side context, we'll get the locale from our settings store

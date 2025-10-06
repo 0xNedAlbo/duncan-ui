@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { MoreVertical, Trash2 } from "lucide-react";
 import { useTranslations } from "@/app-shared/i18n/client";
-import type { BasicPosition } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/types/positions";
 
 interface PositionActionsMenuProps {
   position: BasicPosition;

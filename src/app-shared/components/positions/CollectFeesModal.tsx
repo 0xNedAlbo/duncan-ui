@@ -13,7 +13,7 @@ import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { useTranslations } from "@/app-shared/i18n/client";
 import { NetworkSwitchStep } from "./NetworkSwitchStep";
 import { TransactionStep } from "./TransactionStep";
-import type { BasicPosition } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/types/positions";
 import type { UnclaimedFeeAmounts } from "@/app/api/positions/uniswapv3/[chain]/[nft]/details/route";
 
 interface CollectFeesModalProps {

@@ -12,6 +12,10 @@ import type { Services } from "../ServiceFactory";
 import type { Clients } from "../ClientsFactory";
 
 import { UNISWAP_V3_POOL_ABI, TickData } from "@/lib/contracts/uniswapV3Pool";
+import type { PnlBreakdown, UnclaimedFeesWithMetadata } from "@/types/pnl";
+
+// Re-export types for backward compatibility
+export type { PnlBreakdown, UnclaimedFeesWithMetadata };
 import {
   NONFUNGIBLE_POSITION_MANAGER_ABI,
   NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
@@ -20,7 +24,6 @@ import {
 } from "@/lib/contracts/nonfungiblePositionManager";
 import {
   UnclaimedFees,
-  UnclaimedFeesWithMetadata,
   computeFeeGrowthInside,
   calculateIncrementalFees
 } from "@/lib/utils/uniswap-v3/fees";
@@ -29,24 +32,6 @@ import { PositionService, PositionId } from "./positionService";
 import { PoolService } from "../pools/poolService";
 import { PositionLedgerService } from "./positionLedgerService";
 
-export interface PnlBreakdown {
-  // Core position metrics (all in quote token units as strings)
-  currentValue: string;           // Current position value
-  currentCostBasis: string;       // Latest cost basis from PositionEvent
-  collectedFees: string;          // Total fees collected historically
-  unclaimedFees: string;          // Current unclaimed fees value
-  realizedPnL: string;            // Current realized PnL from PositionEvent
-
-  // Derived metrics
-  unrealizedPnL: string;          // currentValue - currentCostBasis
-  totalPnL: string;               // unrealizedPnL + collectedFees + unclaimedFees
-
-  // Metadata
-  positionChain: string;
-  positionProtocol: string;
-  positionNftId: string;
-  calculatedAt: Date;
-}
 
 export class PositionPnLService {
   private prisma: PrismaClient;

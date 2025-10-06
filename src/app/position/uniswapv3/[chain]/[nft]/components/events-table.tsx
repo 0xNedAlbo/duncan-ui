@@ -3,10 +3,10 @@
 import { useTranslations } from "@/app-shared/i18n/client";
 import { PositionEvent } from "@/types/api";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
-import { useSettingsStore } from "@/store/settings-store";
+import { useSettingsStore } from "@/app-shared/store/settings-store";
 import { ExternalLink, Clock } from "lucide-react";
 import Image from "next/image";
-import type { TokenData } from "@/services/positions/positionService";
+import type { TokenData } from "@/types/positions";
 
 interface EventsTableProps {
     events: PositionEvent[];

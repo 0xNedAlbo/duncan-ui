@@ -1,7 +1,7 @@
 import { getTokenAmountsFromLiquidity, calculatePositionValue } from "@/lib/utils/uniswap-v3/liquidity";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 import type { BasicPosition } from "@/services/positions/positionService";
-import type { PnlBreakdown } from "@/services/positions/positionPnLService";
+import type { PnlBreakdown } from "@/types/pnl";
 
 export interface PositionState {
     baseTokenAmount: bigint;

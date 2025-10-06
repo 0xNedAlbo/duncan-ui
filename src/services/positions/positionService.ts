@@ -11,101 +11,31 @@ import { type PublicClient } from "viem";
 import { UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_FACTORY_ADDRESSES } from "@/lib/contracts/uniswapV3Factory";
 import { NONFUNGIBLE_POSITION_MANAGER_ABI, NONFUNGIBLE_POSITION_MANAGER_ADDRESSES, getChainId } from "@/lib/contracts/nonfungiblePositionManager";
 import { normalizeAddress, compareAddresses } from "@/lib/utils/evm";
+import type {
+    TokenData,
+    PoolData,
+    BasicPosition,
+    CreatePositionData,
+    PositionId,
+    UpdatePositionData,
+    PositionListOptions,
+    DiscoveredPositionSummary
+} from "@/types/positions";
 
-// Token data interface
-export interface TokenData {
-    address: string;
-    symbol: string;
-    name: string;
-    decimals: number;
-    logoUrl?: string;
-}
+// Re-export types for backward compatibility
+export type {
+    TokenData,
+    PoolData,
+    BasicPosition,
+    CreatePositionData,
+    PositionId,
+    UpdatePositionData,
+    PositionListOptions,
+    DiscoveredPositionSummary
+};
 
-// Pool data interface
-export interface PoolData {
-    chain: string;
-    poolAddress: string;
-    protocol: string;
-    fee: number;
-    tickSpacing: number;
-    token0: TokenData;
-    token1: TokenData;
-    currentTick?: number;
-    currentPrice?: string;
-}
-
-// Basic position interface (no PnL data)
-export interface BasicPosition {
-    userId: string;
-    chain: string;
-    protocol: string;
-    nftId: string;
-    liquidity: string;
-    tickLower: number;
-    tickUpper: number;
-    token0IsQuote: boolean;
-    owner?: string;
-    importType: string;
-    status: string;
-    pool: PoolData;
-    createdAt: Date;
-    updatedAt: Date;
-}
-
-// Position creation data
-export interface CreatePositionData {
-    chain: string;
-    protocol: string;
-    nftId: string;
-    userId: string;
-    poolChain: string;
-    poolAddress: string;
-    tickLower: number;
-    tickUpper: number;
-    liquidity: string;
-    token0IsQuote: boolean;
-    owner?: string;
-    importType: "manual" | "wallet" | "nft";
-    status?: string;
-}
-
-// Position composite primary key interface
-export interface PositionId {
-    userId: string;
-    chain: string;
-    protocol: string;
-    nftId: string;
-}
-
-// Helper functions for PositionId
-export function createPositionId(userId: string, chain: string, protocol: string, nftId: string): PositionId {
-    return { userId, chain, protocol, nftId };
-}
-
-export function formatPositionKey(positionId: PositionId): string {
-    return `${positionId.userId}-${positionId.chain}-${positionId.protocol}-${positionId.nftId}`;
-}
-
-// Position update data
-export interface UpdatePositionData {
-    liquidity?: string;
-    tickLower?: number;
-    tickUpper?: number;
-    token0IsQuote?: boolean;
-    owner?: string;
-    status?: string;
-}
-
-// Position list options
-export interface PositionListOptions {
-    userId?: string;
-    chain?: SupportedChainsType;
-    status?: string;
-    limit?: number;
-    offset?: number;
-    sortBy?: "createdAt" | "updatedAt" | "liquidity";
-    sortOrder?: "asc" | "desc";
-}
+// Re-export helper functions
+export { createPositionId, formatPositionKey } from "@/types/positions";
 
 export class PositionService {
     private prisma: PrismaClient;

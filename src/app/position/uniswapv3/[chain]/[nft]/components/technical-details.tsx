@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Copy, ExternalLink, Check } from "lucide-react";
 import { useTranslations } from "@/app-shared/i18n/client";
-import type { BasicPosition } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/types/positions";
 import { getChainConfig } from "@/config/chains";
 import {
     NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,

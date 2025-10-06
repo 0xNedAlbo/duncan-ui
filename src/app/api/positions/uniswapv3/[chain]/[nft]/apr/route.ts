@@ -3,8 +3,9 @@ import { withAuthAndLogging } from "@/lib/api/withAuth";
 import { logError } from "@/lib/api/withLogging";
 import { ApiServiceFactory } from "@/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
-import type { AprApiResponse, PositionAprSummary } from "@/types/apr";
-import type { PositionId } from "@/services/positions/positionService";
+import type { AprApiResponse } from "@/types/api";
+import type { PositionAprSummary } from "@/types/apr";
+import type { PositionId } from "@/types/positions";
 
 /**
  * GET /api/positions/uniswapv3/[chain]/[nft]/apr - Get position APR calculation
@@ -35,10 +36,14 @@ export const GET = withAuthAndLogging<AprApiResponse>(
             if (!chain || !nftId) {
                 return NextResponse.json(
                     {
-                        chain: chain || 'unknown',
-                        nftId: nftId || 'unknown',
                         success: false,
-                        error: "Chain and NFT ID are required"
+                        error: "Chain and NFT ID are required",
+                        meta: {
+                            requestedAt: new Date().toISOString(),
+                            chain: chain || 'unknown',
+                            protocol: 'uniswapv3',
+                            nftId: nftId || 'unknown'
+                        }
                     },
                     { status: 400 }
                 );
@@ -48,10 +53,14 @@ export const GET = withAuthAndLogging<AprApiResponse>(
             if (!SUPPORTED_CHAINS.includes(chain)) {
                 return NextResponse.json(
                     {
-                        chain,
-                        nftId,
                         success: false,
-                        error: `Invalid chain parameter. Supported chains: ${SUPPORTED_CHAINS.join(", ")}`
+                        error: `Invalid chain parameter. Supported chains: ${SUPPORTED_CHAINS.join(", ")}`,
+                        meta: {
+                            requestedAt: new Date().toISOString(),
+                            chain,
+                            protocol: 'uniswapv3',
+                            nftId
+                        }
                     },
                     { status: 400 }
                 );
@@ -61,10 +70,14 @@ export const GET = withAuthAndLogging<AprApiResponse>(
             if (!/^\d+$/.test(nftId)) {
                 return NextResponse.json(
                     {
-                        chain,
-                        nftId,
                         success: false,
-                        error: "Invalid NFT ID format. Must be a positive integer."
+                        error: "Invalid NFT ID format. Must be a positive integer.",
+                        meta: {
+                            requestedAt: new Date().toISOString(),
+                            chain,
+                            protocol: 'uniswapv3',
+                            nftId
+                        }
                     },
                     { status: 400 }
                 );
@@ -95,10 +108,14 @@ export const GET = withAuthAndLogging<AprApiResponse>(
                 );
                 return NextResponse.json(
                     {
-                        chain,
-                        nftId,
                         success: false,
-                        error: "Position not found"
+                        error: "Position not found",
+                        meta: {
+                            requestedAt: new Date().toISOString(),
+                            chain,
+                            protocol: 'uniswapv3',
+                            nftId
+                        }
                     },
                     { status: 404 }
                 );
@@ -166,10 +183,14 @@ export const GET = withAuthAndLogging<AprApiResponse>(
             );
 
             return NextResponse.json({
-                chain,
-                nftId,
                 success: true,
-                data: responseData
+                data: responseData,
+                meta: {
+                    requestedAt: new Date().toISOString(),
+                    chain,
+                    protocol: 'uniswapv3',
+                    nftId
+                }
             });
 
         } catch (error) {
@@ -181,10 +202,14 @@ export const GET = withAuthAndLogging<AprApiResponse>(
 
             return NextResponse.json(
                 {
-                    chain: params?.chain || 'unknown',
-                    nftId: params?.nft || 'unknown',
                     success: false,
-                    error: error instanceof Error ? error.message : "Failed to calculate APR"
+                    error: error instanceof Error ? error.message : "Failed to calculate APR",
+                    meta: {
+                        requestedAt: new Date().toISOString(),
+                        chain: params?.chain || 'unknown',
+                        protocol: 'uniswapv3',
+                        nftId: params?.nft || 'unknown'
+                    }
                 },
                 { status: 500 }
             );

@@ -3,8 +3,8 @@
 import { useTranslations } from "@/app-shared/i18n/client";
 import { usePositionAprPeriods } from "@/app-shared/hooks/api/usePositionAprPeriods";
 import { AprBreakdown } from "@/app-shared/components/positions/apr-breakdown";
-import type { AprBreakdown as AprBreakdownType } from "@/services/positions/positionAprService";
-import type { PnlBreakdown } from "@/services/positions/positionPnLService";
+import type { AprBreakdown as AprBreakdownType } from "@/types/apr";
+import type { PnlBreakdown } from "@/types/pnl";
 
 interface AprTabProps {
     chainSlug: string;

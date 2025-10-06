@@ -1,7 +1,7 @@
 "use client";
 
 import { MiniPnLCurve, type CurveData } from "./mini-pnl-curve";
-import type { BasicPosition } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/types/positions";
 
 interface MiniPnLCurveLazyProps {
     position: BasicPosition;

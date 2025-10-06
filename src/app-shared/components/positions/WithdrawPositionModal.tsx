@@ -14,7 +14,7 @@ import { usePool } from "@/app-shared/hooks/api/usePool";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { NetworkSwitchStep } from "./NetworkSwitchStep";
 import { TransactionStep } from "./TransactionStep";
-import type { BasicPosition } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/types/positions";
 import { usePositionRefresh } from "@/app-shared/hooks/api/usePositionRefresh";
 
 interface WithdrawPositionModalProps {

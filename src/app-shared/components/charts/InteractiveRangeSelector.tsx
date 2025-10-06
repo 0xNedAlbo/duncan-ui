@@ -7,7 +7,7 @@ import { priceToTick } from "@/lib/utils/uniswap-v3/price";
 import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { normalizeAddress } from "@/lib/utils/evm";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
-import type { PoolWithTokens } from "@/services/pools/poolService";
+import type { PoolWithTokens } from "@/types/pools";
 import type {
     InteractiveRangeData,
     InteractionState

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, memo } from "react";
-import type { BasicPosition } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/types/positions";
 import { useTranslations } from "@/app-shared/i18n/client";
 
 interface MiniPnLCurveProps {

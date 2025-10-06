@@ -15,8 +15,8 @@ import {
     ChevronUp,
     Minus,
 } from "lucide-react";
-import type { BasicPosition } from "@/services/positions/positionService";
-import type { PnlBreakdown } from "@/services/positions/positionPnLService";
+import type { BasicPosition } from "@/types/positions";
+import type { PnlBreakdown } from "@/types/pnl";
 import type { CurveData } from "@/app-shared/components/charts/mini-pnl-curve";
 import { calculatePositionStates, calculateBreakEvenPrice } from "@/lib/utils/position-states";
 import { MiniPnLCurve } from "@/app-shared/components/charts/mini-pnl-curve";

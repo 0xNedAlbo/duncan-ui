@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { RotateCcw, Plus } from "lucide-react";
 import { useTranslations } from "@/app-shared/i18n/client";
-import type { BasicPosition } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/types/positions";
 import type { PositionListParams } from "@/types/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/types/api";

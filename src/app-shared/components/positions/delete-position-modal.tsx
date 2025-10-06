@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "@/app-shared/i18n/client";
 import { useDeletePosition } from "@/app-shared/hooks/api/useDeletePosition";
 import { handleApiError } from "@/lib/app/apiError";
-import type { BasicPosition } from "@/services/positions/positionService";
+import type { BasicPosition } from "@/types/positions";
 
 interface DeletePositionModalProps {
   isOpen: boolean;
