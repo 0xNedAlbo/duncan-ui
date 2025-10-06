@@ -1,4 +1,4 @@
-import type { CurveData } from "@/components/charts/mini-pnl-curve";
+import type { CurveData } from "@/app-shared/components/charts/mini-pnl-curve";
 
 export interface CachedCurveData extends CurveData {
     timestamp: number;

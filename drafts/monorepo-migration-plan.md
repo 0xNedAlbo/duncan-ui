@@ -492,7 +492,7 @@ import {
 Keep these imports as-is (web-only modules):
 
 ```typescript
-import { PositionCard } from '@/components/positions/PositionCard';
+import { PositionCard } from '@/app-shared/components/positions/PositionCard';
 import { usePosition } from '@/hooks/api/usePosition';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { getTranslations } from 'next-intl/server'; // i18n

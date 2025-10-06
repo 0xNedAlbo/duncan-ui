@@ -4,7 +4,7 @@ import { useState } from "react";
 import { formatUnits } from "viem";
 import type { SupportedChainsType } from "@/config/chains";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
-import { CowSwapWidget } from "@/components/common/CowSwapWidget";
+import { CowSwapWidget } from "@/app-shared/components/common/CowSwapWidget";
 import type { InsufficientFundsInfo } from "@/hooks/positions/usePositionValidation";
 
 interface PoolData {

@@ -5,7 +5,7 @@ import { ApiServiceFactory } from "@/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
 import type { BasicPosition } from "@/services/positions/positionService";
 import type { PnlBreakdown } from "@/services/positions/positionPnLService";
-import type { CurveData } from "@/components/charts/mini-pnl-curve";
+import type { CurveData } from "@/app-shared/components/charts/mini-pnl-curve";
 import type { AprBreakdown } from "@/services/positions/positionAprService";
 import type { ApiResponse } from "@/types/api";
 

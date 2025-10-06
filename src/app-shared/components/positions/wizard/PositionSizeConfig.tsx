@@ -5,7 +5,7 @@ import { PencilLine, PencilOff, RefreshCw } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useTranslations } from "@/i18n/client";
-import { TokenAmountInput } from "@/components/common/TokenAmountInput";
+import { TokenAmountInput } from "@/app-shared/components/common/TokenAmountInput";
 import type { PoolData } from "@/hooks/api/usePool";
 import type { SupportedChainsType } from "@/config/chains";
 import { usePositionSizeCalculation } from "@/hooks/usePositionSizeCalculation";

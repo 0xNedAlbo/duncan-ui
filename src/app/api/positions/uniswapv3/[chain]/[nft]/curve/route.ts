@@ -3,7 +3,7 @@ import { withAuthAndLogging } from "@/lib/api/withAuth";
 import { logError } from "@/lib/api/withLogging";
 import { ApiServiceFactory } from "@/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
-import type { CurveData } from "@/components/charts/mini-pnl-curve";
+import type { CurveData } from "@/app-shared/components/charts/mini-pnl-curve";
 import type { ApiResponse } from "@/types/api";
 
 export interface PositionCurveResponse extends ApiResponse<CurveData | null> {

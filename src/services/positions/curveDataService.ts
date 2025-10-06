@@ -8,7 +8,7 @@
 import { PrismaClient } from "@prisma/client";
 import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
-import type { CurvePoint, CurveData } from "@/components/charts/mini-pnl-curve";
+import type { CurvePoint, CurveData } from "@/app-shared/components/charts/mini-pnl-curve";
 import type { Services } from "../ServiceFactory";
 import type { Clients } from "../ClientsFactory";
 import type { BasicPosition, PositionId } from "./positionService";

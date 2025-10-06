@@ -31,7 +31,7 @@ import { usePositionRefresh } from "@/hooks/api/usePositionRefresh";
 import { useIsDeletingPosition } from "@/hooks/api/useDeletePosition";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { MiniPnLCurveLazy } from "@/components/charts/mini-pnl-curve-lazy";
+import { MiniPnLCurveLazy } from "@/app-shared/components/charts/mini-pnl-curve-lazy";
 import { PositionActionsMenu } from "./position-actions-menu";
 import { DeletePositionModal } from "./delete-position-modal";
 import { IncreasePositionModal } from "./IncreasePositionModal";

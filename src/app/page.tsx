@@ -1,7 +1,7 @@
 "use client";
 
-import { UserDropdown } from "@/components/auth/user-dropdown";
-import { SettingsModal } from "@/components/settings-modal";
+import { UserDropdown } from "@/app-shared/components/auth/user-dropdown";
+import { SettingsModal } from "@/app-shared/components/settings-modal";
 import { useTranslations } from "@/i18n/client";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";

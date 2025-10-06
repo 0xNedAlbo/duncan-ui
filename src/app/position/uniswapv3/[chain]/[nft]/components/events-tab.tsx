@@ -3,7 +3,7 @@
 import { useTranslations } from "@/i18n/client";
 import { usePositionLedger } from "@/hooks/api/usePositionLedger";
 import { usePosition } from "@/hooks/api/usePosition";
-import { PnLBreakdown } from "@/components/positions/pnl-breakdown";
+import { PnLBreakdown } from "@/app-shared/components/positions/pnl-breakdown";
 import { EventsTable } from "./events-table";
 
 interface EventsTabProps {

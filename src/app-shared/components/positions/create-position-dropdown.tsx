@@ -7,8 +7,8 @@ import { useImportPositionByNftId } from "@/hooks/api/useImportPositionByNftId";
 import { handleApiError } from "@/lib/app/apiError";
 import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/types/api";
-import { ImportWalletModal } from "@/components/positions/import-wallet-modal";
-import { PositionWizard } from "@/components/positions/wizard/PositionWizard";
+import { ImportWalletModal } from "@/app-shared/components/positions/import-wallet-modal";
+import { PositionWizard } from "@/app-shared/components/positions/wizard/PositionWizard";
 import type { BasicPosition } from "@/services/positions/positionService";
 
 interface CreatePositionDropdownProps {

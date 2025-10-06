@@ -1,10 +1,10 @@
 "use client";
 
 import { Suspense } from "react";
-import { UserDropdown } from "@/components/auth/user-dropdown";
-import { SettingsModal } from "@/components/settings-modal";
-import { CreatePositionDropdown } from "@/components/positions/create-position-dropdown";
-import { PositionList } from "@/components/positions/position-list";
+import { UserDropdown } from "@/app-shared/components/auth/user-dropdown";
+import { SettingsModal } from "@/app-shared/components/settings-modal";
+import { CreatePositionDropdown } from "@/app-shared/components/positions/create-position-dropdown";
+import { PositionList } from "@/app-shared/components/positions/position-list";
 import { useTranslations } from "@/i18n/client";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";

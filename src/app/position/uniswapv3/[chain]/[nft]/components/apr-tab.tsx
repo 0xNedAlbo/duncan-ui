@@ -2,7 +2,7 @@
 
 import { useTranslations } from "@/i18n/client";
 import { usePositionAprPeriods } from "@/hooks/api/usePositionAprPeriods";
-import { AprBreakdown } from "@/components/positions/apr-breakdown";
+import { AprBreakdown } from "@/app-shared/components/positions/apr-breakdown";
 import type { AprBreakdown as AprBreakdownType } from "@/services/positions/positionAprService";
 import type { PnlBreakdown } from "@/services/positions/positionPnLService";
 

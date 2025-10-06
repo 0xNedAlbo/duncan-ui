@@ -17,9 +17,9 @@ import {
 } from "lucide-react";
 import type { BasicPosition } from "@/services/positions/positionService";
 import type { PnlBreakdown } from "@/services/positions/positionPnLService";
-import type { CurveData } from "@/components/charts/mini-pnl-curve";
+import type { CurveData } from "@/app-shared/components/charts/mini-pnl-curve";
 import { calculatePositionStates, calculateBreakEvenPrice } from "@/lib/utils/position-states";
-import { MiniPnLCurve } from "@/components/charts/mini-pnl-curve";
+import { MiniPnLCurve } from "@/app-shared/components/charts/mini-pnl-curve";
 import { tickToPrice } from "@/lib/utils/uniswap-v3/price";
 import { RangeStatusLine } from "./range-status-line";
 
