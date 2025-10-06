@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/app-shared/i18n/client";
 import { useDeletePosition } from "@/app-shared/hooks/api/useDeletePosition";
-import { handleApiError } from "@/lib/app/apiError";
+import { handleApiError } from "@/app-shared/lib/api-client/apiError";
 import type { BasicPosition } from "@/types/positions";
 
 interface DeletePositionModalProps {

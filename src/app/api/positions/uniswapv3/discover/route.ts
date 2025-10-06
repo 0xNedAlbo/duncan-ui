@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuthAndLogging } from '@/lib/api/withAuth';
-import { ApiServiceFactory } from '@/lib/api/ApiServiceFactory';
+import { withAuthAndLogging } from '@/app-shared/lib/api/withAuth';
+import { ApiServiceFactory } from '@/app-shared/lib/api/ApiServiceFactory';
 import { SupportedChainsType, SUPPORTED_CHAINS } from '@/config/chains';
 import { normalizeAddress, isValidAddress } from '@/lib/utils/evm';
 import type { DiscoverPositionsRequest, DiscoverPositionsResponse } from '@/types/api';

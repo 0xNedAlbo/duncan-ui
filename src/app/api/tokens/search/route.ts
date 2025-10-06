@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuthAndLogging } from "@/lib/api/withAuth";
+import { withAuthAndLogging } from "@/app-shared/lib/api/withAuth";
 import { DefaultClientsFactory } from "@/services/ClientsFactory";
 import { DefaultServiceFactory } from "@/services/ServiceFactory";
 import { OnChainTokenService } from "@/services/tokens/onChainTokenService";
 import { isValidAddress } from "@/lib/utils/evm";
-import { getPopularTokens, findPopularToken } from "@/lib/config/popularTokens";
+import { getPopularTokens, findPopularToken } from "@/app-shared/lib/config/popularTokens";
 import { SUPPORTED_CHAINS, type SupportedChainsType } from "@/config/chains";
 
 interface TokenSearchResponse {

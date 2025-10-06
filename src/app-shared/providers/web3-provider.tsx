@@ -1,7 +1,7 @@
 "use client";
 
 import { WagmiProvider } from "wagmi";
-import { config } from "@/lib/wagmi";
+import { config } from "@/app-shared/lib/wagmi";
 import "@rainbow-me/rainbowkit/styles.css";
 
 import { RainbowKitProvider } from "@rainbow-me/rainbowkit";

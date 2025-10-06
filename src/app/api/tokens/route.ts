@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuthAndLogging } from "@/lib/api/withAuth";
+import { withAuthAndLogging } from "@/app-shared/lib/api/withAuth";
 import { DefaultServiceFactory } from "@/services/ServiceFactory";
 import { isValidAddress } from "@/lib/utils/evm";
 import { SUPPORTED_CHAINS, type SupportedChainsType } from "@/config/chains";

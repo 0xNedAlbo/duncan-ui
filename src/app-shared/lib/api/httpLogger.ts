@@ -6,7 +6,7 @@
 
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "./logger";
-import type { AuthUser } from "@/lib/auth/getAuthUser";
+import type { AuthUser } from "@/app-shared/lib/auth/getAuthUser";
 
 export function beginRequestLog(req: Request, authUser?: AuthUser) {
   const url = new URL(req.url);

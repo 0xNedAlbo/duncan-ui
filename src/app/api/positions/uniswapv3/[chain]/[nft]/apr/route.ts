@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuthAndLogging } from "@/lib/api/withAuth";
-import { logError } from "@/lib/api/withLogging";
-import { ApiServiceFactory } from "@/lib/api/ApiServiceFactory";
+import { withAuthAndLogging } from "@/app-shared/lib/api/withAuth";
+import { logError } from "@/app-shared/lib/api/withLogging";
+import { ApiServiceFactory } from "@/app-shared/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
 import type { AprApiResponse } from "@/types/api";
 import type { PositionAprSummary } from "@/types/apr";

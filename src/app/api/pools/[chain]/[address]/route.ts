@@ -7,8 +7,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { withAuthAndLogging } from "@/lib/api/withAuth";
-import { getApiServiceFactory } from "@/lib/api/ApiServiceFactory";
+import { withAuthAndLogging } from "@/app-shared/lib/api/withAuth";
+import { getApiServiceFactory } from "@/app-shared/lib/api/ApiServiceFactory";
 import { isValidAddress } from "@/lib/utils/evm";
 import { getChainConfig, SUPPORTED_CHAINS, type SupportedChainsType } from "@/config/chains";
 

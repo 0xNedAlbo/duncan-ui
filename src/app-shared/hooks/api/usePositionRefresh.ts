@@ -5,7 +5,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/app/apiClient';
+import { apiClient } from '@/app-shared/lib/api-client/apiClient';
 import type { PositionRefreshResponse } from '@/types/api';
 
 /**

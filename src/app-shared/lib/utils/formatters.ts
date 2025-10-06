@@ -2,7 +2,7 @@
  * Currency, percentage, and token amount formatting utilities
  */
 
-import { formatHumanWithDecimals, FORMAT_PRESET_EN, FORMAT_PRESET_DE } from './fraction-format';
+import { formatHumanWithDecimals, FORMAT_PRESET_EN, FORMAT_PRESET_DE } from '@/lib/utils/fraction-format';
 
 /**
  * Format a currency value with K/M suffixes

@@ -6,9 +6,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { withLogging } from "@/lib/api/withLogging";
-import { getAuthUser } from "@/lib/auth/getAuthUser";
-import { ApiServiceFactory } from "@/lib/api/ApiServiceFactory";
+import { withLogging } from "@/app-shared/lib/api/withLogging";
+import { getAuthUser } from "@/app-shared/lib/auth/getAuthUser";
+import { ApiServiceFactory } from "@/app-shared/lib/api/ApiServiceFactory";
 
 export const runtime = "nodejs";
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuthAndLogging } from "@/lib/api/withAuth";
+import { withAuthAndLogging } from "@/app-shared/lib/api/withAuth";
 import { DefaultClientsFactory } from "@/services/ClientsFactory";
 import { DefaultServiceFactory } from "@/services/ServiceFactory";
 import { TokenEnrichmentService } from "@/services/tokens/tokenEnrichmentService";

@@ -18,7 +18,7 @@ import {
 import type { BasicPosition } from "@/types/positions";
 import type { PnlBreakdown } from "@/types/pnl";
 import type { CurveData } from "@/app-shared/components/charts/mini-pnl-curve";
-import { calculatePositionStates, calculateBreakEvenPrice } from "@/lib/utils/position-states";
+import { calculatePositionStates, calculateBreakEvenPrice } from "@/app-shared/lib/utils/position-states";
 import { MiniPnLCurve } from "@/app-shared/components/charts/mini-pnl-curve";
 import { tickToPrice } from "@/lib/utils/uniswap-v3/price";
 import { RangeStatusLine } from "./range-status-line";

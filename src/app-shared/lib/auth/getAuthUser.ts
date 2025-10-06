@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/app-shared/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { verify } from '@node-rs/argon2';
 import { createServiceLogger } from "@/lib/logging/loggerFactory";

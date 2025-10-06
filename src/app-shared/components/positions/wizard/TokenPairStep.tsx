@@ -20,7 +20,7 @@ import {
     type TokenSearchResult,
 } from "@/app-shared/hooks/api/useTokenSearch";
 import { useTokenPairValidation } from "@/app-shared/hooks/useTokenPairValidation";
-import { getPopularTokens } from "@/lib/config/popularTokens";
+import { getPopularTokens } from "@/app-shared/lib/config/popularTokens";
 import {
     truncateAddress,
     truncateText,

@@ -6,7 +6,7 @@
  */
 
 import pino from "pino";
-import { logger as baseLogger } from "../api/logger";
+import { logger as baseLogger } from "@/app-shared/lib/api/logger";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface ServiceLogger extends pino.Logger {

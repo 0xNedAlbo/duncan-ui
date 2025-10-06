@@ -3,7 +3,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { withLogging } from '@/lib/api/withLogging';
+import { withLogging } from '@/app-shared/lib/api/withLogging';
 
 export const runtime = "nodejs";
 

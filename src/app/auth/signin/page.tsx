@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAccount, useSignMessage } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { SiweMessage } from "siwe";
-import { useAuthTranslations } from "@/lib/auth-translations";
+import { useAuthTranslations } from "@/app-shared/lib/auth-translations";
 
 export default function SignInPage() {
     const [error, setError] = useState("");

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuthAndLogging } from "@/lib/api/withAuth";
-import { logError } from "@/lib/api/withLogging";
-import { ApiServiceFactory } from "@/lib/api/ApiServiceFactory";
+import { withAuthAndLogging } from "@/app-shared/lib/api/withAuth";
+import { logError } from "@/app-shared/lib/api/withLogging";
+import { ApiServiceFactory } from "@/app-shared/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
 import type { CurveData } from "@/app-shared/components/charts/mini-pnl-curve";
 import type { ApiResponse } from "@/types/api";

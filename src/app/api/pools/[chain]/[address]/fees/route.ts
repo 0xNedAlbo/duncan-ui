@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuthAndLogging } from '@/lib/api/withAuth';
+import { withAuthAndLogging } from '@/app-shared/lib/api/withAuth';
 import { getPoolFeeData } from '@/services/pools/poolFeeService';
 import { isValidAddress, normalizeAddress } from '@/lib/utils/evm';
 import { isValidChainSlug } from '@/config/chains';

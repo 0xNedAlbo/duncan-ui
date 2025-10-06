@@ -5,7 +5,7 @@ import { X, Wallet, Search, Circle, CheckCircle, Loader2, ExternalLink } from "l
 import { useAccount } from "wagmi";
 import { useTranslations } from "@/app-shared/i18n/client";
 import { useDiscoverPositions, useImportDiscoveredPositions } from "@/app-shared/hooks/api/useDiscoverPositions";
-import { handleApiError } from "@/lib/app/apiError";
+import { handleApiError } from "@/app-shared/lib/api-client/apiError";
 import { normalizeAddress, isValidAddress } from "@/lib/utils/evm";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { calculatePositionValueAtPrice } from "@/lib/utils/uniswap-v3/position";

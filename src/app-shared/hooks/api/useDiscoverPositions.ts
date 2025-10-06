@@ -5,8 +5,8 @@
  */
 
 import { useMutation, useQueryClient, UseMutationOptions } from '@tanstack/react-query';
-import { apiClient } from '@/lib/app/apiClient';
-import { ApiError } from '@/lib/app/apiError';
+import { apiClient } from '@/app-shared/lib/api-client/apiClient';
+import { ApiError } from '@/app-shared/lib/api-client/apiError';
 import type {
   DiscoverPositionsRequest,
   DiscoverPositionsResponse,

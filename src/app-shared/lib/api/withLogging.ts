@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beginRequestLog } from "./httpLogger";
 import type { Logger } from "./logger";
-import type { AuthUser } from "@/lib/auth/getAuthUser";
+import type { AuthUser } from "@/app-shared/lib/auth/getAuthUser";
 
 export interface LoggingContext {
     log: Logger;

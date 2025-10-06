@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser, type AuthUser } from "@/lib/auth/getAuthUser";
+import { getAuthUser, type AuthUser } from "@/app-shared/lib/auth/getAuthUser";
 import { createServiceLogger } from "@/lib/logging/loggerFactory";
 import type { NextRouteContext } from './types';
 
