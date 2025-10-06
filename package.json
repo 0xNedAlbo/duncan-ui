@@ -8,14 +8,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest",
     "typecheck": "npx tsc -p tsconfig.typecheck.json",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage",
-    "test:run": "vitest run",
     "db:seed": "npx tsx prisma/seed.ts",
     "postinstall": "prisma generate",
-    "deploy": "prisma generate && prisma migrate deploy && next build"
+    "vercel:build": "prisma generate && prisma migrate deploy && next build",
+    "vercel:install": "npm ci"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
