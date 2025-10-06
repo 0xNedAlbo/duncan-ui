@@ -1,8 +1,8 @@
 "use client";
 
 import { useTranslations } from "@/app-shared/i18n/client";
-import { usePositionLedger } from "@/hooks/api/usePositionLedger";
-import { usePosition } from "@/hooks/api/usePosition";
+import { usePositionLedger } from "@/app-shared/hooks/api/usePositionLedger";
+import { usePosition } from "@/app-shared/hooks/api/usePosition";
 import { PnLBreakdown } from "@/app-shared/components/positions/pnl-breakdown";
 import { EventsTable } from "./events-table";
 

@@ -9,13 +9,13 @@ import { formatUnits } from "viem";
 import { getChainId, SupportedChainsType } from "@/config/chains";
 import { normalizeAddress } from "@/lib/utils/evm";
 import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
-import { useDecreaseLiquidity } from "@/hooks/useDecreaseLiquidity";
-import { usePool } from "@/hooks/api/usePool";
+import { useDecreaseLiquidity } from "@/app-shared/hooks/useDecreaseLiquidity";
+import { usePool } from "@/app-shared/hooks/api/usePool";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { NetworkSwitchStep } from "./NetworkSwitchStep";
 import { TransactionStep } from "./TransactionStep";
 import type { BasicPosition } from "@/services/positions/positionService";
-import { usePositionRefresh } from "@/hooks/api/usePositionRefresh";
+import { usePositionRefresh } from "@/app-shared/hooks/api/usePositionRefresh";
 
 interface WithdrawPositionModalProps {
     isOpen: boolean;

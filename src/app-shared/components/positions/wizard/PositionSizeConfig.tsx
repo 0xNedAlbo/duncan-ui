@@ -6,9 +6,9 @@ import { useAccount } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useTranslations } from "@/app-shared/i18n/client";
 import { TokenAmountInput } from "@/app-shared/components/common/TokenAmountInput";
-import type { PoolData } from "@/hooks/api/usePool";
+import type { PoolData } from "@/app-shared/hooks/api/usePool";
 import type { SupportedChainsType } from "@/config/chains";
-import { usePositionSizeCalculation } from "@/hooks/usePositionSizeCalculation";
+import { usePositionSizeCalculation } from "@/app-shared/hooks/usePositionSizeCalculation";
 import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 

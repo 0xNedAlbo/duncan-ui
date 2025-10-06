@@ -7,8 +7,8 @@ import { useTranslations } from "@/app-shared/i18n/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAccount } from "wagmi";
 import { isValidChainSlug } from "@/config/chains";
-import { useCreatePositionOptimistic } from "@/hooks/api/useCreatePositionOptimistic";
-import { usePositionRefresh } from "@/hooks/api/usePositionRefresh";
+import { useCreatePositionOptimistic } from "@/app-shared/hooks/api/useCreatePositionOptimistic";
+import { usePositionRefresh } from "@/app-shared/hooks/api/usePositionRefresh";
 import { useSession } from "next-auth/react";
 import { compareAddresses } from "@/lib/utils/evm";
 

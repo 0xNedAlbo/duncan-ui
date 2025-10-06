@@ -7,8 +7,8 @@ import { useTranslations } from "@/app-shared/i18n/client";
 import type { SupportedChainsType } from "@/config/chains";
 import { getChainConfig } from "@/config/chains";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
-import type { UseTokenApprovalResult } from "@/hooks/useTokenApproval";
-import type { UseMintPositionResult } from "@/hooks/useMintPosition";
+import type { UseTokenApprovalResult } from "@/app-shared/hooks/useTokenApproval";
+import type { UseMintPositionResult } from "@/app-shared/hooks/useMintPosition";
 
 interface PoolData {
     token0: {

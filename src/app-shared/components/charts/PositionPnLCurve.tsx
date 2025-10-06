@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { PoolData } from "@/hooks/api/usePool";
+import type { PoolData } from "@/app-shared/hooks/api/usePool";
 import { generatePnLCurve } from "@/lib/utils/uniswap-v3/position";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 import { calculatePositionValue, getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";

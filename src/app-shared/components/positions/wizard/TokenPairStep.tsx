@@ -13,13 +13,13 @@ import { useTranslations } from "@/app-shared/i18n/client";
 import type { SupportedChainsType } from "@/config/chains";
 import { isValidChainSlug } from "@/config/chains";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { usePositionNavigation } from "@/hooks/positions/usePositionNavigation";
+import { usePositionNavigation } from "@/app-shared/hooks/positions/usePositionNavigation";
 import { ValidationErrorCard } from "./ValidationErrorCard";
 import {
     useTokenSearch,
     type TokenSearchResult,
-} from "@/hooks/api/useTokenSearch";
-import { useTokenPairValidation } from "@/hooks/useTokenPairValidation";
+} from "@/app-shared/hooks/api/useTokenSearch";
+import { useTokenPairValidation } from "@/app-shared/hooks/useTokenPairValidation";
 import { getPopularTokens } from "@/lib/config/popularTokens";
 import {
     truncateAddress,

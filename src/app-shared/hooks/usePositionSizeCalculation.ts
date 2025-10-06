@@ -5,7 +5,7 @@
  */
 
 import { useMemo } from 'react';
-import type { PoolData } from '@/hooks/api/usePool';
+import type { PoolData } from "@/app-shared/hooks/api/usePool';
 import {
     getLiquidityFromInvestmentAmounts_withTick,
     getTokenAmountsFromLiquidity,

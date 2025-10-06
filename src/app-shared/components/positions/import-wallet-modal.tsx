@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Wallet, Search, Circle, CheckCircle, Loader2, ExternalLink } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useTranslations } from "@/app-shared/i18n/client";
-import { useDiscoverPositions, useImportDiscoveredPositions } from "@/hooks/api/useDiscoverPositions";
+import { useDiscoverPositions, useImportDiscoveredPositions } from "@/app-shared/hooks/api/useDiscoverPositions";
 import { handleApiError } from "@/lib/app/apiError";
 import { normalizeAddress, isValidAddress } from "@/lib/utils/evm";
 import { formatCompactValue } from "@/lib/utils/fraction-format";

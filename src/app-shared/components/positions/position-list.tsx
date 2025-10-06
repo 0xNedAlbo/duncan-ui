@@ -9,10 +9,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/types/api";
 import { useAccount } from "wagmi";
 import { SUPPORTED_CHAINS, type SupportedChainsType } from "@/config/chains";
-import { useDiscoverPositions, useImportDiscoveredPositions } from "@/hooks/api/useDiscoverPositions";
+import { useDiscoverPositions, useImportDiscoveredPositions } from "@/app-shared/hooks/api/useDiscoverPositions";
 
 // New ReactQuery-only hooks
-import { usePositionsList } from "@/hooks/api/usePositionsList";
+import { usePositionsList } from "@/app-shared/hooks/api/usePositionsList";
 
 import { PositionCard } from "./position-card";
 

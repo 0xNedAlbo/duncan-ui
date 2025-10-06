@@ -3,7 +3,7 @@
 import { Plus, ChevronDown, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslations } from "@/app-shared/i18n/client";
-import { useImportPositionByNftId } from "@/hooks/api/useImportPositionByNftId";
+import { useImportPositionByNftId } from "@/app-shared/hooks/api/useImportPositionByNftId";
 import { handleApiError } from "@/lib/app/apiError";
 import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/types/api";

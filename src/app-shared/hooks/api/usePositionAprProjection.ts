@@ -6,8 +6,8 @@
  */
 
 import { useMemo } from "react";
-import type { PoolData } from "@/hooks/api/usePool";
-import { usePoolFeeData } from "@/hooks/api/usePoolFeeData";
+import type { PoolData } from "@/app-shared/hooks/api/usePool";
+import { usePoolFeeData } from "@/app-shared/hooks/api/usePoolFeeData";
 import { calculateProspectiveApr } from "@/lib/utils/apr-calculation";
 
 interface UsePositionAprProjectionParams {

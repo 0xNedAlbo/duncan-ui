@@ -3,10 +3,10 @@
 import { useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, Loader2 } from "lucide-react";
-import { usePool } from "@/hooks/api/usePool";
+import { usePool } from "@/app-shared/hooks/api/usePool";
 import { normalizeAddress } from "@/lib/utils/evm";
-import { usePositionParams } from "@/hooks/positions/usePositionParams";
-import { usePositionNavigation } from "@/hooks/positions/usePositionNavigation";
+import { usePositionParams } from "@/app-shared/hooks/positions/usePositionParams";
+import { usePositionNavigation } from "@/app-shared/hooks/positions/usePositionNavigation";
 import { ValidationErrorCard } from "./ValidationErrorCard";
 import { PositionSizeConfig } from "./PositionSizeConfig";
 import { PositionAprPreview } from "./PositionAprPreview";

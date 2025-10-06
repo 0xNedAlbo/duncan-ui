@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { normalizeAddress } from "@/lib/utils/evm";
-import type { UseTokenApprovalResult } from "@/hooks/useTokenApproval";
+import type { UseTokenApprovalResult } from "@/app-shared/hooks/useTokenApproval";
 
 interface PoolData {
     token0: {

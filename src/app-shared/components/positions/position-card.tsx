@@ -17,7 +17,7 @@ import { useAccount } from "wagmi";
 import { useTranslations } from "@/app-shared/i18n/client";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import type { BasicPosition } from "@/services/positions/positionService";
-import { usePnLDisplayValues } from "@/hooks/usePnLDisplayValues";
+import { usePnLDisplayValues } from "@/app-shared/hooks/usePnLDisplayValues";
 import { getChainConfig } from "@/config/chains";
 import {
     NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
@@ -26,9 +26,9 @@ import {
 import { normalizeAddress } from "@/lib/utils/evm";
 
 // New ReactQuery hooks
-import { usePosition } from "@/hooks/api/usePosition";
-import { usePositionRefresh } from "@/hooks/api/usePositionRefresh";
-import { useIsDeletingPosition } from "@/hooks/api/useDeletePosition";
+import { usePosition } from "@/app-shared/hooks/api/usePosition";
+import { usePositionRefresh } from "@/app-shared/hooks/api/usePositionRefresh";
+import { useIsDeletingPosition } from "@/app-shared/hooks/api/useDeletePosition";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { MiniPnLCurveLazy } from "@/app-shared/components/charts/mini-pnl-curve-lazy";

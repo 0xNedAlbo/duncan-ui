@@ -5,7 +5,7 @@ import { formatUnits } from "viem";
 import type { SupportedChainsType } from "@/config/chains";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { CowSwapWidget } from "@/app-shared/components/common/CowSwapWidget";
-import type { InsufficientFundsInfo } from "@/hooks/positions/usePositionValidation";
+import type { InsufficientFundsInfo } from "@/app-shared/hooks/positions/usePositionValidation";
 
 interface PoolData {
     token0: {

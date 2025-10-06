@@ -3,12 +3,12 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { PencilLine, PencilOff, TrendingUp } from "lucide-react";
 import { useTranslations } from "@/app-shared/i18n/client";
-import type { PoolData } from "@/hooks/api/usePool";
+import type { PoolData } from "@/app-shared/hooks/api/usePool";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { TickMath } from "@uniswap/v3-sdk";
 import { RangeSlider } from "@/app-shared/components/common/RangeSlider";
-import { usePositionAprProjection } from "@/hooks/api/usePositionAprProjection";
+import { usePositionAprProjection } from "@/app-shared/hooks/api/usePositionAprProjection";
 import { compareAddresses } from "@/lib/utils/evm";
 import { PositionPnLCurve } from "@/app-shared/components/charts/PositionPnLCurve";
 

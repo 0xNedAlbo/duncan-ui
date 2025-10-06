@@ -14,12 +14,12 @@ import {
     getRecommendedPool,
     formatUSDValue,
     type PoolDiscoveryResult,
-} from "@/hooks/api/usePoolDiscovery";
+} from "@/app-shared/hooks/api/usePoolDiscovery";
 import type { SupportedChainsType } from "@/config/chains";
 import { isValidChainSlug } from "@/config/chains";
 import { getExplorerAddressUrl } from "@/lib/utils/evm";
 import { formatFeePercentage } from "@/lib/contracts/uniswapV3Factory";
-import { usePositionNavigation } from "@/hooks/positions/usePositionNavigation";
+import { usePositionNavigation } from "@/app-shared/hooks/positions/usePositionNavigation";
 import { ValidationErrorCard } from "./ValidationErrorCard";
 
 interface PoolSelectionStepProps {

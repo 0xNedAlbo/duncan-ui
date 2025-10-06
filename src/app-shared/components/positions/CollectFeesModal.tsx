@@ -8,7 +8,7 @@ import type { Address } from "viem";
 import { useQueryClient } from "@tanstack/react-query";
 import { getChainId, SupportedChainsType } from "@/config/chains";
 import { normalizeAddress } from "@/lib/utils/evm";
-import { useCollectFees } from "@/hooks/useCollectFees";
+import { useCollectFees } from "@/app-shared/hooks/useCollectFees";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { useTranslations } from "@/app-shared/i18n/client";
 import { NetworkSwitchStep } from "./NetworkSwitchStep";
