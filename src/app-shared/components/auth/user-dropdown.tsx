@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { useSession, signOut } from "next-auth/react"
 import Link from "next/link"
 import { User, LogOut, ChevronDown, Key } from "lucide-react"
-import { useTranslations } from "@/i18n/client"
+import { useTranslations } from "@/app-shared/i18n/client"
 
 export function UserDropdown() {
   const { data: session, status } = useSession()

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import { BarChart3, Clock, TrendingUp, Settings } from "lucide-react";
 
 interface PositionTabsProps {

@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { UserDropdown } from "@/app-shared/components/auth/user-dropdown";
 import { SettingsModal } from "@/app-shared/components/settings-modal";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";

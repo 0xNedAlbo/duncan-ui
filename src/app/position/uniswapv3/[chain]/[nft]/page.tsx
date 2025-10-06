@@ -3,7 +3,7 @@
 import { useParams, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { redirect, notFound } from "next/navigation";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import { isValidChainSlug, getChainConfigBySlug } from "@/config/chains";
 import { usePosition } from "@/hooks/api/usePosition";
 import { usePositionRefresh } from "@/hooks/api/usePositionRefresh";

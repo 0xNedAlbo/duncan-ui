@@ -8,7 +8,7 @@ import {
     Zap,
     ExternalLink,
 } from "lucide-react";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import {
     usePoolDiscovery,
     getRecommendedPool,

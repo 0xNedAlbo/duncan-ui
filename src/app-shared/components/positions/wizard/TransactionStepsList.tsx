@@ -3,7 +3,7 @@
 import { Loader2, Check, Circle, ExternalLink } from "lucide-react";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import type { Address } from "viem";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import type { SupportedChainsType } from "@/config/chains";
 import { getChainConfig } from "@/config/chains";
 import { formatCompactValue } from "@/lib/utils/fraction-format";

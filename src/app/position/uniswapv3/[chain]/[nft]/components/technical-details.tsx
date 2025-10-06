@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Copy, ExternalLink, Check } from "lucide-react";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import type { BasicPosition } from "@/services/positions/positionService";
 import { getChainConfig } from "@/config/chains";
 import {

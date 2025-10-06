@@ -1,7 +1,7 @@
 "use client";
 
 import { Target, TrendingUp, Shield, BarChart3 } from "lucide-react";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 
 export function IntroStep() {
     const t = useTranslations();

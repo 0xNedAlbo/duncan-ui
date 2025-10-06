@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { PencilLine, PencilOff, TrendingUp } from "lucide-react";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import type { PoolData } from "@/hooks/api/usePool";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 import { formatCompactValue } from "@/lib/utils/fraction-format";

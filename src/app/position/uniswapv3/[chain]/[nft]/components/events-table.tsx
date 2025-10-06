@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import { PositionEvent } from "@/types/api";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { useSettingsStore } from "@/store/settings-store";

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { X, Globe } from 'lucide-react'
 import { useSettingsStore, type SupportedLocale } from '@/store/settings-store'
-import { useTranslations } from '@/i18n/client'
+import { useTranslations } from "@/app-shared/i18n/client"
 
 export function SettingsModal() {
   const [isOpen, setIsOpen] = useState(false)

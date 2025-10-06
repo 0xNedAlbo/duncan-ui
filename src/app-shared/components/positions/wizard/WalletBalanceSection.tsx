@@ -3,7 +3,7 @@
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useSwitchChain } from "wagmi";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import type { SupportedChainsType } from "@/config/chains";
 import { getChainConfig, getChainId } from "@/config/chains";
 import { formatCompactValue } from "@/lib/utils/fraction-format";

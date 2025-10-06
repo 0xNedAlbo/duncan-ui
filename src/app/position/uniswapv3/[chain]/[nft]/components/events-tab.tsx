@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import { usePositionLedger } from "@/hooks/api/usePositionLedger";
 import { usePosition } from "@/hooks/api/usePosition";
 import { PnLBreakdown } from "@/app-shared/components/positions/pnl-breakdown";

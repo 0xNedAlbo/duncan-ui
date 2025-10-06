@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import type { AprBreakdown } from "@/services/positions/positionAprService";
 import type { PnlBreakdown } from "@/services/positions/positionPnLService";

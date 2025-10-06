@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Eye, EyeOff, Loader2, AlertTriangle } from "lucide-react";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import type { PoolData } from "@/hooks/api/usePool";
 import { usePositionAprProjection } from "@/hooks/api/usePositionAprProjection";
 import { formatCompactValue } from "@/lib/utils/fraction-format";

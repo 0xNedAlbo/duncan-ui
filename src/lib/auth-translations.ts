@@ -1,5 +1,5 @@
-import enMessages from "@/messages/en.json";
-import deMessages from "@/messages/de.json";
+import enMessages from "@/app-shared/messages/en.json";
+import deMessages from "@/app-shared/messages/de.json";
 
 function getBrowserLocale(): "de" | "en" {
     if (typeof window === "undefined") return "en";

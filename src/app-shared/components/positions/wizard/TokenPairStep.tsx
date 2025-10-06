@@ -9,7 +9,7 @@ import {
     Copy,
     ExternalLink,
 } from "lucide-react";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import type { SupportedChainsType } from "@/config/chains";
 import { isValidChainSlug } from "@/config/chains";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";

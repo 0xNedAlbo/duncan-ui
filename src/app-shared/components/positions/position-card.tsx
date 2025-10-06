@@ -14,7 +14,7 @@ import {
     DollarSign,
 } from "lucide-react";
 import { useAccount } from "wagmi";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import type { BasicPosition } from "@/services/positions/positionService";
 import { usePnLDisplayValues } from "@/hooks/usePnLDisplayValues";

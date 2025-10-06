@@ -6,7 +6,7 @@ import { generatePnLCurve } from "@/lib/utils/uniswap-v3/position";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 import { calculatePositionValue, getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
 import { compareAddresses } from "@/lib/utils/evm";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 
 interface TokenInfo {
     address: string;

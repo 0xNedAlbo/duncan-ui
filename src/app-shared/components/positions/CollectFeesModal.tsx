@@ -10,7 +10,7 @@ import { getChainId, SupportedChainsType } from "@/config/chains";
 import { normalizeAddress } from "@/lib/utils/evm";
 import { useCollectFees } from "@/hooks/useCollectFees";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import { NetworkSwitchStep } from "./NetworkSwitchStep";
 import { TransactionStep } from "./TransactionStep";
 import type { BasicPosition } from "@/services/positions/positionService";

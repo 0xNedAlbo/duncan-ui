@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { ArrowLeft, RefreshCw, Copy, ExternalLink } from "lucide-react";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import Link from "next/link";
 import type { ChainConfig } from "@/config/chains";
 import type { BasicPosition } from "@/services/positions/positionService";

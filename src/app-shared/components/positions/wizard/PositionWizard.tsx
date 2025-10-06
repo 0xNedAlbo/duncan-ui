@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X, ArrowLeft, ArrowRight } from "lucide-react";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAccount } from "wagmi";
 import { isValidChainSlug } from "@/config/chains";

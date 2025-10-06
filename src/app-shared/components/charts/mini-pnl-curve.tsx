@@ -2,7 +2,7 @@
 
 import { useState, memo } from "react";
 import type { BasicPosition } from "@/services/positions/positionService";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 
 interface MiniPnLCurveProps {
     position: BasicPosition;

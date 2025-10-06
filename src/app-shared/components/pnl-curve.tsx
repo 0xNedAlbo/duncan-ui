@@ -13,7 +13,7 @@ import {
     Tooltip,
 } from "recharts";
 import { generatePnLCurve } from "@/lib/utils/uniswap-v3/position";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 
 interface ModernPositionParams {
     liquidity: bigint;

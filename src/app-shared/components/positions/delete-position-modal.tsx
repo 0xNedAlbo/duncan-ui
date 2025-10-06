@@ -3,7 +3,7 @@
 import { X, AlertTriangle, Loader2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import { useDeletePosition } from "@/hooks/api/useDeletePosition";
 import { handleApiError } from "@/lib/app/apiError";
 import type { BasicPosition } from "@/services/positions/positionService";

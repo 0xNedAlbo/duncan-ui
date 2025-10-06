@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import { SupportedChainsType, SUPPORTED_CHAINS, getChainConfig } from "@/config/chains";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";

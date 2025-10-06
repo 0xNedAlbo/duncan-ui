@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@/i18n/client";
+import { useTranslations } from "@/app-shared/i18n/client";
 import { usePositionAprPeriods } from "@/hooks/api/usePositionAprPeriods";
 import { AprBreakdown } from "@/app-shared/components/positions/apr-breakdown";
 import type { AprBreakdown as AprBreakdownType } from "@/services/positions/positionAprService";
