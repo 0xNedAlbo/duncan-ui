@@ -1,6 +1,6 @@
 # Backend Logging Architecture
 
-Comprehensive guide to backend logging in the DUNCAN Uniswap V3 Risk Management Platform.
+Comprehensive guide to backend logging in the Midcurve Uniswap V3 Risk Management Platform.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ Comprehensive guide to backend logging in the DUNCAN Uniswap V3 Risk Management 
 
 ## Architecture Overview
 
-DUNCAN uses **Pino** as the logging framework with a **three-layered architecture**:
+Midcurve uses **Pino** as the logging framework with a **three-layered architecture**:
 
 1. **Base Layer** - Core Pino logger with environment-based configuration
 2. **Service Layer** - Service-specific child loggers with filtering capabilities
@@ -762,7 +762,7 @@ LoggerControl.clear();
 
 ## Summary
 
-The DUNCAN logging architecture provides:
+The Midcurve logging architecture provides:
 
 ✅ **Structured JSON logging** - Easy to parse and analyze
 ✅ **Three-layer architecture** - Clean separation of concerns
@@ -773,4 +773,4 @@ The DUNCAN logging architecture provides:
 ✅ **Authentication context** - Automatic user tracking
 ✅ **Error diagnostics** - Full stack traces at DEBUG level
 
-This architecture ensures consistent, filterable, and structured logging across the entire DUNCAN application while maintaining high performance and flexibility.
+This architecture ensures consistent, filterable, and structured logging across the entire Midcurve application while maintaining high performance and flexibility.

@@ -241,7 +241,7 @@ currentValue = (position tokens value) + unclaimedValueInQuote
 ### Basic Request
 ```bash
 curl -X GET "/api/positions/uniswapv3/ethereum/123456/pnl" \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here"
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here"
 ```
 
 ### Multiple Positions
@@ -250,7 +250,7 @@ curl -X GET "/api/positions/uniswapv3/ethereum/123456/pnl" \
 for nftId in 123456 789012 345678; do
   echo "Position $nftId PnL:"
   curl -s -X GET "/api/positions/uniswapv3/ethereum/$nftId/pnl" \
-    -H "Authorization: Bearer duncan_prod_your_api_key_here" | \
+    -H "Authorization: Bearer midcurve_prod_your_api_key_here" | \
     jq '.data.totalPnL'
 done
 ```
@@ -258,7 +258,7 @@ done
 ### Portfolio PnL Summary
 ```bash
 #!/bin/bash
-API_KEY="duncan_prod_your_api_key_here"
+API_KEY="midcurve_prod_your_api_key_here"
 CHAIN="ethereum"
 
 # Get all positions

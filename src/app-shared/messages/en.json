@@ -11,7 +11,7 @@
     "next": "Next"
   },
   "header": {
-    "title": "DUNCAN",
+    "title": "Midcurve",
     "subtitle": "Uniswap V3 Risk Management Platform"
   },
   "positionPlanner": {
@@ -233,7 +233,7 @@
   "auth": {
     "signIn": {
       "title": "Sign In",
-      "connectWallet": "Connect your wallet to access DUNCAN",
+      "connectWallet": "Connect your wallet to access Midcurve",
       "walletConnected": "Wallet Connected",
       "signMessage": "Sign Message to Continue",
       "loading": "Signing...",
@@ -413,7 +413,7 @@
     },
     "cta": {
       "title": "Ready to optimize your DeFi strategy?",
-      "description": "Join DUNCAN and take control of your Uniswap V3 liquidity positions.",
+      "description": "Join Midcurve and take control of your Uniswap V3 liquidity positions.",
       "createAccount": "Create Account"
     }
   },
@@ -584,10 +584,10 @@
   },
   "apiKeys": {
     "title": "API Key Management",
-    "description": "Create and manage API keys for accessing DUNCAN programmatically",
+    "description": "Create and manage API keys for accessing Midcurve programmatically",
     "createKey": "Create API Key",
     "noKeys": "No API keys yet",
-    "noKeysDescription": "Create your first API key to start using the DUNCAN API",
+    "noKeysDescription": "Create your first API key to start using the Midcurve API",
     "keyCreated": "API Key Created",
     "keyCreatedDescription": "Save this key securely - it won't be shown again",
     "copyKey": "Copy API Key",
@@ -618,7 +618,7 @@
     },
     "create": {
       "title": "Create New API Key",
-      "description": "Generate a new API key for programmatic access to DUNCAN",
+      "description": "Generate a new API key for programmatic access to Midcurve",
       "creating": "Creating...",
       "success": "API key created successfully",
       "error": "Failed to create API key"

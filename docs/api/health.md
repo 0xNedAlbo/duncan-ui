@@ -62,7 +62,7 @@ fi
 #!/bin/bash
 # Simple monitoring script
 API_URL="https://your-domain.com/api/health"
-LOG_FILE="/var/log/duncan-health.log"
+LOG_FILE="/var/log/midcurve-health.log"
 
 while true; do
   timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
@@ -409,7 +409,7 @@ Check Interval: 1 minute
 ```yaml
 # prometheus.yml
 scrape_configs:
-  - job_name: 'duncan-api'
+  - job_name: 'midcurve-api'
     static_configs:
       - targets: ['your-domain.com']
     metrics_path: /api/health

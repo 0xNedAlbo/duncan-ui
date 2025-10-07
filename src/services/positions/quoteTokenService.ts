@@ -12,7 +12,7 @@ export interface QuoteTokenResult {
 
 export class QuoteTokenService {
     /**
-     * Bestimmt welcher Token der Quote Asset ist basierend auf DUNCAN Philosophie:
+     * Bestimmt welcher Token der Quote Asset ist basierend auf Midcurve Philosophie:
      * 1. Stablecoins haben höchste Priorität als Quote
      * 2. Wrapped Native Token der Chain (WETH) als Quote
      * 3. Fallback: Token0 als Quote (Uniswap Convention)

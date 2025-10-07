@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * DUNCAN API Debug Script
+ * Midcurve API Debug Script
  *
  * This script helps debug the API by using API key authentication and providing
  * helper functions for common API operations.
@@ -42,7 +42,7 @@ loadEnvFile();
 const DEFAULT_BASE_URL = process.env.NEXTAUTH_URL || "http://localhost:3000";
 
 // Hardcoded API key for test user (0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266)
-const API_KEY = "ak_dev_duncan_test_f39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+const API_KEY = "ak_dev_midcurve_test_f39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 
 interface ApiResponse<T = any> {
     success: boolean;
@@ -59,7 +59,7 @@ class ApiDebugger {
     constructor(baseUrl?: string) {
         this.apiKey = API_KEY;
         this.baseUrl = baseUrl || DEFAULT_BASE_URL;
-        console.log(`🚀 DUNCAN API Debugger`);
+        console.log(`🚀 Midcurve API Debugger`);
         console.log(`📍 Base URL: ${this.baseUrl}`);
         console.log(`🔑 API Key: ${API_KEY.substring(0, 20)}...`);
         console.log("");
@@ -273,7 +273,7 @@ function parseArgs(args: string[]) {
  */
 function showHelp() {
     console.log(`
-🚀 DUNCAN API Debugger
+🚀 Midcurve API Debugger
 
 Usage:
   npx tsx scripts/debug/api-debug.ts [options]

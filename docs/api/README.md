@@ -1,8 +1,8 @@
-# DUNCAN API Documentation
+# Midcurve API Documentation
 
 ## Overview
 
-The DUNCAN API provides comprehensive access to Uniswap V3 liquidity position management, risk analysis, and portfolio tracking. This REST API enables developers to integrate DUNCAN's position analysis capabilities into their applications.
+The Midcurve API provides comprehensive access to Uniswap V3 liquidity position management, risk analysis, and portfolio tracking. This REST API enables developers to integrate Midcurve's position analysis capabilities into their applications.
 
 ## Base URL
 
@@ -15,7 +15,7 @@ https://your-domain.com/api
 ### Authentication
 - **Dual Authentication**: Supports both session-based and API key authentication
 - **Protected by Default**: All endpoints require authentication except `/api/auth/*` and `/api/health`
-- **API Key Format**: `duncan_[environment]_[random]` (e.g., `duncan_prod_abc123def456`)
+- **API Key Format**: `midcurve_[environment]_[random]` (e.g., `midcurve_prod_abc123def456`)
 
 ### Data Precision
 - **BigInt Values**: All token amounts, prices, and position values use BigInt precision
@@ -169,13 +169,13 @@ curl -X GET /api/positions/uniswapv3/list \
 ### Get All Positions
 ```bash
 curl -X GET "/api/positions/uniswapv3/list?limit=10&chain=ethereum" \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here"
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here"
 ```
 
 ### Import NFT Position
 ```bash
 curl -X POST /api/positions/uniswapv3/import-nft \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here" \
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here" \
   -H "Content-Type: application/json" \
   -d '{"chain": "ethereum", "nftId": "123456"}'
 ```
@@ -183,7 +183,7 @@ curl -X POST /api/positions/uniswapv3/import-nft \
 ### Get Position PnL
 ```bash
 curl -X GET /api/positions/uniswapv3/ethereum/123456/pnl \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here"
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here"
 ```
 
 ## SDKs and Libraries

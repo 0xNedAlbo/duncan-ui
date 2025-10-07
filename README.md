@@ -1,8 +1,8 @@
-# DUNCAN - Uniswap V3 Liquidity Risk Management Platform
+# Midcurve - Uniswap V3 Liquidity Risk Management Platform
 
 <div align="center">
 
-![Duncan Logo](https://img.shields.io/badge/DUNCAN-Risk%20Management-blue?style=for-the-badge)
+![Midcurve Logo](https://img.shields.io/badge/Midcurve-Risk%20Management-blue?style=for-the-badge)
 [![Next.js](https://img.shields.io/badge/Next.js-15.5-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38bdf8?style=flat&logo=tailwindcss)](https://tailwindcss.com/)
@@ -16,7 +16,7 @@
 
 ## Overview
 
-DUNCAN is an innovative DeFi risk management platform that helps users understand and manage risks when providing liquidity in Uniswap V3 pools. The platform focuses on **position planning, risk visualization, and hedging strategies** through advanced analytics and integrated risk management tools.
+Midcurve is an innovative DeFi risk management platform that helps users understand and manage risks when providing liquidity in Uniswap V3 pools. The platform focuses on **position planning, risk visualization, and hedging strategies** through advanced analytics and integrated risk management tools.
 
 ### 🎯 Key Features
 
@@ -32,7 +32,7 @@ DUNCAN is an innovative DeFi risk management platform that helps users understan
 
 ### The Three-Phase Risk Structure
 
-DUNCAN's core philosophy centers around understanding Uniswap V3's **asymmetric risk profile** through three distinct phases:
+Midcurve's core philosophy centers around understanding Uniswap V3's **asymmetric risk profile** through three distinct phases:
 
 #### 🔴 Phase 1: Below Range - Linear Downside Risk
 - **Exposure:** 100% Base Asset (e.g., ETH)
@@ -53,7 +53,7 @@ DUNCAN's core philosophy centers around understanding Uniswap V3's **asymmetric 
 
 > **"You trade unlimited downside risk for limited upside potential"**
 
-This asymmetry is what most LP providers don't understand. DUNCAN's visualization makes it immediately clear:
+This asymmetry is what most LP providers don't understand. Midcurve's visualization makes it immediately clear:
 - **Red Zone (left):** Linear losses with base asset decline
 - **Green Zone (center):** Fee collection with IL costs - the "optimal range"
 - **Yellow Zone (right):** Missed gains from base asset pumps
@@ -104,8 +104,8 @@ This asymmetry is what most LP providers don't understand. DUNCAN's visualizatio
 ### 1. Clone and Install
 
 ```bash
-git clone https://github.com/your-username/duncan-ui.git
-cd duncan-ui
+git clone https://github.com/your-username/midcurve-ui.git
+cd midcurve-ui
 npm install
 ```
 
@@ -119,7 +119,7 @@ Edit `.env.local` with your configuration:
 
 ```env
 # Database
-DATABASE_URL="postgresql://username:password@localhost:5432/duncan_db"
+DATABASE_URL="postgresql://username:password@localhost:5432/midcurve_db"
 
 # WalletConnect Project ID (required)
 NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=your_wallet_connect_project_id
@@ -224,7 +224,7 @@ npm run db:seed      # Seed database
 ### Project Structure
 
 ```
-duncan-ui/
+midcurve-ui/
 ├── src/
 │   ├── app/                    # Next.js App Router pages
 │   │   ├── api/               # API routes
@@ -285,6 +285,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Built with ❤️ for the DeFi community**
 
-[⭐ Star this repository](https://github.com/your-username/duncan-ui) if you find it helpful!
+[⭐ Star this repository](https://github.com/your-username/midcurve-ui) if you find it helpful!
 
 </div>

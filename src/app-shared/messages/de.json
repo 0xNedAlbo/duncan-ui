@@ -13,7 +13,7 @@
     "next": "Weiter"
   },
   "header": {
-    "title": "DUNCAN",
+    "title": "Midcurve",
     "subtitle": "Uniswap V3 Risikomanagement Platform"
   },
   "positionPlanner": {
@@ -432,7 +432,7 @@
     },
     "cta": {
       "title": "Bereit, deine DeFi-Strategie zu optimieren?",
-      "description": "Tritt DUNCAN bei und übernimm die Kontrolle über deine Uniswap V3 Liquiditätspositionen.",
+      "description": "Tritt Midcurve bei und übernimm die Kontrolle über deine Uniswap V3 Liquiditätspositionen.",
       "createAccount": "Account erstellen"
     }
   },
@@ -603,10 +603,10 @@
   },
   "apiKeys": {
     "title": "API Key Management",
-    "description": "Erstelle und verwalte API Keys für den programmatischen Zugang zu DUNCAN",
+    "description": "Erstelle und verwalte API Keys für den programmatischen Zugang zu Midcurve",
     "createKey": "API Key erstellen",
     "noKeys": "Noch keine API Keys",
-    "noKeysDescription": "Erstelle deinen ersten API Key, um die DUNCAN API zu nutzen",
+    "noKeysDescription": "Erstelle deinen ersten API Key, um die Midcurve API zu nutzen",
     "keyCreated": "API Key erstellt",
     "keyCreatedDescription": "Speichere diesen Key sicher ab - er wird nicht nochmal angezeigt",
     "copyKey": "API Key kopieren",
@@ -637,7 +637,7 @@
     },
     "create": {
       "title": "Neuen API Key erstellen",
-      "description": "Erstelle einen neuen API Key für programmatischen Zugang zu DUNCAN",
+      "description": "Erstelle einen neuen API Key für programmatischen Zugang zu Midcurve",
       "creating": "Erstelle...",
       "success": "API Key erfolgreich erstellt",
       "error": "API Key konnte nicht erstellt werden"

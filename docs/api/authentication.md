@@ -2,7 +2,7 @@
 
 ## Overview
 
-The DUNCAN platform provides dual authentication methods:
+The Midcurve platform provides dual authentication methods:
 - **Session-based authentication** for web interface and interactive use
 - **API key authentication** for programmatic access and integrations
 
@@ -33,13 +33,13 @@ Used for server-to-server communication and programmatic access.
 
 #### Headers Required
 ```
-Authorization: Bearer duncan_[env]_[key]
+Authorization: Bearer midcurve_[env]_[key]
 Content-Type: application/json
 ```
 
 #### API Key Format
-- **Pattern**: `duncan_[environment]_[random]`
-- **Example**: `duncan_prod_abc123def456789`
+- **Pattern**: `midcurve_[environment]_[random]`
+- **Example**: `midcurve_prod_abc123def456789`
 - **Scope**: Can be limited to specific operations
 
 ## Endpoints
@@ -138,7 +138,7 @@ Cookie: session_cookie_here
     {
       "id": "key_abc123",
       "name": "Production API Key",
-      "prefix": "duncan_prod_abc123",
+      "prefix": "midcurve_prod_abc123",
       "scopes": ["positions:read", "positions:write"],
       "createdAt": "2024-01-15T10:30:00.000Z",
       "lastUsedAt": "2024-01-15T12:00:00.000Z",
@@ -186,8 +186,8 @@ Cookie: session_cookie_here
 {
   "id": "key_abc123",
   "name": "My Integration Key",
-  "key": "duncan_prod_abc123def456789ghi",
-  "prefix": "duncan_prod_abc123",
+  "key": "midcurve_prod_abc123def456789ghi",
+  "prefix": "midcurve_prod_abc123",
   "scopes": ["positions:read"],
   "message": "API key created successfully. Save this key securely - it won't be shown again."
 }
@@ -365,7 +365,7 @@ When rate limits are exceeded:
 // API Key authentication
 const response = await fetch('/api/positions/uniswapv3/list', {
   headers: {
-    'Authorization': `Bearer ${process.env.DUNCAN_API_KEY}`,
+    'Authorization': `Bearer ${process.env.MIDCURVE_API_KEY}`,
     'Content-Type': 'application/json'
   }
 });
@@ -398,7 +398,7 @@ response = requests.get(
 ### cURL Scripts
 ```bash
 #!/bin/bash
-API_KEY="duncan_prod_your_key_here"
+API_KEY="midcurve_prod_your_key_here"
 BASE_URL="https://your-domain.com/api"
 
 # Function to make authenticated requests

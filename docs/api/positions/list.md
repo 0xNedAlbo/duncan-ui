@@ -199,31 +199,31 @@ Array of `BasicPosition` objects (see [Positions Overview](./README.md#basic-pos
 ### Basic Request
 ```bash
 curl -X GET "/api/positions/uniswapv3/list" \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here"
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here"
 ```
 
 ### Filtered Request
 ```bash
 curl -X GET "/api/positions/uniswapv3/list?chain=ethereum&status=active&limit=20" \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here"
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here"
 ```
 
 ### Pagination
 ```bash
 # First page
 curl -X GET "/api/positions/uniswapv3/list?limit=10&offset=0" \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here"
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here"
 
 # Second page
 curl -X GET "/api/positions/uniswapv3/list?limit=10&offset=10" \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here"
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here"
 ```
 
 ### Sorting
 ```bash
 # Sort by liquidity, highest first
 curl -X GET "/api/positions/uniswapv3/list?sortBy=liquidity&sortOrder=desc" \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here"
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here"
 ```
 
 ## JavaScript Examples
@@ -381,7 +381,7 @@ Response caching:
 Use conditional requests for better performance:
 ```bash
 curl -X GET "/api/positions/uniswapv3/list" \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here" \
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here" \
   -H "If-None-Match: \"abc123def456\""
 ```
 

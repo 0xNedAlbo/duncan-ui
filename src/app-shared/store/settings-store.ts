@@ -21,13 +21,13 @@ export const useSettingsStore = create<SettingsState>()(
                 setLocale: (_newLocale) => set({ locale: _newLocale }),
             }),
             {
-                name: "duncan-settings",
+                name: "midcurve-settings",
                 // Only persist certain fields
                 partialize: (state) => ({
                     locale: state.locale,
                 }),
             }
         ),
-        { name: "duncan-settings-store" }
+        { name: "midcurve-settings-store" }
     )
 );

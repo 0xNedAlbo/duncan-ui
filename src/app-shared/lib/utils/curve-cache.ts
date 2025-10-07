@@ -22,7 +22,7 @@ export interface CacheStats {
 
 class CurveCache {
     private static readonly CACHE_VERSION = 1;
-    private static readonly CACHE_PREFIX = "duncan_curve_cache_";
+    private static readonly CACHE_PREFIX = "midcurve_curve_cache_";
     private static readonly MAX_ENTRIES = 100;
     private static readonly DEFAULT_TTL = 60 * 60 * 1000; // 1 hour in ms
     private static readonly MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB total cache limit

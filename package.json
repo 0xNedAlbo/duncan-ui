@@ -1,5 +1,5 @@
 {
-  "name": "duncan-v1",
+  "name": "midcurve-v1",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,6 +10,7 @@
     "lint": "eslint",
     "typecheck": "npx tsc -p tsconfig.typecheck.json",
     "db:seed": "npx tsx prisma/seed.ts",
+    "db:migrate": "npx prisma migrate dev --env-file=.env.local",
     "postinstall": "prisma generate",
     "vercel:build": "prisma generate && prisma migrate deploy && next build",
     "vercel:install": "npm ci"

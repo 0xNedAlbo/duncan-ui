@@ -86,7 +86,7 @@ export function CowSwapWidget({
 
     // Prepare widget parameters
     const params: any = {
-        appCode: "DUNCAN_LIQUIDITY_MANAGER",
+        appCode: "MIDCURVE_LIQUIDITY_MANAGER",
         chainId: getChainIdForCowSwap(chain),
         theme: "dark",
         width: "100%",

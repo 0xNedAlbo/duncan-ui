@@ -9,7 +9,7 @@ export function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
             <div className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-              DUNCAN
+              Midcurve
             </div>
             <span className="text-xs text-slate-400 hidden sm:block">
               V3 Risk Manager

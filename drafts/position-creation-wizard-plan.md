@@ -1,8 +1,8 @@
-# DUNCAN Position Creation Wizard - Comprehensive Implementation Plan
+# Midcurve Position Creation Wizard - Comprehensive Implementation Plan
 
 ## Project Context
 
-**DUNCAN** is an innovative DeFi risk management tool focused on Uniswap V3 liquidity positions. The platform emphasizes **position planning, risk visualization, and hedging strategies** through integrated analytics and visual tools.
+**Midcurve** is an innovative DeFi risk management tool focused on Uniswap V3 liquidity positions. The platform emphasizes **position planning, risk visualization, and hedging strategies** through integrated analytics and visual tools.
 
 ### Current State Analysis
 
@@ -474,7 +474,7 @@ src/
 - Push notifications for risk thresholds
 - Simplified mobile-first position creation
 
-This comprehensive plan transforms DUNCAN from a position tracking tool into a sophisticated position planning and risk management platform, aligning perfectly with the project's vision of innovative DeFi risk management.
+This comprehensive plan transforms Midcurve from a position tracking tool into a sophisticated position planning and risk management platform, aligning perfectly with the project's vision of innovative DeFi risk management.
 
 ---
 

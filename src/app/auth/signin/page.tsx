@@ -26,7 +26,7 @@ export default function SignInPage() {
             // Create SIWE message
             const domain = window.location.host;
             const origin = window.location.origin;
-            const statement = "Sign in to DUNCAN to manage your DeFi positions";
+            const statement = "Sign in to Midcurve to manage your DeFi positions";
 
             const message = new SiweMessage({
                 domain,
@@ -74,7 +74,7 @@ export default function SignInPage() {
                         {t("auth.signIn.title")}
                     </h2>
                     <p className="mt-2 text-center text-sm text-slate-400">
-                        Connect your wallet to access DUNCAN
+                        Connect your wallet to access Midcurve
                     </p>
                 </div>
 

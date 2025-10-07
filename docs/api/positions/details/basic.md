@@ -209,22 +209,22 @@ console.log(`Current price: ${adjustedPrice.toFixed(6)} ${pool.token1.symbol}/${
 ### Basic Request
 ```bash
 curl -X GET "/api/positions/uniswapv3/ethereum/123456" \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here"
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here"
 ```
 
 ### Multiple Chains
 ```bash
 # Ethereum position
 curl -X GET "/api/positions/uniswapv3/ethereum/123456" \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here"
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here"
 
 # Arbitrum position
 curl -X GET "/api/positions/uniswapv3/arbitrum/789012" \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here"
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here"
 
 # Base position
 curl -X GET "/api/positions/uniswapv3/base/345678" \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here"
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here"
 ```
 
 ## JavaScript Examples

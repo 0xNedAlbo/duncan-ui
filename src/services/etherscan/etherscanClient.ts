@@ -85,7 +85,7 @@ export class EtherscanClient {
         const call = async () => {
             const response = await fetch(url, {
                 headers: {
-                    "User-Agent": "Duncan-UI/1.0",
+                    "User-Agent": "Midcurve-UI/1.0",
                 },
             });
 

@@ -2,10 +2,10 @@
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: duncan-postgres
+    container_name: midcurve-postgres
     environment:
-      POSTGRES_DB: duncan_dev
-      POSTGRES_USER: duncan
+      POSTGRES_DB: midcurve_dev
+      POSTGRES_USER: midcurve
       POSTGRES_PASSWORD: dev123
       POSTGRES_INITDB_ARGS: "--no-locale --encoding=UTF8"
     ports:
@@ -13,16 +13,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U duncan -d duncan_dev"]
+      test: ["CMD-SHELL", "pg_isready -U midcurve -d midcurve_dev"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   arbitrum-fork:
     build: ./docker/arbitrum-fork
-    container_name: duncan-arbitrum-fork
+    container_name: midcurve-arbitrum-fork
     env_file:
-      - .env
+      - .env.local
     # Optional gezielt überschreiben/aktivieren:
     environment:
       FUND_ON_START: "1"                        # Funding einschalten

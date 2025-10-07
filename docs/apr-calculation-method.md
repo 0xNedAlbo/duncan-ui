@@ -294,4 +294,4 @@ GET /api/positions/uniswapv3/[chain]/[nft]/apr
 
 This APR calculation method provides an accurate, time-weighted measure of realized returns for Uniswap V3 positions. By accounting for varying capital deployment over time and fairly distributing fees across active periods, it gives users a true picture of their position's performance based on actual fee collections rather than theoretical projections.
 
-The implementation maintains precision through BigInt arithmetic, handles edge cases gracefully, and integrates seamlessly with the existing event-driven architecture of the DUNCAN platform.
+The implementation maintains precision through BigInt arithmetic, handles edge cases gracefully, and integrates seamlessly with the existing event-driven architecture of the Midcurve platform.

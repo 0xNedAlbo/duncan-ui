@@ -243,7 +243,7 @@ After successful import, the system automatically:
 ### Basic Import
 ```bash
 curl -X POST "/api/positions/uniswapv3/import-nft" \
-  -H "Authorization: Bearer duncan_prod_your_api_key_here" \
+  -H "Authorization: Bearer midcurve_prod_your_api_key_here" \
   -H "Content-Type: application/json" \
   -d '{"chain": "ethereum", "nftId": "123456"}'
 ```
@@ -251,7 +251,7 @@ curl -X POST "/api/positions/uniswapv3/import-nft" \
 ### With Error Handling
 ```bash
 #!/bin/bash
-API_KEY="duncan_prod_your_api_key_here"
+API_KEY="midcurve_prod_your_api_key_here"
 CHAIN="ethereum"
 NFT_ID="123456"
 

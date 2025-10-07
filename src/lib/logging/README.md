@@ -1,6 +1,6 @@
 # Structured Logging Framework
 
-A comprehensive logging framework built on Pino for the Duncan application, supporting service filtering, tag-based organization, and debug log muting.
+A comprehensive logging framework built on Pino for the Midcurve application, supporting service filtering, tag-based organization, and debug log muting.
 
 ## Quick Start
 
@@ -177,4 +177,4 @@ LOG_SERVICE_FILTER=PositionImport,EtherscanEvent
 LOG_LEVEL=debug
 ```
 
-This framework ensures consistent, filterable, and structured logging across the entire Duncan application while maintaining high performance and flexibility.
+This framework ensures consistent, filterable, and structured logging across the entire Midcurve application while maintaining high performance and flexibility.

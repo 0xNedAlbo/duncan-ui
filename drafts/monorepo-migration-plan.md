@@ -1,4 +1,4 @@
-# DUNCAN Monorepo Migration Plan
+# Midcurve Monorepo Migration Plan
 
 **Date:** October 3, 2025
 **Status:** Planning Phase
@@ -10,7 +10,7 @@
 ## Overview
 
 Transform the current single-package Next.js project into a **pnpm monorepo** with two packages:
-- **`packages/web`** - Next.js frontend application (current duncan-ui)
+- **`packages/web`** - Next.js frontend application (current midcurve-ui)
 - **`packages/shared`** - Shared utilities, types, business logic, **and Prisma database client**
 
 This structure enables:
@@ -24,7 +24,7 @@ This structure enables:
 ## Final Directory Structure
 
 ```
-duncan-ui/
+midcurve-ui/
 ├── packages/
 │   ├── web/                    # Next.js app
 │   │   ├── src/
@@ -80,20 +80,20 @@ packages:
 #### Root `package.json`
 ```json
 {
-  "name": "duncan-monorepo",
+  "name": "midcurve-monorepo",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter @duncan/web dev",
+    "dev": "pnpm --filter @midcurve/web dev",
     "build": "pnpm -r build",
-    "start": "pnpm --filter @duncan/web start",
+    "start": "pnpm --filter @midcurve/web start",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "db:seed": "pnpm --filter @duncan/shared db:seed",
-    "db:migrate": "pnpm --filter @duncan/shared db:migrate",
-    "db:push": "pnpm --filter @duncan/shared db:push",
-    "db:studio": "pnpm --filter @duncan/shared db:studio"
+    "db:seed": "pnpm --filter @midcurve/shared db:seed",
+    "db:migrate": "pnpm --filter @midcurve/shared db:migrate",
+    "db:push": "pnpm --filter @midcurve/shared db:push",
+    "db:studio": "pnpm --filter @midcurve/shared db:studio"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -117,8 +117,8 @@ packages:
     "jsx": "preserve",
     "incremental": true,
     "paths": {
-      "@duncan/shared": ["./packages/shared/src"],
-      "@duncan/shared/*": ["./packages/shared/src/*"]
+      "@midcurve/shared": ["./packages/shared/src"],
+      "@midcurve/shared/*": ["./packages/shared/src/*"]
     }
   },
   "exclude": ["node_modules", "dist", ".next"]
@@ -150,7 +150,7 @@ packages:
 #### `packages/web/package.json`
 ```json
 {
-  "name": "@duncan/web",
+  "name": "@midcurve/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -162,7 +162,7 @@ packages:
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@duncan/shared": "workspace:*",
+    "@midcurve/shared": "workspace:*",
     "next": "15.5.2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -205,8 +205,8 @@ packages:
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"],
-      "@duncan/shared": ["../shared/src"],
-      "@duncan/shared/*": ["../shared/src/*"]
+      "@midcurve/shared": ["../shared/src"],
+      "@midcurve/shared/*": ["../shared/src/*"]
     }
   },
   "include": [
@@ -227,7 +227,7 @@ Add `transpilePackages` to transpile the shared package:
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['@duncan/shared'],
+  transpilePackages: ['@midcurve/shared'],
 
   images: {
     domains: [
@@ -283,7 +283,7 @@ export default nextConfig;
 #### `packages/shared/package.json`
 ```json
 {
-  "name": "@duncan/shared",
+  "name": "@midcurve/shared",
   "version": "0.1.0",
   "private": true,
   "main": "./src/index.ts",
@@ -484,7 +484,7 @@ import {
   getAuthUser,
   SUPPORTED_CHAINS,
   ApiResponse
-} from '@duncan/shared';
+} from '@midcurve/shared';
 ```
 
 #### Imports that Stay Unchanged
@@ -506,19 +506,19 @@ Use these commands to update imports across all files:
 # In packages/web/ directory
 
 # Services
-find src -type f \( -name "*.ts" -o -name "*.tsx" \) -exec sed -i '' 's|@/services/|@duncan/shared|g' {} +
+find src -type f \( -name "*.ts" -o -name "*.tsx" \) -exec sed -i '' 's|@/services/|@midcurve/shared|g' {} +
 
 # Lib
-find src -type f \( -name "*.ts" -o -name "*.tsx" \) -exec sed -i '' 's|@/lib/|@duncan/shared|g' {} +
+find src -type f \( -name "*.ts" -o -name "*.tsx" \) -exec sed -i '' 's|@/lib/|@midcurve/shared|g' {} +
 
 # Config
-find src -type f \( -name "*.ts" -o -name "*.tsx" \) -exec sed -i '' 's|@/config/|@duncan/shared|g' {} +
+find src -type f \( -name "*.ts" -o -name "*.tsx" \) -exec sed -i '' 's|@/config/|@midcurve/shared|g' {} +
 
 # Types
-find src -type f \( -name "*.ts" -o -name "*.tsx" \) -exec sed -i '' 's|@/types/|@duncan/shared|g' {} +
+find src -type f \( -name "*.ts" -o -name "*.tsx" \) -exec sed -i '' 's|@/types/|@midcurve/shared|g' {} +
 ```
 
-**Note:** After automated replacement, manually review and consolidate imports from `@duncan/shared` for cleaner code.
+**Note:** After automated replacement, manually review and consolidate imports from `@midcurve/shared` for cleaner code.
 
 ### 6. Environment Variables
 
@@ -531,7 +531,7 @@ Environment variables remain at the **root level** and are accessible to all pac
 
 **Prisma configuration:**
 - `packages/shared/prisma/schema.prisma` reads `DATABASE_URL` from root `.env`
-- Both `@duncan/web` and future `@duncan/worker` access same database
+- Both `@midcurve/web` and future `@midcurve/worker` access same database
 
 ### 7. Git & Dependencies
 
@@ -576,7 +576,7 @@ npm install -g pnpm
 pnpm install
 
 # 4. Generate Prisma client
-pnpm --filter @duncan/shared db:generate
+pnpm --filter @midcurve/shared db:generate
 
 # 5. Run database migrations (if needed)
 pnpm db:migrate
@@ -591,7 +591,7 @@ After migration, validate the setup:
 pnpm install
 
 # 2. Generate Prisma client
-pnpm --filter @duncan/shared db:generate
+pnpm --filter @midcurve/shared db:generate
 
 # 3. Type-check all packages
 pnpm typecheck
@@ -624,7 +624,7 @@ pnpm db:seed
 ## Benefits of This Architecture
 
 ### ✅ Shared Prisma Client
-- Both `@duncan/web` and future `@duncan/worker` use same database client
+- Both `@midcurve/web` and future `@midcurve/worker` use same database client
 - Single source of truth for database schema
 - Type-safe database access across all packages
 
@@ -651,15 +651,15 @@ packages/worker/
 
 Worker imports:
 ```typescript
-import { PrismaClient } from '@prisma/client'; // From @duncan/shared
-import { PositionService, EtherscanClient } from '@duncan/shared';
+import { PrismaClient } from '@prisma/client'; // From @midcurve/shared
+import { PositionService, EtherscanClient } from '@midcurve/shared';
 ```
 
 **Future Mobile App Package:**
 ```
 packages/mobile/
 ├── src/
-├── package.json          # Depends on @duncan/shared
+├── package.json          # Depends on @midcurve/shared
 └── tsconfig.json
 ```
 
@@ -668,12 +668,12 @@ packages/mobile/
 packages/cli/
 ├── src/
 │   └── commands/
-├── package.json          # Depends on @duncan/shared
+├── package.json          # Depends on @midcurve/shared
 └── tsconfig.json
 ```
 
 ### ✅ Better Organization
-- Clear separation: UI (`@duncan/web`) vs Logic (`@duncan/shared`)
+- Clear separation: UI (`@midcurve/web`) vs Logic (`@midcurve/shared`)
 - Easier to navigate and maintain
 - Enforced architectural boundaries
 
@@ -702,7 +702,7 @@ packages/cli/
 
 ## Troubleshooting
 
-### Issue: TypeScript can't find `@duncan/shared`
+### Issue: TypeScript can't find `@midcurve/shared`
 
 **Solution:**
 1. Ensure `pnpm install` completed successfully
@@ -713,7 +713,7 @@ packages/cli/
 
 **Solution:**
 ```bash
-pnpm --filter @duncan/shared db:generate
+pnpm --filter @midcurve/shared db:generate
 ```
 
 ### Issue: Next.js can't resolve shared package
@@ -721,14 +721,14 @@ pnpm --filter @duncan/shared db:generate
 **Solution:**
 Add to `packages/web/next.config.ts`:
 ```typescript
-transpilePackages: ['@duncan/shared']
+transpilePackages: ['@midcurve/shared']
 ```
 
 ### Issue: Build fails with "Cannot find module"
 
 **Solution:**
 1. Check all import paths updated correctly
-2. Ensure `@duncan/shared` exports the module in `src/index.ts`
+2. Ensure `@midcurve/shared` exports the module in `src/index.ts`
 3. Clear Next.js cache: `rm -rf packages/web/.next`
 
 ---
@@ -749,10 +749,10 @@ Once monorepo is established, consider:
    - Development utilities
 
 3. **Add `packages/mobile/`** - React Native mobile app
-   - Reuses all business logic from `@duncan/shared`
+   - Reuses all business logic from `@midcurve/shared`
    - Shared types and API client
 
-4. **Add `packages/sdk/`** - Public SDK for DUNCAN platform
+4. **Add `packages/sdk/`** - Public SDK for Midcurve platform
    - Expose position management APIs
    - Publishable to npm
 
@@ -793,7 +793,7 @@ During migration:
 
 After migration:
 - [ ] Run `pnpm install`
-- [ ] Run `pnpm --filter @duncan/shared db:generate`
+- [ ] Run `pnpm --filter @midcurve/shared db:generate`
 - [ ] Run `pnpm typecheck`
 - [ ] Run `pnpm dev` - verify app starts
 - [ ] Run `pnpm build` - verify build succeeds

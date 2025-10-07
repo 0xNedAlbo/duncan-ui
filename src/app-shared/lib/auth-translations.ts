@@ -6,7 +6,7 @@ function getBrowserLocale(): "de" | "en" {
 
     // Check localStorage first (same key as settings store)
     try {
-        const stored = localStorage.getItem("duncan-settings");
+        const stored = localStorage.getItem("midcurve-settings");
         if (stored) {
             const settings = JSON.parse(stored);
             if (settings.state?.locale === "de-DE") return "de";

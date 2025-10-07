@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-    title: "DUNCAN - Uniswap V3 Risk Manager",
+    title: "Midcurve - Uniswap V3 Risk Manager",
     description:
         "Advanced risk management and position planning for Uniswap V3 liquidity providers",
 };

@@ -1,8 +1,8 @@
-# DUNCAN - Uniswap V3 Liquidity Risk Management Platform
+# Midcurve - Uniswap V3 Liquidity Risk Management Platform
 
 ## Project Vision
 
-DUNCAN is an innovative DeFi risk management tool that helps users understand and manage risks when providing liquidity in Uniswap V3 pools. The platform focuses on **position planning, risk visualization, and hedging strategies** through integrated Hyperliquid short positions.
+Midcurve is an innovative DeFi risk management tool that helps users understand and manage risks when providing liquidity in Uniswap V3 pools. The platform focuses on **position planning, risk visualization, and hedging strategies** through integrated Hyperliquid short positions.
 
 ## Core Philosophy & Risk Framework
 
