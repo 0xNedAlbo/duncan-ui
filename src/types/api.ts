@@ -4,23 +4,17 @@
  * Shared types for API requests and responses across the application
  */
 
-import type { BasicPosition, DiscoveredPositionSummary } from '@/types/positions';
+import type { BasicPosition, DiscoveredPositionSummary, PositionEvent } from '@/types/positions';
 import type { NFTPosition } from '@/lib/contracts/nonfungiblePositionManager';
-import type { PnlBreakdown } from '@/types/pnl';
+import type { PnlBreakdown, PositionWithPnL } from '@/types/pnl';
 import type { AprBreakdown, PositionAprSummary } from '@/types/apr';
 import type { CurveData } from '@/app-shared/components/charts/mini-pnl-curve';
+import type { UserProfile, UserSettings } from '@/types/user';
 
-// Enhanced position interface for API responses (includes PnL data)
-export interface PositionWithPnL extends BasicPosition {
-  initialValue: string;
-  currentValue: string;
-  unrealizedPnL: string;
-  realizedPnL: string;
-  totalPnL: string;
-  feesCollected0: string;
-  feesCollected1: string;
-  feeValueInQuote: string;
-}
+// Re-export types that were moved to domain-specific files for backward compatibility
+export type { PositionEvent, BasicPosition, DiscoveredPositionSummary } from '@/types/positions';
+export type { PositionWithPnL, PnlBreakdown } from '@/types/pnl';
+export type { UserProfile, UserSettings } from '@/types/user';
 
 // Generic API response wrapper
 export interface ApiResponse<T = any> {
@@ -67,25 +61,6 @@ export interface PositionListData {
 }
 
 // Position Events API Types
-export interface PositionEvent {
-  id: string;
-  eventType: 'CREATE' | 'INCREASE' | 'DECREASE' | 'COLLECT' | 'CLOSE';
-  timestamp: string; // ISO string
-  blockNumber: number;
-  transactionHash: string;
-  liquidityDelta: string; // BigInt as string
-  token0Delta: string; // BigInt as string
-  token1Delta: string; // BigInt as string
-  collectedFee0?: string; // BigInt as string, COLLECT events only
-  collectedFee1?: string; // BigInt as string, COLLECT events only
-  poolPrice: string; // BigInt as string
-  valueInQuote: string; // BigInt as string
-  feeValueInQuote?: string; // BigInt as string, COLLECT events only
-  source: 'subgraph' | 'onchain' | 'manual';
-  confidence: 'exact' | 'estimated';
-  createdAt: string; // ISO string
-}
-
 export interface PositionEventsParams extends PaginationParams {
   eventType?: PositionEvent['eventType'];
   sortOrder?: 'asc' | 'desc';
@@ -224,14 +199,6 @@ export interface LoginResponse extends ApiResponse<{ message: string }> {
 }
 
 // User API Types
-export interface UserProfile {
-  id: string;
-  email: string;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface UserProfileResponse extends ApiResponse<UserProfile> {
   data?: UserProfile;
 }
@@ -246,18 +213,6 @@ export interface UpdateUserProfileResponse extends ApiResponse<UserProfile> {
 }
 
 // Settings API Types
-export interface UserSettings {
-  language: 'en' | 'de';
-  theme: 'dark' | 'light';
-  notifications: {
-    email: boolean;
-    browser: boolean;
-    positionAlerts: boolean;
-  };
-  defaultChain: string;
-  defaultCurrency: string;
-}
-
 export interface UserSettingsResponse extends ApiResponse<UserSettings> {
   data?: UserSettings;
 }

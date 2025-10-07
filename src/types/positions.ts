@@ -114,3 +114,23 @@ export interface DiscoveredPositionSummary {
     liquidity: string;
     status: "active" | "closed";
 }
+
+// Position event types
+export interface PositionEvent {
+    id: string;
+    eventType: 'CREATE' | 'INCREASE' | 'DECREASE' | 'COLLECT' | 'CLOSE';
+    timestamp: string; // ISO string
+    blockNumber: number;
+    transactionHash: string;
+    liquidityDelta: string; // BigInt as string
+    token0Delta: string; // BigInt as string
+    token1Delta: string; // BigInt as string
+    collectedFee0?: string; // BigInt as string, COLLECT events only
+    collectedFee1?: string; // BigInt as string, COLLECT events only
+    poolPrice: string; // BigInt as string
+    valueInQuote: string; // BigInt as string
+    feeValueInQuote?: string; // BigInt as string, COLLECT events only
+    source: 'subgraph' | 'onchain' | 'manual';
+    confidence: 'exact' | 'estimated';
+    createdAt: string; // ISO string
+}
