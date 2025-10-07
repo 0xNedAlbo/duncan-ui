@@ -412,3 +412,43 @@ model PositionCurve {
   @@index([calculatedAt]) // Cleanup old cache entries
   @@map("position_curve_cache")
 }
+
+// Blockscanner Models for Reorg Detection and Event Scanning
+
+// Block Header Model - Sliding window of recent block headers for reorg detection
+model BlockScannerHeader {
+  id String @id @default(cuid())
+
+  // Chain and Block Identification
+  chain       String // "ethereum", "arbitrum", "base"
+  blockNumber BigInt // Block number
+  hash        String // Block hash (0x...)
+  parentHash  String // Parent block hash for reorg detection
+  timestamp   DateTime // Block timestamp
+
+  // Metadata
+  createdAt DateTime @default(now())
+
+  // Composite unique constraint and indexes
+  @@unique([chain, blockNumber]) // One header per chain per block number
+  @@index([chain, blockNumber]) // Fast lookups by chain and block
+  @@index([chain, hash]) // Fast hash lookups for reorg detection
+  @@map("blockscanner_headers")
+}
+
+// Scanner Watermark Model - Track highest processed block per chain
+model BlockScannerWatermark {
+  id String @id @default(cuid())
+
+  // Chain Identification
+  chain String @unique // "ethereum", "arbitrum", "base" (one watermark per chain)
+
+  // Watermark State
+  lastProcessedHeight BigInt // Highest fully processed block number
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("blockscanner_watermarks")
+}

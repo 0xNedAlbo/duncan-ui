@@ -5,6 +5,12 @@
 /.pnp
 .pnp.js
 
+src/workers/*/node_modules
+src/workers/*/.env
+src/workers/*/.env.production
+src/workers/*/.env.local
+src/workers/*/.env.development
+
 # testing
 /coverage
 

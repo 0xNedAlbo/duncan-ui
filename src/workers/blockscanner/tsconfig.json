@@ -10,12 +10,16 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "outDir": "./dist",
-    "rootDir": "./src",
+    "baseUrl": ".",
     "paths": {
       "@/*": ["../../*"],
       "@prisma/client": ["../../../node_modules/@prisma/client"]
     }
   },
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*",
+    "../../lib/**/*",
+    "../../config/**/*"
+  ],
   "exclude": ["node_modules", "dist"]
 }
