@@ -1,0 +1,48 @@
+# Fly.io configuration for Blockscanner Worker
+# Deploy with: fly deploy --config src/workers/blockscanner/fly.toml
+
+app = 'midcurve-blockscanner'
+primary_region = 'fra'
+
+[build]
+  dockerfile = 'src/workers/blockscanner/Dockerfile'
+
+[env]
+  NODE_ENV = 'production'
+  LOG_LEVEL = 'info'
+
+[[services]]
+  protocol = 'tcp'
+  internal_port = 8080
+
+  [[services.ports]]
+    port = 80
+    handlers = ['http']
+
+  [[services.ports]]
+    port = 443
+    handlers = ['tls', 'http']
+
+  [services.concurrency]
+    type = 'connections'
+    hard_limit = 25
+    soft_limit = 20
+
+  [[services.tcp_checks]]
+    interval = '15s'
+    timeout = '2s'
+    grace_period = '10s'
+
+[deploy]
+  strategy = 'rolling'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '256mb'
+
+# Required secrets (set with: fly secrets set KEY=value)
+# - DATABASE_URL
+# - DATABASE_URL_UNPOOLED (optional, for Prisma connection pooling)
+# - ETHEREUM_RPC_URL
+# - ARBITRUM_RPC_URL
+# - BASE_RPC_URL

@@ -235,6 +235,23 @@ export const GET = withAuth<ResponseType>(
 - **User must request commits** - do not assume commits should be made after completing tasks
 - **Exception:** Only when user uses the `/git-commit` slash command or directly asks to commit changes
 
+**Worker Architecture:**
+- **Workers are background processes** deployed as independent Docker containers on Fly.io
+- **Location:** All workers reside under `src/workers/` directory
+- **Structure:** Each worker has its own subdirectory with complete deployment setup:
+  - `src/index.ts` - Main entry point with proper error handling and graceful shutdown
+  - `package.json` - Independent dependencies (Pino logging, Prisma client, etc.)
+  - `tsconfig.json` - TypeScript config with path aliases to main codebase
+  - `Dockerfile` - Multi-stage build optimized for production
+  - `.dockerignore` - Exclude development artifacts
+  - `fly.toml` - Fly.io deployment configuration
+- **Shared Code Access:** Workers import services, utilities, and types from main project via path aliases (`@/services`, `@/lib`, `@/types`, `@prisma/client`)
+- **Database Access:** Workers use same Prisma client as main application
+- **Logging:** Structured logging with Pino (consistent with API layer)
+- **Deployment:** Independent deployments via `fly deploy --config src/workers/{worker-name}/fly.toml`
+- **Currently Implemented Workers:**
+  - `blockscanner` - Blockchain event scanner (stub, tracks Uniswap V3 position changes)
+
 **Additional Coding Guidelines for Claude:**
 - use formatCompactValue() from fraction-formats.ts when displaying bigint values (not formatFractionHuman which requires Fraction objects)
 - use scripts/api-debug.ts when testing API behaviour because it contains proper authentication

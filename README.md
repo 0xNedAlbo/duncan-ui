@@ -91,6 +91,7 @@ This asymmetry is what most LP providers don't understand. Midcurve's visualizat
 - **Local Blockchain:** Arbitrum fork with pre-funded test accounts
 - **Testing:** Vitest with React Testing Library
 - **Linting:** ESLint with custom configuration
+- **Workers:** Background processes for async operations (Fly.io deployment)
 
 ## Quick Start
 
@@ -243,7 +244,9 @@ midcurve-ui/
 │   │   └── web3/             # Web3 utilities
 │   ├── services/             # Business logic services
 │   ├── store/                # Zustand state stores
-│   └── types/                # TypeScript type definitions
+│   ├── types/                # TypeScript type definitions
+│   └── workers/              # Background worker processes
+│       └── blockscanner/     # Blockchain event scanner
 ├── prisma/                   # Database schema and migrations
 ├── public/                   # Static assets
 └── docs/                     # Documentation
@@ -257,6 +260,53 @@ midcurve-ui/
 - **EVM address normalization** using centralized utilities
 - **Structured logging** with request correlation
 - **API service layer** with consistent error handling
+
+## Workers
+
+Background worker processes handle asynchronous operations independently from the main web application. Workers are deployed as Docker containers on Fly.io.
+
+### Architecture
+
+- **Location:** `src/workers/` directory
+- **Deployment:** Independent Docker containers on Fly.io
+- **Shared Code:** Workers import services, utilities, and types from main project
+- **Database:** Same PostgreSQL database via Prisma client
+- **Logging:** Structured logging with Pino
+
+### Current Workers
+
+#### Blockscanner (`src/workers/blockscanner/`)
+
+Scans blockchain events and updates position data in real-time.
+
+**Status:** Stub implementation
+
+**Planned Features:**
+- Subscribe to Uniswap V3 pool events (mint, burn, collect)
+- Track position changes in real-time
+- Update position ledger in database
+- Calculate real-time PnL and APR
+
+**Development:**
+```bash
+cd src/workers/blockscanner
+npm install
+npm run dev
+```
+
+**Deployment:**
+```bash
+# From project root
+fly deploy --config src/workers/blockscanner/fly.toml
+```
+
+**Configuration:**
+
+Required environment variables (set as Fly.io secrets):
+- `DATABASE_URL` - PostgreSQL connection string
+- `ETHEREUM_RPC_URL` - Ethereum RPC endpoint
+- `ARBITRUM_RPC_URL` - Arbitrum RPC endpoint
+- `BASE_RPC_URL` - Base RPC endpoint
 
 ## Contributing
 
