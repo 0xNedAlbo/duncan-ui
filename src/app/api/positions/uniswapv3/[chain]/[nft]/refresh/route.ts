@@ -173,9 +173,9 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
 
             // Trigger fresh PnL calculation - this handles:
             // - Pool state update via poolService.updatePoolState()
-            // - Position events sync via positionLedgerService.syncPositionEvents()
             // - Fresh PnL calculation with current prices and unclaimed fees
             // - Cache update with new data
+            // Note: Event syncing is handled automatically by blockscanner worker
             let pnlBreakdown = null;
             try {
                 pnlBreakdown = await positionPnLService.getPnlBreakdown(

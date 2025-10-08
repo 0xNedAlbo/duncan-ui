@@ -199,7 +199,7 @@ export const GET = withAuthAndLogging<PositionEventsResponse>(
                     poolPrice: dbEvent.poolPrice,
                     valueInQuote: dbEvent.tokenValueInQuote,
                     feeValueInQuote: mappedEventType === 'COLLECT' ? dbEvent.feeValueInQuote : undefined,
-                    source: dbEvent.source as 'subgraph' | 'onchain' | 'manual',
+                    source: 'onchain' as const, // All events are onchain
                     confidence: 'exact' as const, // Default to exact for all database events
                     createdAt: dbEvent.createdAt.toISOString(),
                 };

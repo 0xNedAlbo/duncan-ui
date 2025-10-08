@@ -142,7 +142,6 @@ export class ApiServiceFactory {
                 {
                     tokenService: this.tokenService,
                     poolPriceService: this.poolPriceService,
-                    etherscanBlockInfoService: this.etherscanBlockInfoService,
                     evmBlockInfoService: this.evmBlockInfoService,
                     positionAprService: this.positionAprService
                 }

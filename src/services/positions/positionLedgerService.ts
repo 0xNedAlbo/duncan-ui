@@ -6,14 +6,13 @@
  * EventStateCalculator to get calculated states and PnL data.
  */
 
-import { createHash, randomUUID } from "crypto";
+import { createHash } from "crypto";
 import { SupportedChainsType } from "@/config/chains";
 import type { Clients } from "../ClientsFactory";
 import type { Services } from "../ServiceFactory";
 import type { RawPositionEvent } from "../etherscan/etherscanEventService";
 import { EtherscanEventService } from "../etherscan/etherscanEventService";
 import { PoolPriceService } from "../prices/poolPriceService";
-import { EtherscanBlockInfoService } from "../etherscan/etherscanBlockInfoService";
 import { EvmBlockInfoService } from "../evm/evmBlockInfoService";
 import { PrismaClient, type PositionEvent } from "@prisma/client";
 import {
@@ -27,24 +26,8 @@ import {
 import JSBI from "jsbi";
 import type { BasicPosition } from "./positionService";
 import type { PositionAprService } from "./positionAprService";
-
-// Unified event interface for processing mixed manual/onchain events
-interface ProcessableEvent {
-    // Common blockchain ordering fields
-    blockNumber: bigint;
-    transactionIndex: number;
-    logIndex: number;
-    blockTimestamp: Date;
-
-    // Event classification
-    source: "manual" | "onchain";
-    eventType: string;
-    ledgerIgnore: boolean;
-
-    // Event data (will be populated based on source)
-    rawEvent?: RawPositionEvent; // For new onchain events
-    dbEvent?: PositionEvent; // For existing manual events
-}
+import { getNFPMAddress } from "@/workers/blockscanner/src/config";
+import { EtherscanClient } from "../etherscan/etherscanClient";
 
 // Position sync information interface - picks necessary fields from BasicPosition
 export type PositionSyncInfo = Pick<
@@ -60,12 +43,14 @@ export type PositionSyncInfo = Pick<
 
 export class PositionLedgerService {
     private prisma: PrismaClient;
-    private etherscanBlockInfoService: EtherscanBlockInfoService;
     private evmBlockInfoService: EvmBlockInfoService;
     private poolPriceService: PoolPriceService;
     private etherscanEventService: EtherscanEventService;
     private positionAprService: PositionAprService;
     private logger: ServiceLogger;
+
+    // Cache for NFPM deployment blocks
+    private nfpmDeploymentBlocks: Record<string, bigint> = {};
 
     /**
      * Helper method to create PositionSyncInfo from BasicPosition
@@ -96,14 +81,11 @@ export class PositionLedgerService {
             Services,
             | "tokenService"
             | "poolPriceService"
-            | "etherscanBlockInfoService"
             | "evmBlockInfoService"
             | "positionAprService"
         >
     ) {
         this.prisma = requiredClients.prisma;
-        this.etherscanBlockInfoService =
-            requiredServices.etherscanBlockInfoService;
         this.evmBlockInfoService = requiredServices.evmBlockInfoService;
         this.poolPriceService = requiredServices.poolPriceService;
         this.positionAprService = requiredServices.positionAprService;
@@ -138,15 +120,6 @@ export class PositionLedgerService {
     }
 
     /**
-     * Generate inputHash for manual events
-     * Format: MD5("manual-" + randomUUID())
-     */
-    public generateManualInputHash(): string {
-        const input = `manual-${randomUUID()}`;
-        return createHash("md5").update(input).digest("hex");
-    }
-
-    /**
      * Generate inputHash for onchain events
      * Format: MD5(CONCAT(blockNumber, transactionIndex, logIndex))
      */
@@ -159,18 +132,21 @@ export class PositionLedgerService {
         return createHash("md5").update(input).digest("hex");
     }
 
+
     /**
-     * Fetch events from Etherscan with smart block range selection
-     * - First-time imports: Fetch from "earliest" to get complete history
-     * - Subsequent syncs: Use finality boundary optimization to avoid re-fetching stable events
+     * One-time initial import of position events from blockchain
+     * - Only runs if position has no existing events (idempotent)
+     * - Fetches complete history from NFPM deployment to latest block
+     * - Processes events sequentially without finality/reorg handling
+     * - Blockscanner worker handles ongoing updates after initial import
      */
-    private async fetchEventsFromEtherscan(
+    async syncPositionEvents(
         positionInfo: PositionSyncInfo,
         nftId: string
-    ): Promise<RawPositionEvent[]> {
+    ): Promise<PositionEvent[]> {
         const chain = positionInfo.pool.chain as SupportedChainsType;
 
-        // Check if this is a first-time import (no events in database yet)
+        // Check if position already has events (idempotent - skip if already imported)
         const existingEventCount = await this.prisma.positionEvent.count({
             where: {
                 positionUserId: positionInfo.userId,
@@ -180,720 +156,219 @@ export class PositionLedgerService {
             },
         });
 
+        if (existingEventCount > 0) {
+            this.logger.debug(
+                {
+                    nftId,
+                    chain,
+                    existingEventCount,
+                },
+                "Position already has events - skipping initial import (blockscanner handles updates)"
+            );
+
+            return await this.prisma.positionEvent.findMany({
+                where: {
+                    positionUserId: positionInfo.userId,
+                    positionChain: positionInfo.chain,
+                    positionProtocol: positionInfo.protocol,
+                    positionNftId: positionInfo.nftId,
+                },
+                orderBy: [
+                    { blockNumber: "asc" },
+                    { transactionIndex: "asc" },
+                    { logIndex: "asc" },
+                ],
+            });
+        }
+
+        // Get NFPM deployment block for optimization (no need to scan before contract existed)
+        const deploymentBlock = await this.getNFPMDeploymentBlock(chain);
+
+        // Fetch all historical events from NFPM deployment to latest
+        const rawEvents = await this.etherscanEventService.fetchPositionEvents(
+            chain,
+            nftId,
+            { fromBlock: deploymentBlock.toString() }
+        );
+
         this.logger.debug(
             {
-                existingEventCount,
+                nftId,
+                chain,
+                deploymentBlock: deploymentBlock.toString(),
+                eventCount: rawEvents.length,
+            },
+            "Fetched complete event history for initial import"
+        );
+
+        if (rawEvents.length === 0) {
+            this.logger.debug(
+                { nftId, chain },
+                "No events found - returning empty array"
+            );
+            return [];
+        }
+
+        // Process events sequentially from earliest to latest
+        let currentState = {
+            liquidityAfter: "0",
+            costBasisAfter: "0",
+            realizedPnLAfter: "0",
+            uncollectedPrincipal0: "0",
+            uncollectedPrincipal1: "0",
+        };
+
+        for (let i = 0; i < rawEvents.length; i++) {
+            const rawEvent = rawEvents[i];
+
+            // Process event and create in database (shared helper)
+            const { eventId, newState, feeValue } =
+                await this.processAndCreateEvent(
+                    rawEvent,
+                    positionInfo,
+                    currentState
+                );
+
+            // Create APR record for this event
+            const nextEvent = rawEvents[i + 1];
+            const periodEndDate = nextEvent?.blockTimestamp || null;
+
+            await this.positionAprService.createEventAprRecord(
+                eventId,
+                rawEvent.blockTimestamp,
+                periodEndDate,
+                newState.costBasisAfter
+            );
+
+            // If there was a previous event, close its period
+            if (i > 0) {
+                await this.positionAprService.updatePreviousEventPeriodEnd(
+                    positionInfo.chain,
+                    positionInfo.protocol,
+                    positionInfo.nftId,
+                    rawEvent.blockTimestamp
+                );
+            }
+
+            // If this is a COLLECT event, distribute fees across existing periods
+            if (rawEvent.eventType === "COLLECT" && feeValue !== "0") {
+                await this.positionAprService.distributeSingleCollectEventFees(
+                    positionInfo.chain,
+                    positionInfo.protocol,
+                    positionInfo.nftId,
+                    rawEvent.blockTimestamp,
+                    feeValue
+                );
+            }
+
+            // Update current state for next iteration
+            currentState = newState;
+        }
+
+        this.logger.debug(
+            {
+                nftId,
+                chain,
+                processedEventCount: rawEvents.length,
+            },
+            "Initial import completed - blockscanner worker will handle ongoing updates"
+        );
+
+        // Return the processed events
+        return await this.prisma.positionEvent.findMany({
+            where: {
+                positionUserId: positionInfo.userId,
                 positionChain: positionInfo.chain,
                 positionProtocol: positionInfo.protocol,
                 positionNftId: positionInfo.nftId,
             },
-            "Existing events for position"
-        );
-
-        let fromBlock: string | number = "earliest";
-
-        if (existingEventCount > 0) {
-            // Position has existing events - use finality boundary optimization
-            const lastFinalizedBlock =
-                await this.evmBlockInfoService.getLastFinalizedBlockNumber(
-                    chain
-                );
-
-            if (lastFinalizedBlock !== null) {
-                // Start fetching from the finalized block to avoid re-fetching stable events
-                fromBlock = lastFinalizedBlock.toString();
-                this.logger.debug(
-                    { fromBlock },
-                    "Using finality boundary optimization"
-                );
-            } else {
-                this.logger.debug(
-                    "No finalized blocks available - using earliest"
-                );
-            }
-        } else {
-            // First-time import - fetch complete history from earliest block
-            this.logger.debug(
-                "First-time import detected - fetching complete history from earliest"
-            );
-        }
-
-        // Fetch events from Etherscan using the determined starting block
-        return await this.etherscanEventService.fetchPositionEvents(
-            chain,
-            nftId,
-            { fromBlock }
-        );
+            orderBy: [
+                { blockNumber: "asc" },
+                { transactionIndex: "asc" },
+                { logIndex: "asc" },
+            ],
+        });
     }
 
     /**
-     * Find the finality boundary for a position and return the last final event with its state
-     * This helps establish the initial state for processing non-final events
+     * Shared helper: Process raw event and create position event in database
+     * Used by both syncPositionEvents() and processBlockchainEvent()
+     *
+     * @param rawEvent - Raw blockchain event
+     * @param positionInfo - Position information
+     * @param currentState - Current position state before this event
+     * @returns Event ID, new state, and fee value
      */
-    private async findFinalityBoundary(
+    private async processAndCreateEvent(
+        rawEvent: RawPositionEvent,
         positionInfo: PositionSyncInfo,
-        chain: SupportedChainsType
+        currentState: {
+            liquidityAfter: string;
+            costBasisAfter: string;
+            realizedPnLAfter: string;
+            uncollectedPrincipal0: string;
+            uncollectedPrincipal1: string;
+        }
     ): Promise<{
-        lastFinalEvent: PositionEvent | null;
-        initialState: {
+        eventId: string;
+        newState: {
             liquidityAfter: string;
             costBasisAfter: string;
             realizedPnLAfter: string;
             uncollectedPrincipal0: string;
             uncollectedPrincipal1: string;
         };
+        deltaCostBasis: string;
+        deltaPnL: string;
+        feeValue: string;
     }> {
-        // Get the last finalized block number
-        const lastFinalizedBlock =
-            await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
-
-        // Query all position events ordered by blockchain order
-        const allEvents = await this.prisma.positionEvent.findMany({
-            where: {
-                positionUserId: positionInfo.userId,
-                positionChain: positionInfo.chain,
-                positionProtocol: positionInfo.protocol,
-                positionNftId: positionInfo.nftId,
-            },
-            orderBy: [
-                { blockNumber: "asc" },
-                { transactionIndex: "asc" },
-                { logIndex: "asc" },
-            ],
-        });
-
-        // Find the last event that is at or before the finalized block
-        let lastFinalEvent: PositionEvent | null = null;
-
-        if (lastFinalizedBlock !== null) {
-            for (let i = allEvents.length - 1; i >= 0; i--) {
-                const event = allEvents[i];
-                if (event.blockNumber <= lastFinalizedBlock) {
-                    lastFinalEvent = event;
-                    break;
-                }
-            }
-        }
-
-        // Return the initial state based on the last final event
-        const initialState = lastFinalEvent
-            ? {
-                  liquidityAfter: lastFinalEvent.liquidityAfter,
-                  costBasisAfter: lastFinalEvent.costBasisAfter,
-                  realizedPnLAfter: lastFinalEvent.realizedPnLAfter,
-                  uncollectedPrincipal0: lastFinalEvent.uncollectedPrincipal0,
-                  uncollectedPrincipal1: lastFinalEvent.uncollectedPrincipal1,
-              }
-            : {
-                  liquidityAfter: "0",
-                  costBasisAfter: "0",
-                  realizedPnLAfter: "0",
-                  uncollectedPrincipal0: "0",
-                  uncollectedPrincipal1: "0",
-              };
-
-        return { lastFinalEvent, initialState };
-    }
-
-    /**
-     * Filter raw events to keep only events that need processing
-     * - Always keeps non-final events (for reorg protection)
-     * - Keeps final events that are not yet in database (for catch-up sync)
-     * - Skips final events already in database (for efficiency)
-     */
-    private async filterNonFinalEvents(
-        rawEvents: RawPositionEvent[],
-        chain: SupportedChainsType,
-        positionInfo: PositionSyncInfo
-    ): Promise<RawPositionEvent[]> {
-        if (rawEvents.length === 0) {
-            return [];
-        }
-
-        this.logger.debug(
-            { rawEventCount: rawEvents.length },
-            "Filtering raw events for finality"
-        );
-
-        // Get the last finalized block number with single RPC call
-        const lastFinalizedBlock =
-            await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
-        this.logger.debug(
-            { lastFinalizedBlock },
-            "Last finalized block determined"
-        );
-
-        if (lastFinalizedBlock === null) {
-            // No finalized blocks yet, all events are non-final
-            this.logger.debug("No finalized blocks yet - keeping all events");
-            return rawEvents;
-        }
-
-        // Get unique existing transaction hashes ONLY after finalized block
-        // (events <= finalized block are either correctly processed or need processing anyway)
-        const existingTxHashes = new Set(
-            (
-                await this.prisma.positionEvent.findMany({
-                    where: {
-                        positionUserId: positionInfo.userId,
-                        positionChain: positionInfo.chain,
-                        positionProtocol: positionInfo.protocol,
-                        positionNftId: positionInfo.nftId,
-                        blockNumber: { gt: lastFinalizedBlock },
-                    },
-                    select: { transactionHash: true },
-                    distinct: ["transactionHash"],
-                })
-            ).map((event) => event.transactionHash)
-        );
-
-        const filteredEvents = rawEvents.filter((event) => {
-            this.logger.debug(
-                {
-                    blockNumber: event.blockNumber,
-                    txHashShort: event.transactionHash.slice(0, 10),
-                },
-                "Checking event block"
-            );
-
-            // Keep non-final events (always process for reorg protection)
-            if (event.blockNumber > lastFinalizedBlock) {
-                this.logger.debug(
-                    { blockNumber: event.blockNumber, lastFinalizedBlock },
-                    "Event is NON-FINAL - keeping"
-                );
-                return true;
-            }
-
-            // For final events: only keep if NOT already in database (catch-up sync)
-            const alreadyInDB = existingTxHashes.has(event.transactionHash);
-            if (alreadyInDB) {
-                this.logger.debug(
-                    { blockNumber: event.blockNumber },
-                    "Event is FINAL and already in DB - skipping"
-                );
-            } else {
-                this.logger.debug(
-                    { blockNumber: event.blockNumber },
-                    "Event is FINAL but NOT in DB - keeping for catch-up"
-                );
-            }
-            return !alreadyInDB;
-        });
-
-        this.logger.debug(
-            {
-                filteredCount: filteredEvents.length,
-                totalCount: rawEvents.length,
-            },
-            "Filtered result"
-        );
-        return filteredEvents;
-    }
-
-    /**
-     * Delete only non-final position events, preserving final events and user data
-     * This is a more targeted deletion than the clean slate approach
-     */
-    private async deleteNonFinalEvents(
-        positionInfo: PositionSyncInfo,
-        chain: SupportedChainsType
-    ): Promise<number> {
-        // Get the last finalized block number
-        const lastFinalizedBlock =
-            await this.evmBlockInfoService.getLastFinalizedBlockNumber(chain);
-
-        if (lastFinalizedBlock === null) {
-            // No finalized blocks yet, all events are non-final, delete all onchain events
-            return this.deletePositionEvents(positionInfo);
-        }
-
-        // Delete only non-final events (blockNumber > lastFinalizedBlock)
-        // Still preserve manual events and ledgerIgnore events
-        const result = await this.prisma.positionEvent.deleteMany({
-            where: {
-                positionUserId: positionInfo.userId,
-                positionChain: positionInfo.chain,
-                positionProtocol: positionInfo.protocol,
-                positionNftId: positionInfo.nftId,
-                blockNumber: { gt: lastFinalizedBlock },
-                AND: [
-                    { source: { not: "manual" } }, // Exclude manual events
-                    { ledgerIgnore: false }, // Exclude ledgerIgnore events
-                ],
-            },
-        });
-
-        return result.count;
-    }
-
-    /**
-     * Sync position events from blockchain to database
-     * Fetches events internally using finality boundary optimization
-     * Validates chronological ordering with failsafe checks during iteration
-     */
-    async syncPositionEvents(
-        positionInfo: PositionSyncInfo,
-        nftId: string
-    ): Promise<PositionEvent[]> {
-        this.logger.debug(
-            {
-                nftId,
-                chain: positionInfo.pool.chain,
-                positionChain: positionInfo.chain,
-                positionProtocol: positionInfo.protocol,
-                positionNftId: positionInfo.nftId,
-            },
-            "Starting syncPositionEvents"
-        );
-
-        // Fetch events from Etherscan using finality boundary optimization
-        this.logger.debug("Fetching events from Etherscan");
-        const rawEvents = await this.fetchEventsFromEtherscan(
-            positionInfo,
-            nftId
-        );
-        this.logger.debug(
-            { rawEventCount: rawEvents.length },
-            "Retrieved raw events from Etherscan"
-        );
-
-        if (rawEvents.length === 0) {
-            this.logger.debug(
-                { nftId },
-                "No events found for NFT - returning empty array"
-            );
-            return [];
-        }
-
         const chain = positionInfo.pool.chain as SupportedChainsType;
 
-        // Find the finality boundary and establish initial state from last final event
-        const { lastFinalEvent, initialState } =
-            await this.findFinalityBoundary(positionInfo, chain);
-
-        // Filter input events to exclude already-final ones (but keep final events not yet in DB)
-        this.logger.debug("Filtering non-final events");
-        const nonFinalRawEvents = await this.filterNonFinalEvents(
-            rawEvents,
+        // Get pool price at event block
+        const priceData = await this.poolPriceService.getExactPoolPriceAtBlock(
+            positionInfo.pool.poolAddress,
             chain,
+            rawEvent.blockNumber,
+            rawEvent.blockTimestamp
+        );
+
+        const poolPrice = this.calculatePoolPriceInQuoteToken(
+            priceData.sqrtPriceX96,
+            positionInfo.token0IsQuote,
+            positionInfo.pool.token0.decimals,
+            positionInfo.pool.token1.decimals
+        );
+
+        // Calculate token value in quote
+        const tokenValueInQuote = this.calculateTokenValueInQuote(
+            rawEvent.amount0 || "0",
+            rawEvent.amount1 || "0",
+            poolPrice,
+            positionInfo.token0IsQuote,
+            positionInfo.pool.token0.decimals,
+            positionInfo.pool.token1.decimals
+        ).toString();
+
+        // Calculate new state
+        const stateResult = this.calculateNewState(
+            currentState,
+            rawEvent,
+            tokenValueInQuote,
+            poolPrice,
             positionInfo
         );
-        this.logger.debug(
-            { nonFinalCount: nonFinalRawEvents.length },
-            "Non-final events after filtering"
-        );
-        this.logger.debug(
-            { hasLastFinalEvent: !!lastFinalEvent },
-            "Last final event status"
-        );
 
-        if (nonFinalRawEvents.length === 0 && lastFinalEvent) {
-            // All input events are already final, nothing to process
-            this.logger.debug(
-                "All input events are already final - returning empty array"
-            );
-            return [];
-        }
+        const newState = stateResult.state;
+        const deltaCostBasis = stateResult.deltaCostBasis || "0";
+        const deltaPnL = stateResult.deltaPnL || "0";
+        const feeValue = stateResult.feeValue || "0";
 
-        // Delete only non-final events (preserve final events, manual events, and ledgerIgnore)
-        await this.deleteNonFinalEvents(positionInfo, chain);
-
-        // Start from the state after the last final event (not zero state)
-        let currentState = initialState;
-
-        // Get all events (manual + non-final existing + non-final new) in natural blockchain order
-        const allEvents = await this.getAllPositionEventsWithRaw(
-            positionInfo,
-            nonFinalRawEvents
-        );
-
-        // Filter to only process events after the finality boundary
-        const eventsToProcess = lastFinalEvent
-            ? allEvents.filter(
-                  (event) =>
-                      event.blockNumber > lastFinalEvent.blockNumber ||
-                      (event.blockNumber === lastFinalEvent.blockNumber &&
-                          (event.transactionIndex >
-                              lastFinalEvent.transactionIndex ||
-                              (event.transactionIndex ===
-                                  lastFinalEvent.transactionIndex &&
-                                  event.logIndex > lastFinalEvent.logIndex)))
-              )
-            : allEvents;
-
-        // Process each event in chronological order (only non-final events)
-        for (let i = 0; i < eventsToProcess.length; i++) {
-            const event = eventsToProcess[i];
-
-            if (event.ledgerIgnore) {
-                // Update DB but don't change ledger state
-
-                // For existing DB events, just keep current state values
-                if (event.dbEvent) {
-                    await this.prisma.positionEvent.update({
-                        where: { id: event.dbEvent.id },
-                        data: {
-                            // Keep existing calculated values unchanged
-                            liquidityAfter: currentState.liquidityAfter,
-                            costBasisAfter: currentState.costBasisAfter,
-                            realizedPnLAfter: currentState.realizedPnLAfter,
-                        },
-                    });
-                }
-
-                // For new onchain events, this should never happen - throw error
-                if (event.rawEvent) {
-                    throw new Error(
-                        `Invalid state: New onchain event cannot have ledgerIgnore=true. ` +
-                            `Event: ${event.eventType} at ${event.blockNumber}:${event.transactionIndex}:${event.logIndex}`
-                    );
-                }
-            } else {
-                // Calculate token value for this event
-                let tokenValueInQuote = "0";
-                let poolPrice = 0n;
-                let calculatedDeltaCostBasis = "0";
-                let calculatedFeeValue = "0";
-
-                if (event.rawEvent) {
-                    // For new onchain events, calculate values
-                    const priceData =
-                        await this.poolPriceService.getExactPoolPriceAtBlock(
-                            positionInfo.pool.poolAddress,
-                            positionInfo.pool.chain as any,
-                            event.rawEvent.blockNumber,
-                            event.rawEvent.blockTimestamp
-                        );
-                    poolPrice = this.calculatePoolPriceInQuoteToken(
-                        priceData.sqrtPriceX96,
-                        positionInfo.token0IsQuote,
-                        positionInfo.pool.token0.decimals,
-                        positionInfo.pool.token1.decimals
-                    );
-                    tokenValueInQuote = this.calculateTokenValueInQuote(
-                        event.rawEvent.amount0 || "0",
-                        event.rawEvent.amount1 || "0",
-                        poolPrice,
-                        positionInfo.token0IsQuote,
-                        positionInfo.pool.token0.decimals,
-                        positionInfo.pool.token1.decimals
-                    ).toString();
-                } else if (event.dbEvent) {
-                    // For existing DB events, use stored values
-                    tokenValueInQuote = event.dbEvent.tokenValueInQuote;
-                }
-
-                // Update ledger state and get deltaCostBasis from the calculation
-                const stateResult = this.calculateNewState(
-                    currentState,
-                    event,
-                    tokenValueInQuote,
-                    poolPrice,
-                    positionInfo
-                );
-                const newState = stateResult.state;
-                calculatedDeltaCostBasis = stateResult.deltaCostBasis || "0";
-                const calculatedDeltaPnL = stateResult.deltaPnL || "0";
-                calculatedFeeValue = stateResult.feeValue || "0";
-
-                // Save event with calculated state
-                let eventId: string;
-                if (event.rawEvent) {
-                    // Create new onchain event in DB with pre-calculated values
-                    eventId = await this.createPositionEventFromRaw(
-                        event.rawEvent,
-                        positionInfo,
-                        newState,
-                        tokenValueInQuote,
-                        poolPrice,
-                        calculatedDeltaCostBasis,
-                        calculatedFeeValue,
-                        calculatedDeltaPnL,
-                        currentState // Pass the BEFORE state for fee calculation
-                    );
-                } else if (event.dbEvent) {
-                    // Update existing manual event with new state
-                    await this.prisma.positionEvent.update({
-                        where: { id: event.dbEvent.id },
-                        data: {
-                            liquidityAfter: newState.liquidityAfter,
-                            costBasisAfter: newState.costBasisAfter,
-                            realizedPnLAfter: newState.realizedPnLAfter,
-                            uncollectedPrincipal0:
-                                newState.uncollectedPrincipal0,
-                            uncollectedPrincipal1:
-                                newState.uncollectedPrincipal1,
-                        },
-                    });
-                    eventId = event.dbEvent.id;
-                } else {
-                    throw new Error(
-                        "Event must have either rawEvent or dbEvent"
-                    );
-                }
-
-                // Create APR record for this event (incremental processing)
-                const nextEvent = eventsToProcess[i + 1];
-                const periodEndDate = nextEvent?.blockTimestamp || null;
-
-                await this.positionAprService.createEventAprRecord(
-                    eventId,
-                    event.blockTimestamp,
-                    periodEndDate,
-                    newState.costBasisAfter
-                );
-
-                // If there was a previous event, close its period
-                if (i > 0) {
-                    await this.positionAprService.updatePreviousEventPeriodEnd(
-                        positionInfo.chain,
-                        positionInfo.protocol,
-                        positionInfo.nftId,
-                        event.blockTimestamp
-                    );
-                }
-
-                // If this is a COLLECT event, distribute fees across existing periods
-                if (
-                    event.eventType === "COLLECT" &&
-                    calculatedFeeValue !== "0"
-                ) {
-                    await this.positionAprService.distributeSingleCollectEventFees(
-                        positionInfo.chain,
-                        positionInfo.protocol,
-                        positionInfo.nftId,
-                        event.blockTimestamp,
-                        calculatedFeeValue
-                    );
-                }
-
-                // Update current state for next iteration
-                currentState = newState;
-            }
-        }
-
-        // APR records are already calculated incrementally during sync
-        // No need to invalidate cache since records are created/updated in real-time
-        this.logger.debug(
-            {
-                positionChain: positionInfo.chain,
-                positionProtocol: positionInfo.protocol,
-                positionNftId: positionInfo.nftId,
-            },
-            "APR records updated incrementally during event sync"
-        );
-
-        // Return the processed events for reporting
-        const processedEvents = await this.prisma.positionEvent.findMany({
-            where: {
-                positionUserId: positionInfo.userId,
-                positionChain: positionInfo.chain,
-                positionProtocol: positionInfo.protocol,
-                positionNftId: positionInfo.nftId,
-            },
-            orderBy: [
-                { blockNumber: "asc" },
-                { transactionIndex: "asc" },
-                { logIndex: "asc" },
-            ],
-        });
-
-        return processedEvents;
-    }
-
-    /**
-     * Delete position events with business logic preservation rules
-     *
-     * DELETES:
-     * - Events with source "onchain" AND ledgerIgnore false
-     *
-     * PRESERVES:
-     * - Events with source "manual" (user-created entries)
-     * - Events with ledgerIgnore true (marked to ignore in calculations)
-     *
-     * Use this method for normal cleanup operations that respect user data.
-     * For complete deletion, use hardResetPositionEvents() instead.
-     *
-     * @param positionInfo - Position information with composite key
-     * @returns Number of deleted records
-     */
-    async deletePositionEvents(
-        positionInfo: PositionSyncInfo
-    ): Promise<number> {
-        const result = await this.prisma.positionEvent.deleteMany({
-            where: {
-                positionUserId: positionInfo.userId,
-                positionChain: positionInfo.chain,
-                positionProtocol: positionInfo.protocol,
-                positionNftId: positionInfo.nftId,
-                AND: [
-                    { source: { not: "manual" } }, // Exclude manual events
-                    { ledgerIgnore: false }, // Exclude ledgerIgnore events
-                ],
-            },
-        });
-
-        // Invalidate APR cache since events have been deleted
-        if (result.count > 0) {
-            await this.positionAprService.invalidatePositionApr(
-                positionInfo.chain,
-                positionInfo.protocol,
-                positionInfo.nftId
-            );
-            this.logger.debug(
-                {
-                    positionChain: positionInfo.chain,
-                    positionProtocol: positionInfo.protocol,
-                    positionNftId: positionInfo.nftId,
-                    deletedCount: result.count,
-                },
-                "APR cache invalidated after event deletion"
-            );
-        }
-
-        return result.count;
-    }
-
-    /**
-     * Hard reset: Delete ALL position events for a position from database
-     * This is a destructive operation that removes all event history.
-     * Use this for complete position resyncs or cleanup operations.
-     * For business-logic deletion, use deletePositionEvents() instead.
-     *
-     * @param positionInfo - Position information with composite key
-     * @returns Number of deleted records
-     */
-    async hardResetPositionEvents(
-        positionInfo: PositionSyncInfo
-    ): Promise<number> {
-        const result = await this.prisma.positionEvent.deleteMany({
-            where: {
-                positionUserId: positionInfo.userId,
-                positionChain: positionInfo.chain,
-                positionProtocol: positionInfo.protocol,
-                positionNftId: positionInfo.nftId,
-            },
-        });
-
-        // Invalidate APR cache since all events have been deleted
-        if (result.count > 0) {
-            await this.positionAprService.invalidatePositionApr(
-                positionInfo.chain,
-                positionInfo.protocol,
-                positionInfo.nftId
-            );
-            this.logger.debug(
-                {
-                    positionChain: positionInfo.chain,
-                    positionProtocol: positionInfo.protocol,
-                    positionNftId: positionInfo.nftId,
-                    deletedCount: result.count,
-                },
-                "APR cache invalidated after hard reset"
-            );
-        }
-
-        return result.count;
-    }
-
-    /**
-     * Get all position events (manual + new onchain) in natural blockchain order
-     * Merges existing manual events from DB with new RawPositionEvents
-     */
-    private async getAllPositionEventsWithRaw(
-        positionInfo: PositionSyncInfo,
-        rawEvents: RawPositionEvent[]
-    ): Promise<ProcessableEvent[]> {
-        // Get existing manual and ledgerIgnore events from DB
-        const existingEvents = await this.prisma.positionEvent.findMany({
-            where: {
-                positionUserId: positionInfo.userId,
-                positionChain: positionInfo.chain,
-                positionProtocol: positionInfo.protocol,
-                positionNftId: positionInfo.nftId,
-                OR: [
-                    { source: "manual" }, // Keep manual events
-                    { ledgerIgnore: true }, // Keep ledgerIgnore events
-                ],
-            },
-        });
-
-        const processableEvents: ProcessableEvent[] = [];
-
-        // Add existing DB events
-        for (const dbEvent of existingEvents) {
-            processableEvents.push({
-                blockNumber: dbEvent.blockNumber,
-                transactionIndex: dbEvent.transactionIndex,
-                logIndex: dbEvent.logIndex,
-                blockTimestamp: dbEvent.blockTimestamp,
-                source: dbEvent.source as "manual" | "onchain",
-                eventType: dbEvent.eventType,
-                ledgerIgnore: dbEvent.ledgerIgnore,
-                dbEvent,
-            });
-        }
-
-        // Add new onchain events
-        for (const rawEvent of rawEvents) {
-            processableEvents.push({
-                blockNumber: rawEvent.blockNumber,
-                transactionIndex: rawEvent.transactionIndex,
-                logIndex: rawEvent.logIndex,
-                blockTimestamp: rawEvent.blockTimestamp,
-                source: "onchain",
-                eventType: rawEvent.eventType,
-                ledgerIgnore: false, // New onchain events are never ignored by default
-                rawEvent,
-            });
-        }
-
-        // Sort by natural blockchain order
-        processableEvents.sort((a, b) => {
-            if (a.blockNumber !== b.blockNumber) {
-                return Number(a.blockNumber - b.blockNumber);
-            }
-            if (a.transactionIndex !== b.transactionIndex) {
-                return a.transactionIndex - b.transactionIndex;
-            }
-            return a.logIndex - b.logIndex;
-        });
-
-        return processableEvents;
-    }
-
-    /**
-     * Create PositionEvent in database from RawPositionEvent with given state
-     */
-    private async createPositionEventFromRaw(
-        rawEvent: RawPositionEvent,
-        positionInfo: PositionSyncInfo,
-        state: {
-            liquidityAfter: string;
-            costBasisAfter: string;
-            realizedPnLAfter: string;
-            uncollectedPrincipal0: string;
-            uncollectedPrincipal1: string;
-        },
-        tokenValueInQuote: string,
-        poolPrice: bigint,
-        deltaCostBasis: string,
-        calculatedFeeValue?: string,
-        calculatedDeltaPnL?: string,
-        previousState?: {
-            uncollectedPrincipal0: string;
-            uncollectedPrincipal1: string;
-        }
-    ): Promise<string> {
+        // Create position event in database
         const inputHash = this.generateOnchainInputHash(
             rawEvent.blockNumber,
             rawEvent.transactionIndex,
             rawEvent.logIndex
         );
-
-        // Use calculated deltaPnL
-        const deltaPnL = calculatedDeltaPnL || "0";
 
         const createdEvent = await this.prisma.positionEvent.create({
             data: {
@@ -901,7 +376,6 @@ export class PositionLedgerService {
                 positionChain: positionInfo.chain,
                 positionProtocol: positionInfo.protocol,
                 positionNftId: positionInfo.nftId,
-                ledgerIgnore: false, // New events are never ignored by default
 
                 // Blockchain ordering
                 blockNumber: rawEvent.blockNumber,
@@ -915,7 +389,7 @@ export class PositionLedgerService {
 
                 // Liquidity changes
                 deltaL: rawEvent.liquidity || "0",
-                liquidityAfter: state.liquidityAfter,
+                liquidityAfter: newState.liquidityAfter,
 
                 // Price information
                 poolPrice: poolPrice.toString(),
@@ -927,47 +401,42 @@ export class PositionLedgerService {
 
                 // Fees (for COLLECT events) - pure fees only, excluding principal
                 feesCollected0:
-                    rawEvent.eventType === "COLLECT" && previousState
-                        ? this.calculatePureFees(
-                              rawEvent,
-                              previousState
-                          ).feeToken0.toString()
-                        : rawEvent.eventType === "COLLECT"
-                        ? rawEvent.amount0 || "0"
+                    rawEvent.eventType === "COLLECT"
+                        ? this.calculatePureFees(rawEvent, currentState)
+                              .feeToken0.toString()
                         : "0",
                 feesCollected1:
-                    rawEvent.eventType === "COLLECT" && previousState
-                        ? this.calculatePureFees(
-                              rawEvent,
-                              previousState
-                          ).feeToken1.toString()
-                        : rawEvent.eventType === "COLLECT"
-                        ? rawEvent.amount1 || "0"
+                    rawEvent.eventType === "COLLECT"
+                        ? this.calculatePureFees(rawEvent, currentState)
+                              .feeToken1.toString()
                         : "0",
                 feeValueInQuote:
-                    rawEvent.eventType === "COLLECT"
-                        ? calculatedFeeValue || "0"
-                        : "0",
+                    rawEvent.eventType === "COLLECT" ? feeValue : "0",
 
                 // Uncollected principal tracking
-                uncollectedPrincipal0: state.uncollectedPrincipal0,
-                uncollectedPrincipal1: state.uncollectedPrincipal1,
+                uncollectedPrincipal0: newState.uncollectedPrincipal0,
+                uncollectedPrincipal1: newState.uncollectedPrincipal1,
 
                 // Cost basis and PnL
                 deltaCostBasis,
-                costBasisAfter: state.costBasisAfter,
+                costBasisAfter: newState.costBasisAfter,
                 deltaPnL,
-                realizedPnLAfter: state.realizedPnLAfter,
+                realizedPnLAfter: newState.realizedPnLAfter,
 
                 // Metadata
-                source: "onchain",
                 createdAt: new Date(),
                 inputHash,
-                calcVersion: 1, // TODO: Use proper version
+                calcVersion: 1,
             },
         });
 
-        return createdEvent.id;
+        return {
+            eventId: createdEvent.id,
+            newState,
+            deltaCostBasis,
+            deltaPnL,
+            feeValue,
+        };
     }
 
     /**
@@ -982,7 +451,7 @@ export class PositionLedgerService {
             uncollectedPrincipal0: string;
             uncollectedPrincipal1: string;
         },
-        event: ProcessableEvent,
+        event: RawPositionEvent,
         tokenValueInQuote: string
     ): {
         liquidityAfter: string;
@@ -991,8 +460,7 @@ export class PositionLedgerService {
         uncollectedPrincipal0: string;
         uncollectedPrincipal1: string;
     } {
-        const deltaL =
-            event.rawEvent?.liquidity || event.dbEvent?.deltaL || "0";
+        const deltaL = event.liquidity || "0";
         const newLiquidityAfter = (
             BigInt(currentState.liquidityAfter) + BigInt(deltaL)
         ).toString();
@@ -1032,7 +500,7 @@ export class PositionLedgerService {
             uncollectedPrincipal0: string;
             uncollectedPrincipal1: string;
         },
-        event: ProcessableEvent,
+        event: RawPositionEvent,
         tokenValueInQuote: string
     ): {
         liquidityAfter: string;
@@ -1041,8 +509,7 @@ export class PositionLedgerService {
         uncollectedPrincipal0: string;
         uncollectedPrincipal1: string;
     } {
-        const deltaL =
-            event.rawEvent?.liquidity || event.dbEvent?.deltaL || "0";
+        const deltaL = event.liquidity || "0";
         const currentLiquidity = BigInt(currentState.liquidityAfter);
         const newLiquidityAfter = (
             currentLiquidity - BigInt(deltaL)
@@ -1075,10 +542,8 @@ export class PositionLedgerService {
         ).toString();
 
         // DECREASE events add tokens to uncollected principal
-        const token0Amount =
-            event.rawEvent?.amount0 || event.dbEvent?.token0Amount || "0";
-        const token1Amount =
-            event.rawEvent?.amount1 || event.dbEvent?.token1Amount || "0";
+        const token0Amount = event.amount0 || "0";
+        const token1Amount = event.amount1 || "0";
         const newUncollectedToken0Amount = (
             BigInt(currentState.uncollectedPrincipal0) + BigInt(token0Amount)
         ).toString();
@@ -1107,7 +572,7 @@ export class PositionLedgerService {
             uncollectedPrincipal0: string;
             uncollectedPrincipal1: string;
         },
-        event: ProcessableEvent
+        event: RawPositionEvent
     ): {
         liquidityAfter: string;
         costBasisAfter: string;
@@ -1116,12 +581,8 @@ export class PositionLedgerService {
         uncollectedPrincipal1: string;
     } {
         // Get token amounts from the COLLECT event
-        const collectedToken0 = BigInt(
-            event.rawEvent?.amount0 || event.dbEvent?.token0Amount || "0"
-        );
-        const collectedToken1 = BigInt(
-            event.rawEvent?.amount1 || event.dbEvent?.token1Amount || "0"
-        );
+        const collectedToken0 = BigInt(event.amount0 || "0");
+        const collectedToken1 = BigInt(event.amount1 || "0");
 
         // Get current uncollected principal amounts
         const currentUncollectedToken0 = BigInt(
@@ -1303,7 +764,7 @@ export class PositionLedgerService {
             uncollectedPrincipal0: string;
             uncollectedPrincipal1: string;
         },
-        event: ProcessableEvent,
+        event: RawPositionEvent,
         tokenValueInQuote: string,
         poolPrice: bigint,
         positionInfo: PositionSyncInfo
@@ -1361,7 +822,7 @@ export class PositionLedgerService {
                     event
                 );
                 const feeValue = this.calculatePureFeeValue(
-                    event.rawEvent!,
+                    event,
                     currentState,
                     poolPrice,
                     positionInfo
@@ -1485,52 +946,343 @@ export class PositionLedgerService {
     }
 
     /**
-     * Generate blockchain-like identifiers for manual PositionEvents
-     * Creates blockNumber from timestamp, uses -1 for transactionIndex,
-     * and sequential negative logIndex values to avoid conflicts with onchain events
+     * Process a blockchain event for all users who own the position
+     * Called by blockscanner worker (user-agnostic)
      *
-     * @param timestamp - Timestamp for the manual event
-     * @param positionInfo - Position information with composite key
-     * @param chain - Chain to get block information from
-     * @returns Blockchain identifiers for chronological ordering
-     * @throws Error if timestamp is too old or too new for block data
+     * This method is idempotent - duplicate events are skipped
+     * Fetches blockTimestamp only if positions exist (optimization)
+     *
+     * @param rawEvent - Raw event data from blockchain (without timestamp)
+     * @returns Array of results (one per affected user)
      */
-    async generateManualEventBlockData(
-        timestamp: Date,
-        positionInfo: PositionSyncInfo,
-        chain: SupportedChainsType
-    ): Promise<{
+    async processBlockchainEvent(rawEvent: {
+        chain: SupportedChainsType;
+        protocol: string;
+        nftId: string;
+        eventType: "INCREASE_LIQUIDITY" | "DECREASE_LIQUIDITY" | "COLLECT";
         blockNumber: bigint;
         transactionIndex: number;
         logIndex: number;
-    }> {
-        // Get block number for timestamp using Etherscan API
-        const blockNumber =
-            await this.etherscanBlockInfoService.getBlockNumberForTimestamp(
-                timestamp,
-                chain,
-                "before" // Get block before or at the timestamp
-            );
+        blockHash: string;
+        transactionHash: string;
+        liquidity?: string;
+        amount0: string;
+        amount1: string;
+        recipient?: string;
+    }): Promise<Array<{ userId: string; success: boolean; error?: string }>> {
+        const results: Array<{
+            userId: string;
+            success: boolean;
+            error?: string;
+        }> = [];
 
-        // Count existing manual events at the same blockNumber for this position
-        const existingManualEvents = await this.prisma.positionEvent.count({
+        // Find all users who own this position
+        const positions = await this.prisma.position.findMany({
             where: {
-                positionUserId: positionInfo.userId,
-                positionChain: positionInfo.chain,
-                positionProtocol: positionInfo.protocol,
-                positionNftId: positionInfo.nftId,
-                blockNumber: blockNumber,
-                source: "manual",
+                chain: rawEvent.chain,
+                nftId: rawEvent.nftId,
+                protocol: rawEvent.protocol,
+            },
+            include: {
+                pool: {
+                    include: {
+                        token0: true,
+                        token1: true,
+                    },
+                },
             },
         });
 
-        // Calculate sequential negative logIndex: -1, -2, -3, etc.
-        const logIndex = -1 - existingManualEvents;
+        if (positions.length === 0) {
+            this.logger.debug(
+                { chain: rawEvent.chain, nftId: rawEvent.nftId },
+                "No users own this position (not imported yet)"
+            );
+            return results;
+        }
+
+        // Fetch block timestamp (only needed when positions exist)
+        const blockInfo = await this.evmBlockInfoService.getBlockByNumber(
+            rawEvent.blockNumber,
+            rawEvent.chain
+        );
+        const blockTimestamp = new Date(Number(blockInfo.timestamp) * 1000);
+
+        // Process event for each user
+        for (const position of positions) {
+            try {
+                // Check if event already exists (idempotent)
+                const existingEvent = await this.prisma.positionEvent.findFirst(
+                    {
+                        where: {
+                            positionUserId: position.userId,
+                            positionChain: position.chain,
+                            positionProtocol: position.protocol,
+                            positionNftId: position.nftId,
+                            transactionHash: rawEvent.transactionHash,
+                            logIndex: rawEvent.logIndex,
+                        },
+                    }
+                );
+
+                if (existingEvent) {
+                    this.logger.debug(
+                        {
+                            userId: position.userId,
+                            chain: rawEvent.chain,
+                            nftId: rawEvent.nftId,
+                            txHash: rawEvent.transactionHash,
+                            logIndex: rawEvent.logIndex,
+                        },
+                        "Event already exists, skipping"
+                    );
+                    results.push({ userId: position.userId, success: true });
+                    continue;
+                }
+
+                // Get position info for state calculations
+                const positionInfo: PositionSyncInfo = {
+                    userId: position.userId,
+                    chain: position.chain,
+                    protocol: position.protocol,
+                    nftId: position.nftId,
+                    token0IsQuote: position.token0IsQuote,
+                    pool: {
+                        poolAddress: position.pool.poolAddress,
+                        chain: position.pool.chain,
+                        token0: {
+                            decimals: position.pool.token0.decimals,
+                        },
+                        token1: {
+                            decimals: position.pool.token1.decimals,
+                        },
+                    },
+                };
+
+                // Get current state (last event or zero state)
+                const lastEvent = await this.prisma.positionEvent.findFirst({
+                    where: {
+                        positionUserId: position.userId,
+                        positionChain: position.chain,
+                        positionProtocol: position.protocol,
+                        positionNftId: position.nftId,
+                    },
+                    orderBy: [
+                        { blockNumber: "desc" },
+                        { transactionIndex: "desc" },
+                        { logIndex: "desc" },
+                    ],
+                });
+
+                const currentState = lastEvent
+                    ? {
+                          liquidityAfter: lastEvent.liquidityAfter,
+                          costBasisAfter: lastEvent.costBasisAfter,
+                          realizedPnLAfter: lastEvent.realizedPnLAfter,
+                          uncollectedPrincipal0:
+                              lastEvent.uncollectedPrincipal0,
+                          uncollectedPrincipal1:
+                              lastEvent.uncollectedPrincipal1,
+                      }
+                    : {
+                          liquidityAfter: "0",
+                          costBasisAfter: "0",
+                          realizedPnLAfter: "0",
+                          uncollectedPrincipal0: "0",
+                          uncollectedPrincipal1: "0",
+                      };
+
+                // Build RawPositionEvent for helper method
+                const rawPositionEvent: RawPositionEvent = {
+                    eventType: rawEvent.eventType,
+                    tokenId: rawEvent.nftId,
+                    transactionHash: rawEvent.transactionHash,
+                    blockNumber: rawEvent.blockNumber,
+                    transactionIndex: rawEvent.transactionIndex,
+                    logIndex: rawEvent.logIndex,
+                    blockTimestamp: blockTimestamp,
+                    liquidity: rawEvent.liquidity,
+                    amount0: rawEvent.amount0,
+                    amount1: rawEvent.amount1,
+                    recipient: rawEvent.recipient,
+                    chain: rawEvent.chain,
+                };
+
+                // Process event and create in database (shared helper)
+                const { eventId, newState, feeValue } =
+                    await this.processAndCreateEvent(
+                        rawPositionEvent,
+                        positionInfo,
+                        currentState
+                    );
+
+                // Create APR record (FIXED: was missing in original implementation!)
+                // Note: For single events, we don't know the next event yet, so periodEndDate is null
+                await this.positionAprService.createEventAprRecord(
+                    eventId,
+                    blockTimestamp,
+                    null, // Period end will be updated when next event arrives
+                    newState.costBasisAfter
+                );
+
+                // Update the previous event's period end to this event's timestamp
+                await this.positionAprService.updatePreviousEventPeriodEnd(
+                    positionInfo.chain,
+                    positionInfo.protocol,
+                    positionInfo.nftId,
+                    blockTimestamp
+                );
+
+                // If this is a COLLECT event, distribute fees across existing periods
+                if (rawEvent.eventType === "COLLECT" && feeValue !== "0") {
+                    await this.positionAprService.distributeSingleCollectEventFees(
+                        positionInfo.chain,
+                        positionInfo.protocol,
+                        positionInfo.nftId,
+                        blockTimestamp,
+                        feeValue
+                    );
+                }
+
+                results.push({ userId: position.userId, success: true });
+            } catch (error) {
+                this.logger.error(
+                    {
+                        userId: position.userId,
+                        chain: rawEvent.chain,
+                        nftId: rawEvent.nftId,
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                    },
+                    "Failed to process blockchain event for user"
+                );
+                results.push({
+                    userId: position.userId,
+                    success: false,
+                    error:
+                        error instanceof Error ? error.message : String(error),
+                });
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Rollback events above a specific block for ALL positions on a chain
+     * Called by blockscanner worker when reorg detected
+     *
+     * @param chain - Chain name
+     * @param minAffectedBlock - Delete events >= this block
+     * @returns Statistics about deleted events
+     */
+    async rollbackEventsAboveBlock(
+        chain: SupportedChainsType,
+        minAffectedBlock: bigint
+    ): Promise<{
+        deletedEvents: number;
+        affectedUsers: number;
+        affectedPositions: number;
+    }> {
+        // Find all positions on this chain
+        const positions = await this.prisma.position.findMany({
+            where: { chain },
+            select: {
+                userId: true,
+                chain: true,
+                protocol: true,
+                nftId: true,
+            },
+        });
+
+        let deletedEvents = 0;
+        const affectedUserIds = new Set<string>();
+
+        // Delete events for each position
+        for (const position of positions) {
+            const result = await this.prisma.positionEvent.deleteMany({
+                where: {
+                    positionUserId: position.userId,
+                    positionChain: position.chain,
+                    positionProtocol: position.protocol,
+                    positionNftId: position.nftId,
+                    blockNumber: { gte: minAffectedBlock },
+                },
+            });
+
+            if (result.count > 0) {
+                deletedEvents += result.count;
+                affectedUserIds.add(position.userId);
+
+                // Invalidate APR cache for this position
+                await this.positionAprService.invalidatePositionApr(
+                    position.chain,
+                    position.protocol,
+                    position.nftId
+                );
+            }
+        }
+
+        this.logger.info(
+            {
+                chain,
+                minAffectedBlock: minAffectedBlock.toString(),
+                deletedEvents,
+                affectedUsers: affectedUserIds.size,
+                affectedPositions: positions.length,
+            },
+            "Rolled back position events for reorg"
+        );
 
         return {
-            blockNumber,
-            transactionIndex: -1, // Always -1 for manual events
-            logIndex,
+            deletedEvents,
+            affectedUsers: affectedUserIds.size,
+            affectedPositions: positions.length,
         };
+    }
+
+    /**
+     * Get NFPM contract deployment block for a chain (cached)
+     * @private
+     */
+    private async getNFPMDeploymentBlock(
+        chain: SupportedChainsType
+    ): Promise<bigint> {
+        // Check cache first
+        if (this.nfpmDeploymentBlocks[chain]) {
+            return this.nfpmDeploymentBlocks[chain];
+        }
+
+        // Fetch from Etherscan API
+        try {
+            const nfpmAddress = getNFPMAddress(chain);
+            const etherscanClient = new EtherscanClient();
+            const creation = await etherscanClient.fetchContractCreation(
+                chain,
+                nfpmAddress
+            );
+
+            const block = BigInt(creation.blockNumber);
+            this.nfpmDeploymentBlocks[chain] = block;
+
+            this.logger.info(
+                { chain, deploymentBlock: block.toString() },
+                "NFPM deployment block cached"
+            );
+
+            return block;
+        } catch (error) {
+            this.logger.error(
+                {
+                    chain,
+                    error:
+                        error instanceof Error ? error.message : String(error),
+                },
+                "Failed to fetch NFPM deployment block, using 0"
+            );
+            return 0n;
+        }
     }
 }

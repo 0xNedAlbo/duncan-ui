@@ -228,9 +228,6 @@ model PositionEvent {
   positionNftId    String
   position         Position @relation(fields: [positionUserId, positionChain, positionProtocol, positionNftId], references: [userId, chain, protocol, nftId], onDelete: Cascade)
 
-  // Ledger Order
-  ledgerIgnore Boolean // Ignore this event in the ledger
-
   // Blockchain Ordering (CRITICAL for proper event sequencing)
   blockNumber      BigInt // Ethereum block number
   transactionIndex Int // Transaction index within block
@@ -271,9 +268,8 @@ model PositionEvent {
   realizedPnLAfter String // BigInt: Realized PnL from position changes only (INCREASE/DECREASE)
 
   // Metadata and syncing
-  source      String // "onchain" | "manual"
   createdAt   DateTime
-  inputHash   String // manual: MD5("manual-rnd()), onchain: MD5(CONCAT(blocknumber, txIndex, logIndex))")
+  inputHash   String // MD5(CONCAT(blocknumber, txIndex, logIndex)) - unique identifier for deduplication
   calcVersion Int // Increasing number per calculation run, should be the same within each position
 
   // APR Calculation
@@ -414,27 +410,6 @@ model PositionCurve {
 }
 
 // Blockscanner Models for Reorg Detection and Event Scanning
-
-// Block Header Model - Sliding window of recent block headers for reorg detection
-model BlockScannerHeader {
-  id String @id @default(cuid())
-
-  // Chain and Block Identification
-  chain       String // "ethereum", "arbitrum", "base"
-  blockNumber BigInt // Block number
-  hash        String // Block hash (0x...)
-  parentHash  String // Parent block hash for reorg detection
-  timestamp   DateTime // Block timestamp
-
-  // Metadata
-  createdAt DateTime @default(now())
-
-  // Composite unique constraint and indexes
-  @@unique([chain, blockNumber]) // One header per chain per block number
-  @@index([chain, blockNumber]) // Fast lookups by chain and block
-  @@index([chain, hash]) // Fast hash lookups for reorg detection
-  @@map("blockscanner_headers")
-}
 
 // Scanner Watermark Model - Track highest processed block per chain
 model BlockScannerWatermark {

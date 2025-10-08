@@ -461,14 +461,9 @@ export class PositionPnLService {
       };
     }
 
-    // No valid cache found - update pool state and sync position events, then calculate fresh PnL data
+    // No valid cache found - update pool state and calculate fresh PnL data
+    // Note: Event syncing is handled by blockscanner worker, not by user-triggered refresh
     await this.poolService.updatePoolState(position.pool.chain, position.pool.poolAddress);
-
-    // Sync position events after pool state update to ensure latest ledger state
-    if (position.nftId) {
-      const positionSyncInfo = PositionLedgerService.createSyncInfo(position);
-      await this.positionLedgerService.syncPositionEvents(positionSyncInfo, position.nftId);
-    }
 
     await this.calculateAndCachePnL(positionId, position);
 
