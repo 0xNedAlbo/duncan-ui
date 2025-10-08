@@ -1,105 +1,71 @@
-/**
- * Type definitions for Blockscanner Worker
- */
+// Blockscanner Worker Type Definitions
 
-import { Address } from 'viem';
+import type { EtherscanLog } from "@/services/etherscan/etherscanClient";
 
-/**
- * Block header data for reorg detection
- */
-export interface BlockHeaderData {
-  chain: string;
-  blockNumber: bigint;
-  hash: string;
-  parentHash: string;
-  timestamp: Date;
+// ═══════════════════════════════════════════════════════════════════════════════
+// EVENT LOG TYPES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export type EventType = "INCREASE_LIQUIDITY" | "DECREASE_LIQUIDITY" | "COLLECT";
+
+// Unique identifier for a log entry
+export interface LogKey {
+  txHash: string;
+  logIndex: number;
+  blockHash: string;
 }
 
-/**
- * Watermark state for chain scanning progress
- */
-export interface WatermarkData {
-  chain: string;
-  lastProcessedHeight: bigint;
+// Full log record with parsed event data
+export interface LogRecord {
+  blockNumber: bigint;
+  blockHash: string;
+  transactionIndex: number;
+  logIndex: number;
+  txHash: string;
+  eventType: EventType;
+  rawLog: EtherscanLog; // Original Etherscan log for reference
 }
 
-/**
- * Uniswap V3 NFPM event types
- */
-export type NFPMEventType = 'IncreaseLiquidity' | 'DecreaseLiquidity' | 'Collect';
+// ═══════════════════════════════════════════════════════════════════════════════
+// SLIDING WINDOW TYPES
+// ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * Parsed IncreaseLiquidity event
- */
-export interface IncreaseLiquidityEvent {
-  type: 'IncreaseLiquidity';
-  tokenId: bigint;
-  liquidity: bigint;
-  amount0: bigint;
-  amount1: bigint;
+// Window entry for reorg detection (compact format)
+export interface WindowEntry {
   blockNumber: bigint;
-  blockTimestamp: Date;
-  transactionHash: string;
+  blockHash: string;
   transactionIndex: number;
   logIndex: number;
 }
 
-/**
- * Parsed DecreaseLiquidity event
- */
-export interface DecreaseLiquidityEvent {
-  type: 'DecreaseLiquidity';
-  tokenId: bigint;
-  liquidity: bigint;
-  amount0: bigint;
-  amount1: bigint;
-  blockNumber: bigint;
-  blockTimestamp: Date;
-  transactionHash: string;
-  transactionIndex: number;
-  logIndex: number;
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHAIN STATE
+// ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * Parsed Collect event
- */
-export interface CollectEvent {
-  type: 'Collect';
-  tokenId: bigint;
-  recipient: Address;
-  amount0: bigint;
-  amount1: bigint;
-  blockNumber: bigint;
-  blockTimestamp: Date;
-  transactionHash: string;
-  transactionIndex: number;
-  logIndex: number;
-}
-
-/**
- * Union type for all NFPM events
- */
-export type NFPMEvent = IncreaseLiquidityEvent | DecreaseLiquidityEvent | CollectEvent;
-
-/**
- * Chain configuration for scanner
- */
-export interface ChainScannerConfig {
+// Per-chain state tracking
+export interface ChainState {
   chain: string;
-  chainId: number;
-  rpcUrl: string;
-  nfpmAddress: Address;
-  confirmationsFallback: number; // Number of blocks to wait if finalized/safe not supported
-  supportsFinalized: boolean; // Whether chain supports 'finalized' block tag
-  supportsSafe: boolean; // Whether chain supports 'safe' block tag
-  pollIntervalMs: number; // Polling interval in milliseconds
+  watermark: bigint; // Last processed block height
+  recentWindow: Map<string, WindowEntry>; // txHash -> WindowEntry
 }
 
-/**
- * Reorg detection result
- */
-export interface ReorgDetection {
-  hasReorg: boolean;
-  commonAncestor?: bigint; // Block number of common ancestor (if reorg detected)
-  reorgDepth?: number; // Number of blocks affected by reorg
+// ═══════════════════════════════════════════════════════════════════════════════
+// ETHERSCAN API RESPONSE TYPES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Result from adaptive getLogs fetch
+export interface FetchLogsResult {
+  logs: EtherscanLog[];
+  success: boolean;
+  fromBlock: bigint;
+  toBlock: bigint;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REORG DETECTION TYPES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface ReorgDetectionResult {
+  reorgDetected: boolean;
+  minAffectedBlock: bigint | null; // Earliest block affected by reorg
 }

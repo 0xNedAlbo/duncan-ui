@@ -49,6 +49,18 @@ export interface BlockNumberResponse {
     result: string; // Block number as string
 }
 
+// Response for contract creation lookup
+export interface ContractCreationResponse {
+    status: string;
+    message: string;
+    result: Array<{
+        contractAddress: string;
+        contractCreator: string;
+        txHash: string;
+        blockNumber: string;
+    }>;
+}
+
 // Options for fetching logs
 export interface LogOptions {
     fromBlock?: string | number;
@@ -238,6 +250,48 @@ export class EtherscanClient {
         }
 
         return data.result;
+    }
+
+    /**
+     * Get contract creation information (block number, creator, txHash)
+     * Uses Etherscan API v2 getcontractcreation endpoint
+     */
+    async fetchContractCreation(
+        chain: SupportedChainsType,
+        contractAddress: string
+    ): Promise<{ blockNumber: string; txHash: string; contractCreator: string }> {
+        this.validateApiKey();
+        const config = CHAIN_CONFIG[chain];
+        if (!config) {
+            throw new Error(`Unsupported chain: ${chain}`);
+        }
+
+        const params = new URLSearchParams({
+            chainid: config.chainId.toString(),
+            module: "contract",
+            action: "getcontractcreation",
+            contractaddresses: contractAddress,
+            apikey: process.env.ETHERSCAN_API_KEY!,
+        });
+
+        const url = `${API_BASE_URL}?${params.toString()}`;
+        const data = await this.doFetch<ContractCreationResponse>(url);
+
+        if (data.status !== "1") {
+            throw new Error(
+                `Etherscan API error: ${data.message} ${
+                    Array.isArray(data.result) ? "" : data.result
+                }`
+            );
+        }
+
+        if (!data.result || data.result.length === 0) {
+            throw new Error(
+                `Contract creation not found for ${contractAddress} on ${chain}`
+            );
+        }
+
+        return data.result[0];
     }
 
     /**

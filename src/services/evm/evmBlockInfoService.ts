@@ -75,6 +75,74 @@ export class EvmBlockInfoService {
     }
 
     /**
+     * Get block information by block tag (finalized, safe, latest)
+     *
+     * @param blockTag - Block tag to retrieve ("finalized", "safe", "latest")
+     * @param chain - Blockchain to query
+     * @returns BlockInfo structure with essential block data, or null if tag not supported
+     * @throws Error if chain is not supported or RPC call fails
+     */
+    async getBlockByTag(
+        blockTag: "finalized" | "safe" | "latest",
+        chain: SupportedChainsType
+    ): Promise<BlockInfo | null> {
+        const client = this.rpcClients.get(chain);
+        if (!client) {
+            throw new Error(`RPC client not found for chain: ${chain}`);
+        }
+
+        try {
+            const block = await client.getBlock({
+                blockTag,
+                includeTransactions: false
+            });
+
+            if (!block || !block.number) {
+                return null;
+            }
+
+            return {
+                hash: block.hash!,
+                number: block.number,
+                timestamp: block.timestamp,
+                gasUsed: block.gasUsed,
+                gasLimit: block.gasLimit,
+                baseFeePerGas: block.baseFeePerGas,
+                transactionCount: block.transactions.length,
+                parentHash: block.parentHash,
+                blockTag
+            };
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (_error) {
+            // Block tag not supported by chain (e.g., "finalized" on older chains)
+            return null;
+        }
+    }
+
+    /**
+     * Get latest block number
+     *
+     * @param chain - Blockchain to query
+     * @returns Latest block number
+     * @throws Error if chain is not supported or RPC call fails
+     */
+    async getBlockNumber(chain: SupportedChainsType): Promise<bigint> {
+        const client = this.rpcClients.get(chain);
+        if (!client) {
+            throw new Error(`RPC client not found for chain: ${chain}`);
+        }
+
+        try {
+            return await client.getBlockNumber();
+        } catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get block number on ${chain}: ${error.message}`);
+            }
+            throw new Error(`Unknown error getting block number on ${chain}`);
+        }
+    }
+
+    /**
      * Check if a transaction in a specific block is final
      *
      * @param transactionBlockNumber - Block number containing the transaction

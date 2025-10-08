@@ -1,76 +1,125 @@
-/**
- * Chain-specific configuration for Blockscanner Worker
- */
+// Blockscanner Worker Configuration
+// Constants and chain setup for event scanning
 
-import type { ChainScannerConfig } from "./types";
-import { NONFUNGIBLE_POSITION_MANAGER_ADDRESSES } from "../../../lib/contracts/nonfungiblePositionManager";
+import { SUPPORTED_CHAINS, type SupportedChainsType } from "@/config/chains";
+import { EtherscanClient } from "@/services/etherscan/etherscanClient";
+import { EvmBlockInfoService } from "@/services/evm/evmBlockInfoService";
+import { BackendRpcClients } from "@/services/evm/rpcClients";
+import { NONFUNGIBLE_POSITION_MANAGER_ADDRESSES, getChainId } from "@/lib/contracts/nonfungiblePositionManager";
+import { DefaultServiceFactory } from "@/services/ServiceFactory";
+import type { PositionLedgerService } from "@/services/positions/positionLedgerService";
 
-/**
- * Get scanner configuration for a chain
- */
-export function getChainScannerConfig(chain: string): ChainScannerConfig {
-    const configs: Record<string, ChainScannerConfig> = {
-        ethereum: {
-            chain: "ethereum",
-            chainId: 1,
-            rpcUrl: process.env.ETHEREUM_RPC_URL || process.env.NEXT_PUBLIC_ETHEREUM_RPC_URL || "",
-            nfpmAddress: NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[1],
-            confirmationsFallback: 12, // Ethereum: wait 12 blocks if finalized not available
-            supportsFinalized: true,
-            supportsSafe: true,
-            pollIntervalMs: 12_000, // 12 seconds (Ethereum block time)
-        },
-        arbitrum: {
-            chain: "arbitrum",
-            chainId: 42161,
-            rpcUrl: process.env.ARBITRUM_RPC_URL || process.env.NEXT_PUBLIC_ARBITRUM_RPC_URL || "",
-            nfpmAddress: NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[42161],
-            confirmationsFallback: 20, // Arbitrum: wait 20 blocks (~5 seconds)
-            supportsFinalized: false, // Arbitrum doesn't support 'finalized'
-            supportsSafe: false, // Arbitrum doesn't support 'safe'
-            pollIntervalMs: 2_000, // 2 seconds (fast L2)
-        },
-        base: {
-            chain: "base",
-            chainId: 8453,
-            rpcUrl: process.env.BASE_RPC_URL || process.env.NEXT_PUBLIC_BASE_RPC_URL || "",
-            nfpmAddress: NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[8453],
-            confirmationsFallback: 20, // Base: wait 20 blocks (~40 seconds)
-            supportsFinalized: true,
-            supportsSafe: true,
-            pollIntervalMs: 2_000, // 2 seconds (Base block time)
-        },
-    };
+// ═══════════════════════════════════════════════════════════════════════════════
+// UNISWAP V3 NONFUNGIBLE POSITION MANAGER ADDRESSES
+// ═══════════════════════════════════════════════════════════════════════════════
 
-    const config = configs[chain.toLowerCase()];
-    if (!config) {
-        throw new Error(`Unsupported chain: ${chain}`);
-    }
-
-    if (!config.rpcUrl) {
-        throw new Error(
-            `Missing RPC URL for chain: ${chain}. Set ${chain.toUpperCase()}_RPC_URL or NEXT_PUBLIC_${chain.toUpperCase()}_RPC_URL environment variable.`
-        );
-    }
-
-    return config;
+// Helper function to get NFPM address for a chain
+export function getNFPMAddress(chain: SupportedChainsType): string {
+  const chainId = getChainId(chain);
+  const address = NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[chainId];
+  if (!address) {
+    throw new Error(`No NFPM address configured for chain: ${chain} (chainId: ${chainId})`);
+  }
+  return address;
 }
 
-/**
- * Get all supported chains for scanning
- */
-export function getSupportedChains(): string[] {
-    return ["ethereum", "arbitrum", "base"];
-}
-
-/**
- * Event signatures for NFPM events
- */
-export const EVENT_SIGNATURES = {
-    IncreaseLiquidity:
-        "0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f",
-    DecreaseLiquidity:
-        "0x26f6a048ee9138f2c0ce266f322cb99228e8d619ae2bff30c67f8dcf9d2377b4",
-    Collect:
-        "0x40d0efd1a53d60ecbf40971b9daf7dc90178c3aadc7aab1765632738fa8b8f01",
+// Event signatures (keccak256)
+export const TOPICS = {
+  INCREASE_LIQUIDITY:
+    "0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f", // IncreaseLiquidity(uint256,uint128,uint256,uint256)
+  DECREASE_LIQUIDITY:
+    "0x26f6a048ee9138f2c0ce266f322cb99228e8d619ae2bff30c67f8dcf9d2377b4", // DecreaseLiquidity(uint256,uint128,uint256,uint256)
+  COLLECT:
+    "0x40d0efd1a53d60ecbf40971b9daf7dc90178c3aadc7aab1765632738fa8b8f01", // Collect(uint256,address,uint256,uint256)
 } as const;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TIMING CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const POLL_INTERVAL_MS = 60_000; // Run every 60 seconds
+export const WINDOW_BLOCKS = 100_000; // Sliding window size (≈3-10 min on Arbitrum)
+export const SAFETY_BUFFER = 2_000; // Rollback safety margin
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ETHERSCAN API CHUNKING PARAMETERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const CHUNK_MIN = 1_000; // Minimum block span per Etherscan getLogs call
+export const CHUNK_MAX = 5_000; // Maximum block span per Etherscan getLogs call (conservative)
+export const TARGET_LOGS_PER_CALL = 3_000; // Adaptive target for chunk sizing
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHAIN CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface ChainClientConfig {
+  chain: SupportedChainsType;
+  etherscanClient: EtherscanClient;
+  blockInfoService: EvmBlockInfoService;
+  positionLedgerService: PositionLedgerService;
+}
+
+// Parse SCAN_CHAINS from environment or default to all supported chains
+function getParsedChains(): SupportedChainsType[] {
+  const envChains = process.env.SCAN_CHAINS;
+  if (!envChains) {
+    return SUPPORTED_CHAINS as SupportedChainsType[];
+  }
+
+  const chains = envChains
+    .split(",")
+    .map((c) => c.trim().toLowerCase())
+    .filter((c) => SUPPORTED_CHAINS.includes(c)) as SupportedChainsType[];
+
+  if (chains.length === 0) {
+    throw new Error(
+      `Invalid SCAN_CHAINS: "${envChains}". Supported: ${SUPPORTED_CHAINS.join(", ")}`
+    );
+  }
+
+  return chains;
+}
+
+// Initialize Etherscan client (singleton - shared across all chains)
+let etherscanClientInstance: EtherscanClient | null = null;
+
+export function getEtherscanClient(): EtherscanClient {
+  if (!etherscanClientInstance) {
+    if (!process.env.ETHERSCAN_API_KEY) {
+      throw new Error("ETHERSCAN_API_KEY environment variable is required");
+    }
+    etherscanClientInstance = new EtherscanClient();
+  }
+  return etherscanClientInstance;
+}
+
+// Initialize chain clients with Etherscan API + BlockInfoService for block queries
+export function initializeChainClients(): ChainClientConfig[] {
+  const chains = getParsedChains();
+  const etherscanClient = getEtherscanClient();
+  const rpcClients = new BackendRpcClients();
+  const blockInfoService = new EvmBlockInfoService(rpcClients.getClients());
+  const services = DefaultServiceFactory.getInstance().getServices();
+  const positionLedgerService = services.positionLedgerService;
+  const configs: ChainClientConfig[] = [];
+
+  for (const chain of chains) {
+    configs.push({
+      chain,
+      etherscanClient,
+      blockInfoService,
+      positionLedgerService,
+    });
+  }
+
+  return configs;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LOGGING CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const LOG_LEVEL =
+  process.env.LOG_LEVEL ||
+  (process.env.NODE_ENV === "production" ? "info" : "debug");

@@ -1,100 +1,302 @@
-/**
- * Blockscanner Worker
- *
- * Scans blockchain events and updates position data in real-time.
- * Implements reorg-resistant event scanning per sync-algo.md specification.
- * Deployed as a standalone Docker container on Fly.io.
- */
+// Blockscanner Worker - Main Entry Point
+// Scans blockchain events with reorg detection and adaptive chunking
 
-import pino from 'pino';
-import { BlockScanner } from './scanner';
-import { getSupportedChains } from './config';
+import pino from "pino";
+import { POLL_INTERVAL_MS, LOG_LEVEL, initializeChainClients, WINDOW_BLOCKS } from "./config.js";
+import { getWatermark, closeWatermarkConnection } from "./state/watermark.js";
+import { pruneWindow } from "./state/window.js";
+import { forwardSync } from "./sync/forward.js";
+import { reorgCheck, rollbackAndReplay } from "./sync/reorg.js";
+import type { ChainState } from "./types.js";
+import type { SupportedChainsType } from "@/config/chains";
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LOGGER SETUP
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
+  level: LOG_LEVEL,
   transport:
-    process.env.NODE_ENV === 'development'
-      ? { target: 'pino-pretty' }
+    process.env.NODE_ENV !== "production"
+      ? {
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+            ignore: "pid,hostname",
+            translateTime: "HH:MM:ss.l",
+          },
+        }
       : undefined,
 });
 
-// Track all active scanners
-const scanners: BlockScanner[] = [];
+// ═══════════════════════════════════════════════════════════════════════════════
+// GLOBAL STATE
+// ═══════════════════════════════════════════════════════════════════════════════
 
-async function main() {
-  logger.info('🚀 Blockscanner worker starting...');
+let isShuttingDown = false;
+const chainStates = new Map<string, ChainState>();
 
-  // Get chains to scan from environment or use all supported chains
-  const chainsToScan = process.env.SCAN_CHAINS
-    ? process.env.SCAN_CHAINS.split(',').map((c) => c.trim())
-    : getSupportedChains();
+// ═══════════════════════════════════════════════════════════════════════════════
+// BOUNDARY HEIGHT CALCULATION
+// ═══════════════════════════════════════════════════════════════════════════════
 
-  logger.info({ chains: chainsToScan }, 'Initializing scanners for chains');
-
-  // Create scanner for each chain
-  for (const chain of chainsToScan) {
-    try {
-      const scanner = new BlockScanner(chain, logger);
-
-      // Run startup sequence (probe finality, catch-up, reorg check)
-      await scanner.startup();
-
-      // Start main polling loop
-      await scanner.start();
-
-      scanners.push(scanner);
-
-      logger.info({ chain }, '✅ Scanner started successfully');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(
-        { chain, error: errorMessage, stack: error instanceof Error ? error.stack : undefined },
-        '❌ Failed to start scanner for chain'
+/**
+ * Calculate boundary height for window pruning
+ * Prefers finalized/safe block tags if supported, falls back to latest - WINDOW_BLOCKS
+ */
+async function getBoundaryHeight(
+  blockInfoService: any,
+  chain: SupportedChainsType
+): Promise<bigint> {
+  try {
+    // Try finalized tag first
+    const finalizedBlock = await blockInfoService.getBlockByTag("finalized", chain);
+    if (finalizedBlock?.number) {
+      logger.debug(
+        { chain, boundary: finalizedBlock.number.toString() },
+        "Using finalized block as boundary"
       );
-      // Continue with other chains even if one fails
-    }
-  }
-
-  if (scanners.length === 0) {
-    logger.error('No scanners started successfully, exiting');
-    process.exit(1);
-  }
-
-  logger.info(
-    { activeScannersCount: scanners.length },
-    '✅ All scanners initialized and running'
-  );
-
-  // Graceful shutdown handlers
-  async function shutdown(signal: string) {
-    logger.info({ signal }, '⏹️  Shutdown signal received');
-
-    // Stop all scanners gracefully
-    for (const scanner of scanners) {
-      try {
-        await scanner.stop();
-      } catch (error) {
-        logger.error({ error }, 'Error stopping scanner');
-      }
+      return finalizedBlock.number;
     }
 
-    logger.info('Shutdown complete');
-    process.exit(0);
-  }
+    // Try safe tag
+    const safeBlock = await blockInfoService.getBlockByTag("safe", chain);
+    if (safeBlock?.number) {
+      logger.debug(
+        { chain, boundary: safeBlock.number.toString() },
+        "Using safe block as boundary"
+      );
+      return safeBlock.number;
+    }
 
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+    // Fallback: latest - WINDOW_BLOCKS
+    const latestBlock = await blockInfoService.getBlockNumber(chain);
+    const boundary = latestBlock > BigInt(WINDOW_BLOCKS)
+      ? latestBlock - BigInt(WINDOW_BLOCKS)
+      : 0n;
 
-  // Heartbeat to monitor worker health
-  setInterval(() => {
     logger.debug(
-      { activeScannersCount: scanners.length },
-      '💓 Blockscanner heartbeat'
+      { chain, boundary: boundary.toString(), method: "latest - WINDOW_BLOCKS" },
+      "Using calculated boundary"
     );
-  }, 60000); // Every 60 seconds
+
+    return boundary;
+  } catch (error) {
+    logger.error(
+      {
+        chain,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Failed to get boundary height, using 0"
+    );
+    return 0n;
+  }
 }
 
-main().catch((error) => {
-  logger.error({ err: error }, '❌ Fatal error in blockscanner worker');
+// ═══════════════════════════════════════════════════════════════════════════════
+// COLD START INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Initialize chain state on cold start
+ */
+async function initializeChainState(
+  chain: SupportedChainsType,
+  blockInfoService: any
+): Promise<ChainState> {
+  const existingWatermark = await getWatermark(chain, logger);
+
+  let watermark: bigint;
+
+  if (existingWatermark === null) {
+    // Cold start: use latest block as starting point
+    const latestBlock = await blockInfoService.getBlockNumber(chain);
+    watermark = latestBlock;
+
+    logger.info(
+      { chain, startingBlock: watermark.toString() },
+      "Cold start: initialized watermark at latest block"
+    );
+  } else {
+    watermark = existingWatermark;
+
+    logger.info(
+      { chain, watermark: watermark.toString() },
+      "Resuming from persisted watermark"
+    );
+  }
+
+  return {
+    chain,
+    watermark,
+    recentWindow: new Map(),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN TICK LOOP
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Single tick: prune → forward sync → reorg check → rollback if needed
+ */
+async function tick(): Promise<void> {
+  const chainClients = initializeChainClients();
+
+  for (const { chain, etherscanClient, blockInfoService, positionLedgerService } of chainClients) {
+    if (isShuttingDown) break;
+
+    const chainLog = logger.child({ chain });
+
+    try {
+      // Initialize state if needed
+      if (!chainStates.has(chain)) {
+        const state = await initializeChainState(chain, blockInfoService);
+        chainStates.set(chain, state);
+      }
+
+      const state = chainStates.get(chain)!;
+
+      // Calculate boundary and prune old window entries
+      const boundary = await getBoundaryHeight(blockInfoService, chain);
+      pruneWindow(state.recentWindow, boundary, chain, chainLog);
+
+      // Forward sync: fetch new events
+      const syncSuccess = await forwardSync({
+        etherscanClient,
+        blockInfoService,
+        positionLedgerService,
+        chain,
+        state,
+        log: chainLog,
+      });
+
+      if (!syncSuccess) {
+        chainLog.error("Forward sync failed, skipping reorg check");
+        continue;
+      }
+
+      // Reorg detection
+      const reorgResult = await reorgCheck({
+        etherscanClient,
+        blockInfoService,
+        positionLedgerService,
+        chain,
+        state,
+        log: chainLog,
+      });
+
+      if (reorgResult.reorgDetected && reorgResult.minAffectedBlock !== null) {
+        chainLog.warn(
+          { minAffectedBlock: reorgResult.minAffectedBlock.toString() },
+          "Reorg detected, initiating rollback and replay"
+        );
+
+        await rollbackAndReplay({
+          etherscanClient,
+          blockInfoService,
+          positionLedgerService,
+          chain,
+          state,
+          minAffectedBlock: reorgResult.minAffectedBlock,
+          log: chainLog,
+        });
+      }
+    } catch (error) {
+      chainLog.error(
+        {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+        "Tick failed for chain"
+      );
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GRACEFUL SHUTDOWN
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function shutdown(signal: string): Promise<void> {
+  logger.info({ signal }, "Received shutdown signal");
+  isShuttingDown = true;
+
+  // Close database connections
+  await closeWatermarkConnection();
+
+  logger.info("Blockscanner worker stopped gracefully");
+  process.exit(0);
+}
+
+// Register signal handlers
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN RUN LOOP
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function run(): Promise<void> {
+  logger.info(
+    {
+      pollInterval: `${POLL_INTERVAL_MS}ms`,
+      windowBlocks: WINDOW_BLOCKS,
+      logLevel: LOG_LEVEL,
+    },
+    "Blockscanner worker starting"
+  );
+
+  // Initial tick (cold start or catch-up)
+  try {
+    await tick();
+  } catch (error) {
+    logger.error(
+      {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      "Initial tick failed"
+    );
+  }
+
+  // Periodic tick loop
+  const intervalId = setInterval(async () => {
+    if (isShuttingDown) {
+      clearInterval(intervalId);
+      return;
+    }
+
+    try {
+      await tick();
+    } catch (error) {
+      logger.error(
+        {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+        "Tick failed, will retry next interval"
+      );
+
+      // Backoff on persistent errors
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.min(60_000, POLL_INTERVAL_MS * 2))
+      );
+    }
+  }, POLL_INTERVAL_MS);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// START WORKER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+run().catch((error) => {
+  logger.fatal(
+    {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    },
+    "Fatal error in worker"
+  );
   process.exit(1);
 });
