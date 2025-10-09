@@ -10,6 +10,7 @@ import type { PnlBreakdown, PositionWithPnL } from '@/types/pnl';
 import type { AprBreakdown, PositionAprSummary } from '@/types/apr';
 import type { CurveData } from '@/app-shared/components/charts/mini-pnl-curve';
 import type { UserProfile, UserSettings } from '@/types/user';
+import type { UnclaimedFeeAmounts } from '@/app/api/positions/uniswapv3/[chain]/[nft]/details/route';
 
 // Re-export types that were moved to domain-specific files for backward compatibility
 export type { PositionEvent, BasicPosition, DiscoveredPositionSummary } from '@/types/positions';
@@ -105,7 +106,7 @@ export interface PositionDetailsResponse extends ApiResponse<PositionWithPnL> {
   data?: PositionWithPnL;
 }
 
-export interface PositionRefreshResponse extends ApiResponse<{ position: BasicPosition | null; pnlBreakdown: PnlBreakdown | null; aprBreakdown?: AprBreakdown; curveData?: CurveData }> {
+export interface PositionRefreshResponse extends ApiResponse<{ position: BasicPosition | null; pnlBreakdown: PnlBreakdown | null; unclaimedFeesAmounts?: UnclaimedFeeAmounts | null; aprBreakdown?: AprBreakdown; curveData?: CurveData }> {
   meta: {
     requestedAt: string;
     chain: string;

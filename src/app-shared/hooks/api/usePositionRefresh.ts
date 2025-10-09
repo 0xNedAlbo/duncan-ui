@@ -29,7 +29,7 @@ export function usePositionRefresh() {
     onSuccess: (response, { userId, chain, protocol, nftId }) => {
       if (!response.data) return;
 
-      const { position, pnlBreakdown, aprBreakdown, curveData } = response.data;
+      const { position, pnlBreakdown, aprBreakdown, curveData, unclaimedFeesAmounts } = response.data;
 
       // ✅ UPDATE caches with fresh data instead of invalidating
 
@@ -42,6 +42,7 @@ export function usePositionRefresh() {
             pnlBreakdown,
             aprBreakdown,
             curveData,
+            unclaimedFeesAmounts,
             lastUpdated: new Date().toISOString()
           }
         }

@@ -217,8 +217,11 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
                         chain: position.chain,
                         protocol: position.protocol,
                         nftId: position.nftId,
+                        token0IsQuote: position.token0IsQuote,
                         baseAmount: unclaimedFeesAmounts.baseTokenAmount,
-                        quoteAmount: unclaimedFeesAmounts.quoteTokenAmount
+                        quoteAmount: unclaimedFeesAmounts.quoteTokenAmount,
+                        token0Amount: unclaimedFeesAmounts.token0Amount,
+                        token1Amount: unclaimedFeesAmounts.token1Amount
                     },
                     "Unclaimed fees amounts calculated"
                 );

@@ -4,6 +4,7 @@ import { logError } from "@/app-shared/lib/api/withLogging";
 import { ApiServiceFactory } from "@/app-shared/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
 import type { PositionRefreshResponse } from "@/types/api";
+import type { UnclaimedFeeAmounts } from "@/app/api/positions/uniswapv3/[chain]/[nft]/details/route";
 
 /**
  * POST /api/positions/uniswapv3/[chain]/[nft]/refresh - Refresh position data
@@ -204,6 +205,46 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                 );
             }
 
+            // Calculate unclaimed fee amounts (pure fees excluding uncollected principal)
+            let unclaimedFeesAmounts = null;
+            try {
+                const unclaimedFeesData = await positionPnLService.getUnclaimedFees(positionId);
+
+                // Convert to token0/token1 amounts for contract call
+                const token0Amount = position.token0IsQuote
+                    ? unclaimedFeesData.quoteTokenAmount
+                    : unclaimedFeesData.baseTokenAmount;
+                const token1Amount = position.token0IsQuote
+                    ? unclaimedFeesData.baseTokenAmount
+                    : unclaimedFeesData.quoteTokenAmount;
+
+                unclaimedFeesAmounts = {
+                    baseTokenAmount: unclaimedFeesData.baseTokenAmount.toString(),
+                    quoteTokenAmount: unclaimedFeesData.quoteTokenAmount.toString(),
+                    token0Amount: token0Amount.toString(),
+                    token1Amount: token1Amount.toString(),
+                };
+
+                log.debug(
+                    {
+                        chain: position.chain,
+                        protocol: position.protocol,
+                        nftId: position.nftId,
+                        token0IsQuote: position.token0IsQuote,
+                        baseAmount: unclaimedFeesAmounts.baseTokenAmount,
+                        quoteAmount: unclaimedFeesAmounts.quoteTokenAmount,
+                        token0Amount: unclaimedFeesAmounts.token0Amount,
+                        token1Amount: unclaimedFeesAmounts.token1Amount
+                    },
+                    "Unclaimed fees amounts calculated during refresh"
+                );
+            } catch (error) {
+                log.debug(
+                    { chain: position.chain, protocol: position.protocol, nftId: position.nftId, error: error instanceof Error ? error.message : String(error) },
+                    "Unclaimed fees calculation failed during refresh"
+                );
+            }
+
             // Calculate fresh APR breakdown with or without PnL data
             let aprBreakdown = undefined;
             try {
@@ -305,6 +346,7 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                 data: {
                     position: refreshedPosition,
                     pnlBreakdown: pnlBreakdown,
+                    unclaimedFeesAmounts,
                     ...(aprBreakdown && { aprBreakdown }),
                     ...(curveData && { curveData }),
                 },
