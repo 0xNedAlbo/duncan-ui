@@ -98,16 +98,6 @@ export function IntroStep() {
                     </div>
                 </div>
             </div>
-
-            {/* Warning Notice */}
-            <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
-                <h5 className="text-orange-400 font-medium mb-2">
-                    {t("positionWizard.openPosition.warning.title")}
-                </h5>
-                <p className="text-orange-200/80 text-sm">
-                    {t("positionWizard.openPosition.warning.message")}
-                </p>
-            </div>
         </div>
     );
 }

@@ -15,12 +15,21 @@ import { useDiscoverPositions, useImportDiscoveredPositions } from "@/app-shared
 import { usePositionsList } from "@/app-shared/hooks/api/usePositionsList";
 
 import { PositionCard } from "./position-card";
+import { EmptyStateActions } from "./empty-state-actions";
 
 interface PositionListProps {
   className?: string;
+  onWizardModalOpen?: () => void;
+  onImportModalOpen?: () => void;
+  onImportSuccess?: (position: any) => void;
 }
 
-export function PositionList({ className }: PositionListProps) {
+export function PositionList({
+  className,
+  onWizardModalOpen,
+  onImportModalOpen,
+  onImportSuccess,
+}: PositionListProps) {
   const t = useTranslations();
   const queryClient = useQueryClient();
   const { address: connectedAddress } = useAccount();
@@ -301,20 +310,11 @@ export function PositionList({ className }: PositionListProps) {
           <p className="text-slate-400">Loading positions...</p>
         </div>
       ) : positions.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="max-w-md mx-auto">
-            <div className="bg-slate-800/50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-              <Plus className="w-8 h-8 text-slate-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-white mb-2">
-              {t("dashboard.emptyState.title")}
-            </h3>
-            <p className="text-slate-400 mb-6">
-              {t("dashboard.emptyState.description")}
-            </p>
-            {/* CreatePositionDropdown handled by parent dashboard */}
-          </div>
-        </div>
+        <EmptyStateActions
+          onWizardClick={() => onWizardModalOpen?.()}
+          onWalletImportClick={() => onImportModalOpen?.()}
+          onImportSuccess={onImportSuccess}
+        />
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4">

@@ -5,7 +5,9 @@ import { ApiServiceFactory } from "@/app-shared/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
 import { normalizeAddress, isValidAddress } from "@/lib/utils/evm";
 import type { BasicPosition } from "@/services/positions/positionService";
-import type { ApiResponse } from "@/types/api";
+import type { ApiResponse, PositionRefreshResponse } from "@/types/api";
+import type { AprBreakdown } from "@/types/apr";
+import type { CurveData } from "@/app-shared/components/charts/mini-pnl-curve";
 
 /**
  * GET /api/positions/uniswapv3/[chain]/[nft] - Get position details
@@ -151,9 +153,18 @@ interface CreatePositionRequestBody {
     liquidity: string;
     token0IsQuote: boolean;
     owner?: string;
+    initialEvent?: {
+        transactionHash: string;
+        blockNumber: string;
+        transactionIndex: number;
+        logIndex: number;
+        liquidity: string;
+        amount0: string;
+        amount1: string;
+    };
 }
 
-export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
+export const PUT = withAuthAndLogging<PositionRefreshResponse>(
     async (
         request: NextRequest,
         { user, log },
@@ -168,7 +179,14 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
                 return NextResponse.json(
                     {
                         success: false,
-                        error: "Chain and NFT ID are required in path"
+                        error: "Chain and NFT ID are required in path",
+                        meta: {
+                            requestedAt: new Date().toISOString(),
+                            chain: '',
+                            protocol: '',
+                            nftId: '',
+                            refreshedAt: new Date().toISOString()
+                        }
                     },
                     { status: 400 }
                 );
@@ -179,7 +197,14 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
                 return NextResponse.json(
                     {
                         success: false,
-                        error: `Invalid chain parameter. Supported chains: ${SUPPORTED_CHAINS.join(", ")}`
+                        error: `Invalid chain parameter. Supported chains: ${SUPPORTED_CHAINS.join(", ")}`,
+                        meta: {
+                            requestedAt: new Date().toISOString(),
+                            chain: '',
+                            protocol: '',
+                            nftId: '',
+                            refreshedAt: new Date().toISOString()
+                        }
                     },
                     { status: 400 }
                 );
@@ -190,7 +215,14 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
                 return NextResponse.json(
                     {
                         success: false,
-                        error: "Invalid NFT ID format. Must be a positive integer."
+                        error: "Invalid NFT ID format. Must be a positive integer.",
+                        meta: {
+                            requestedAt: new Date().toISOString(),
+                            chain: '',
+                            protocol: '',
+                            nftId: '',
+                            refreshedAt: new Date().toISOString()
+                        }
                     },
                     { status: 400 }
                 );
@@ -204,7 +236,14 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
                 return NextResponse.json(
                     {
                         success: false,
-                        error: "Invalid JSON in request body"
+                        error: "Invalid JSON in request body",
+                        meta: {
+                            requestedAt: new Date().toISOString(),
+                            chain: '',
+                            protocol: '',
+                            nftId: '',
+                            refreshedAt: new Date().toISOString()
+                        }
                     },
                     { status: 400 }
                 );
@@ -213,11 +252,20 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
             // Validate required fields
             const { poolAddress, tickLower, tickUpper, liquidity, token0IsQuote, owner } = body;
 
+            const errorMeta = {
+                requestedAt: new Date().toISOString(),
+                chain: '',
+                protocol: '',
+                nftId: '',
+                refreshedAt: new Date().toISOString()
+            };
+
             if (!poolAddress || tickLower === undefined || tickUpper === undefined || !liquidity || token0IsQuote === undefined) {
                 return NextResponse.json(
                     {
                         success: false,
-                        error: "Missing required fields: poolAddress, tickLower, tickUpper, liquidity, token0IsQuote"
+                        error: "Missing required fields: poolAddress, tickLower, tickUpper, liquidity, token0IsQuote",
+                        meta: errorMeta
                     },
                     { status: 400 }
                 );
@@ -228,7 +276,8 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
                 return NextResponse.json(
                     {
                         success: false,
-                        error: "Invalid pool address format"
+                        error: "Invalid pool address format",
+                        meta: errorMeta
                     },
                     { status: 400 }
                 );
@@ -239,7 +288,8 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
                 return NextResponse.json(
                     {
                         success: false,
-                        error: "Invalid owner address format"
+                        error: "Invalid owner address format",
+                        meta: errorMeta
                     },
                     { status: 400 }
                 );
@@ -250,7 +300,8 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
                 return NextResponse.json(
                     {
                         success: false,
-                        error: "Tick values must be integers"
+                        error: "Tick values must be integers",
+                        meta: errorMeta
                     },
                     { status: 400 }
                 );
@@ -260,7 +311,8 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
                 return NextResponse.json(
                     {
                         success: false,
-                        error: "tickLower must be less than tickUpper"
+                        error: "tickLower must be less than tickUpper",
+                        meta: errorMeta
                     },
                     { status: 400 }
                 );
@@ -271,7 +323,8 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
                 return NextResponse.json(
                     {
                         success: false,
-                        error: "Invalid liquidity format. Must be a positive integer string."
+                        error: "Invalid liquidity format. Must be a positive integer string.",
+                        meta: errorMeta
                     },
                     { status: 400 }
                 );
@@ -303,17 +356,24 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
             if (existingPosition) {
                 log.debug(
                     { chain, nftId, userId: user.userId },
-                    "Position already exists - returning existing position"
+                    "Position already exists - returning existing position with full data"
                 );
 
+                // Return full position data structure for existing position
                 return NextResponse.json({
                     success: true,
-                    data: existingPosition,
+                    data: {
+                        position: existingPosition,
+                        pnlBreakdown: null,
+                        aprBreakdown: undefined,
+                        curveData: undefined
+                    },
                     meta: {
                         requestedAt: new Date().toISOString(),
                         chain,
+                        protocol: "uniswapv3",
                         nftId,
-                        existed: true
+                        refreshedAt: new Date().toISOString()
                     }
                 });
             }
@@ -332,7 +392,14 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
                 return NextResponse.json(
                     {
                         success: false,
-                        error: "Failed to load pool data from blockchain"
+                        error: "Failed to load pool data from blockchain",
+                        meta: {
+                            requestedAt: new Date().toISOString(),
+                            chain,
+                            protocol: "uniswapv3",
+                            nftId,
+                            refreshedAt: new Date().toISOString()
+                        }
                     },
                     { status: 500 }
                 );
@@ -367,14 +434,111 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
                 "Position created successfully"
             );
 
+            // Seed initial event if provided
+            if (body.initialEvent) {
+                const ledgerService = apiFactory.positionLedgerService;
+
+                try {
+                    await ledgerService.seedMintEvent(
+                        {
+                            userId: user.userId,
+                            chain,
+                            protocol: "uniswapv3",
+                            nftId,
+                            token0IsQuote: createdPosition.token0IsQuote,
+                            pool: {
+                                poolAddress: createdPosition.pool.poolAddress,
+                                chain: createdPosition.pool.chain,
+                                token0: { decimals: createdPosition.pool.token0.decimals },
+                                token1: { decimals: createdPosition.pool.token1.decimals }
+                            }
+                        },
+                        body.initialEvent
+                    );
+
+                    log.debug(
+                        { chain, nftId, txHash: body.initialEvent.transactionHash },
+                        'Seeded initial INCREASE_LIQUIDITY event'
+                    );
+                } catch (error) {
+                    // Non-fatal - scheduled refresh will sync eventually
+                    log.warn(
+                        {
+                            chain,
+                            nftId,
+                            error: error instanceof Error ? error.message : 'Unknown error'
+                        },
+                        'Failed to seed initial event - scheduled refresh will handle'
+                    );
+                }
+            }
+
+            // Calculate full position data (matching refresh endpoint)
+            // Note: positionId already declared at line 345
+            let pnlBreakdown = null;
+            let aprBreakdown: AprBreakdown | undefined = undefined;
+            let curveData: CurveData | undefined = undefined;
+
+            // Calculate PnL breakdown
+            try {
+                pnlBreakdown = await apiFactory.positionPnLService.getPnlBreakdown(positionId);
+                log.debug(
+                    { chain, nftId, costBasis: pnlBreakdown?.currentCostBasis },
+                    'Calculated PnL breakdown'
+                );
+            } catch (error) {
+                log.debug(
+                    { chain, nftId, error: error instanceof Error ? error.message : 'Unknown' },
+                    'PnL calculation failed'
+                );
+            }
+
+            // Calculate APR breakdown if PnL succeeded
+            if (pnlBreakdown) {
+                try {
+                    const unclaimedFees = pnlBreakdown.unclaimedFees;
+                    aprBreakdown = await apiFactory.positionAprService.getAprBreakdown(
+                        positionId,
+                        unclaimedFees
+                    );
+                    log.debug({ chain, nftId }, 'Calculated APR breakdown');
+                } catch (error) {
+                    log.debug(
+                        { chain, nftId, error: error instanceof Error ? error.message : 'Unknown' },
+                        'APR calculation failed'
+                    );
+                }
+            }
+
+            // Calculate curve data
+            try {
+                if (apiFactory.curveDataService.validatePosition(createdPosition)) {
+                    curveData = await apiFactory.curveDataService.getCurveData(createdPosition);
+                    log.debug({ chain, nftId }, 'Calculated curve data');
+                }
+            } catch (error) {
+                log.debug(
+                    { chain, nftId, error: error instanceof Error ? error.message : 'Unknown' },
+                    'Curve calculation failed'
+                );
+            }
+
+            // Return full position data (matching refresh endpoint structure)
             return NextResponse.json({
                 success: true,
-                data: createdPosition,
+                data: {
+                    position: createdPosition,
+                    pnlBreakdown,
+                    aprBreakdown,
+                    curveData
+                },
                 meta: {
                     requestedAt: new Date().toISOString(),
                     chain,
+                    protocol: "uniswapv3",
                     nftId,
-                    existed: false
+                    existed: false,
+                    refreshedAt: pnlBreakdown?.calculatedAt?.toISOString() || new Date().toISOString()
                 }
             });
 
@@ -389,7 +553,14 @@ export const PUT = withAuthAndLogging<ApiResponse<BasicPosition>>(
             return NextResponse.json(
                 {
                     success: false,
-                    error: "Internal server error"
+                    error: "Internal server error",
+                    meta: {
+                        requestedAt: new Date().toISOString(),
+                        chain: params?.chain || '',
+                        protocol: "uniswapv3",
+                        nftId: params?.nft || '',
+                        refreshedAt: new Date().toISOString()
+                    }
                 },
                 { status: 500 }
             );

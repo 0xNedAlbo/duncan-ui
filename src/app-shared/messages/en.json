@@ -89,8 +89,17 @@
     "title": "Your Positions",
     "subtitle": "Manage and analyze your Uniswap V3 liquidity positions",
     "emptyState": {
-      "title": "No positions yet",
-      "description": "Get started with your first Uniswap V3 position using the button above."
+      "title": "Get Started with Your First Position",
+      "subtitle": "Choose how you'd like to add your Uniswap V3 position",
+      "wizard": {
+        "button": "Start Wizard"
+      },
+      "wallet": {
+        "button": "Import from Wallet"
+      },
+      "nft": {
+        "button": "Import by NFT ID"
+      }
     },
     "addPosition": {
       "button": "Add Position",

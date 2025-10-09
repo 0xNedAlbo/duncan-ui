@@ -96,6 +96,115 @@ export class PositionLedgerService {
     }
 
     /**
+     * Seed initial INCREASE_LIQUIDITY event from mint transaction
+     *
+     * Called immediately after position creation to provide instant cost basis.
+     * Uses existing processAndCreateEvent() infrastructure for consistency.
+     * Idempotent via onchainInputHash - safe to call even if blockscanner runs first.
+     *
+     * @param positionInfo - Position sync info
+     * @param eventData - Parsed event data from mint transaction receipt
+     */
+    async seedMintEvent(
+        positionInfo: PositionSyncInfo,
+        eventData: {
+            transactionHash: string;
+            blockNumber: string;
+            transactionIndex: number;
+            logIndex: number;
+            liquidity: string;
+            amount0: string;
+            amount1: string;
+        }
+    ): Promise<void> {
+        const chain = positionInfo.pool.chain as SupportedChainsType;
+
+        // Check if event already exists (idempotent via onchainInputHash)
+        const inputHash = this.generateOnchainInputHash(
+            BigInt(eventData.blockNumber),
+            eventData.transactionIndex,
+            eventData.logIndex
+        );
+
+        const existingEvent = await this.prisma.positionEvent.findFirst({
+            where: {
+                positionUserId: positionInfo.userId,
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
+                inputHash,
+            },
+        });
+
+        if (existingEvent) {
+            this.logger.debug(
+                {
+                    nftId: positionInfo.nftId,
+                    chain,
+                    inputHash,
+                },
+                "Event already exists - skipping seed (blockscanner was faster)"
+            );
+            return;
+        }
+
+        // Get block timestamp for event
+        const blockInfo = await this.evmBlockInfoService.getBlockByNumber(
+            BigInt(eventData.blockNumber),
+            chain
+        );
+
+        // Construct RawPositionEvent for processAndCreateEvent
+        const rawEvent: RawPositionEvent = {
+            eventType: "INCREASE_LIQUIDITY",
+            tokenId: positionInfo.nftId,
+            transactionHash: eventData.transactionHash,
+            blockNumber: BigInt(eventData.blockNumber),
+            transactionIndex: eventData.transactionIndex,
+            logIndex: eventData.logIndex,
+            blockTimestamp: new Date(Number(blockInfo.timestamp) * 1000),
+            liquidity: eventData.liquidity,
+            amount0: eventData.amount0,
+            amount1: eventData.amount1,
+            chain,
+        };
+
+        // Initial state (first event for position)
+        const initialState = {
+            liquidityAfter: "0",
+            costBasisAfter: "0",
+            realizedPnLAfter: "0",
+            uncollectedPrincipal0: "0",
+            uncollectedPrincipal1: "0",
+        };
+
+        // Reuse existing event processing logic
+        const { eventId, newState } = await this.processAndCreateEvent(
+            rawEvent,
+            positionInfo,
+            initialState
+        );
+
+        // Create initial APR record
+        await this.positionAprService.createEventAprRecord(
+            eventId,
+            new Date(Number(blockInfo.timestamp) * 1000),
+            null, // Open-ended period until next event
+            newState.costBasisAfter
+        );
+
+        this.logger.debug(
+            {
+                nftId: positionInfo.nftId,
+                chain,
+                eventId,
+                costBasis: newState.costBasisAfter,
+            },
+            "Successfully seeded initial INCREASE_LIQUIDITY event"
+        );
+    }
+
+    /**
      * Calculate position status based on liquidity events
      */
     calculatePositionStatus(events: RawPositionEvent[]): {

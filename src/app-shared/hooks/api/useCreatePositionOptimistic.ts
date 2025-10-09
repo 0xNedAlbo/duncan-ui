@@ -20,6 +20,15 @@ export interface CreatePositionOptimisticRequest {
   liquidity: string;
   token0IsQuote: boolean;
   owner?: string;
+  initialEvent?: {
+    transactionHash: string;
+    blockNumber: string;
+    transactionIndex: number;
+    logIndex: number;
+    liquidity: string;
+    amount0: string;
+    amount1: string;
+  };
 }
 
 /**
@@ -45,6 +54,7 @@ export function useCreatePositionOptimistic(
           liquidity: data.liquidity,
           token0IsQuote: data.token0IsQuote,
           owner: data.owner,
+          initialEvent: data.initialEvent,
         }
       ),
     onSuccess: () => {

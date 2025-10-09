@@ -91,7 +91,11 @@ function DashboardContent() {
                     </div>
 
                     {/* Position List */}
-                    <PositionList />
+                    <PositionList
+                        onWizardModalOpen={handleWizardModalOpen}
+                        onImportModalOpen={handleImportModalOpen}
+                        onImportSuccess={handleImportSuccess}
+                    />
                 </div>
             </div>
         </div>

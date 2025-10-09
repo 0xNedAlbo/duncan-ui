@@ -36,7 +36,10 @@ interface CreatedPositionData {
 
 interface OpenPositionStepProps {
     // eslint-disable-next-line no-unused-vars
-    onPositionCreated?: (data: CreatedPositionData | null) => void;
+    onPositionCreated?: (
+        data: CreatedPositionData | null,
+        receipt?: import('viem').TransactionReceipt
+    ) => void;
 }
 
 export function OpenPositionStep(props: OpenPositionStepProps) {
@@ -297,22 +300,25 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
             baseToken &&
             quoteToken
         ) {
-            props.onPositionCreated?.({
-                chain,
-                nftId: mintPosition.tokenId,
-                pool,
-                baseToken,
-                quoteToken,
-                tickLower:
-                    tickLower && !isNaN(tickLower)
-                        ? tickLower
-                        : TickMath.MIN_TICK,
-                tickUpper:
-                    tickUpper && !isNaN(tickUpper)
-                        ? tickUpper
-                        : TickMath.MAX_TICK,
-                liquidity: (liquidity || 0n).toString(),
-            });
+            props.onPositionCreated?.(
+                {
+                    chain,
+                    nftId: mintPosition.tokenId,
+                    pool,
+                    baseToken,
+                    quoteToken,
+                    tickLower:
+                        tickLower && !isNaN(tickLower)
+                            ? tickLower
+                            : TickMath.MIN_TICK,
+                    tickUpper:
+                        tickUpper && !isNaN(tickUpper)
+                            ? tickUpper
+                            : TickMath.MAX_TICK,
+                    liquidity: (liquidity || 0n).toString(),
+                },
+                mintPosition.receipt
+            );
         } else if (!mintPosition.isSuccess) {
             props.onPositionCreated?.(null);
         }

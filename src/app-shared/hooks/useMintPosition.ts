@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Address } from 'viem';
+import { Address, TransactionReceipt } from 'viem';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import {
   NONFUNGIBLE_POSITION_MANAGER_ADDRESSES,
@@ -31,6 +31,7 @@ export interface UseMintPositionResult {
   // Position result
   tokenId: bigint | undefined;
   isSuccess: boolean;
+  receipt: TransactionReceipt | undefined;
 
   // Reset state
   reset: () => void;
@@ -156,6 +157,7 @@ export function useMintPosition(params: MintPositionParams | null): UseMintPosit
     // Position result
     tokenId,
     isSuccess,
+    receipt,
 
     // Reset
     reset,

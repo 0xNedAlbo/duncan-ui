@@ -6,11 +6,12 @@ import { X, ArrowLeft, ArrowRight } from "lucide-react";
 import { useTranslations } from "@/app-shared/i18n/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAccount } from "wagmi";
-import { isValidChainSlug } from "@/config/chains";
+import { isValidChainSlug, getChainId, type SupportedChainsType } from "@/config/chains";
 import { useCreatePositionOptimistic } from "@/app-shared/hooks/api/useCreatePositionOptimistic";
-import { usePositionRefresh } from "@/app-shared/hooks/api/usePositionRefresh";
 import { useSession } from "next-auth/react";
 import { compareAddresses } from "@/lib/utils/evm";
+import { parseIncreaseLiquidityEvent } from "@/lib/utils/uniswap-v3/parse-mint-receipt";
+import { NONFUNGIBLE_POSITION_MANAGER_ADDRESSES } from "@/lib/contracts/nonfungiblePositionManager";
 
 import { IntroStep } from "./IntroStep";
 import { ChainSelectionStep } from "./ChainSelectionStep";
@@ -81,20 +82,10 @@ export function PositionWizard({
                 onPositionCreated?.(response.data);
             }
 
-            // Trigger background refresh to sync events/PnL/APR/curve
-            if (response.data && user?.id) {
-                refreshMutation.mutate({
-                    userId: user.id,
-                    chain: response.data.chain,
-                    protocol: response.data.protocol,
-                    nftId: response.data.nftId
-                });
-            }
+            // No background refresh needed - PUT endpoint now returns full data
+            // Scheduled refresh will handle subsequent updates
         }
     });
-
-    // Background refresh mutation
-    const refreshMutation = usePositionRefresh();
 
     // Handle closing wizard - let parent handle URL clearing if available
     const handleClose = useCallback(() => {
@@ -207,7 +198,7 @@ export function PositionWizard({
             case 5:
                 return (
                     <OpenPositionStep
-                        onPositionCreated={(positionData) => {
+                        onPositionCreated={(positionData, receipt) => {
                             // Create position optimistically when transaction succeeds
                             if (positionData) {
                                 setPositionCreated(true);
@@ -224,6 +215,32 @@ export function PositionWizard({
                                     positionData.quoteToken
                                 ) > 0;
 
+                                // Parse initial event from receipt if available
+                                let initialEvent = undefined;
+                                if (receipt) {
+                                    const chainId = getChainId(chainForApi as SupportedChainsType);
+                                    const nftManagerAddress = NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[chainId];
+
+                                    if (nftManagerAddress) {
+                                        const parsed = parseIncreaseLiquidityEvent(
+                                            receipt,
+                                            nftManagerAddress
+                                        );
+
+                                        if (parsed) {
+                                            initialEvent = {
+                                                transactionHash: parsed.transactionHash,
+                                                blockNumber: parsed.blockNumber.toString(),
+                                                transactionIndex: parsed.transactionIndex,
+                                                logIndex: parsed.logIndex,
+                                                liquidity: parsed.liquidity,
+                                                amount0: parsed.amount0,
+                                                amount1: parsed.amount1
+                                            };
+                                        }
+                                    }
+                                }
+
                                 // Create position optimistically (fast - returns immediately)
                                 createOptimisticMutation.mutate({
                                     chain: chainForApi,
@@ -233,7 +250,8 @@ export function PositionWizard({
                                     tickUpper: positionData.tickUpper,
                                     liquidity: positionData.liquidity,
                                     token0IsQuote,
-                                    owner: walletAddress
+                                    owner: walletAddress,
+                                    initialEvent
                                 });
                             } else {
                                 setPositionCreated(false);
