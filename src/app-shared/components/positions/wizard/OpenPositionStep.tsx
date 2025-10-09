@@ -135,13 +135,23 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
                 liquidity,
                 pool.currentTick,
                 tickLower && !isNaN(tickLower) ? tickLower : TickMath.MIN_TICK,
-                tickUpper && !isNaN(tickUpper) ? tickUpper : TickMath.MAX_TICK
+                tickUpper && !isNaN(tickUpper) ? tickUpper : TickMath.MAX_TICK,
+                false // Use floor to match what user entered
             );
 
             const isQuoteToken0 =
                 pool.token0.address.toLowerCase() === quoteToken.toLowerCase();
             const baseAmount = isQuoteToken0 ? token1Amount : token0Amount;
             const quoteAmount = isQuoteToken0 ? token0Amount : token1Amount;
+
+            console.log('[OpenPositionStep] Required amounts from liquidity:', {
+                liquidity: liquidity.toString(),
+                baseAmount: baseAmount.toString(),
+                quoteAmount: quoteAmount.toString(),
+                token0Amount: token0Amount.toString(),
+                token1Amount: token1Amount.toString(),
+                isQuoteToken0,
+            });
 
             return { baseAmount, quoteAmount };
         } catch (error) {

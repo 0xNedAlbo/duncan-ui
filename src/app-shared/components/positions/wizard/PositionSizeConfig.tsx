@@ -9,8 +9,13 @@ import { TokenAmountInput } from "@/app-shared/components/common/TokenAmountInpu
 import type { PoolData } from "@/app-shared/hooks/api/usePool";
 import type { SupportedChainsType } from "@/config/chains";
 import { usePositionSizeCalculation } from "@/app-shared/hooks/usePositionSizeCalculation";
-import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
+import {
+    getTokenAmountsFromLiquidity,
+    getLiquidityFromAmount0,
+    getLiquidityFromAmount1,
+} from "@/lib/utils/uniswap-v3/liquidity";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
+import { TickMath } from "@uniswap/v3-sdk";
 
 interface TokenInfo {
     address: string;
@@ -28,13 +33,13 @@ interface PositionSizeConfigProps {
     liquidity: bigint; // Current liquidity value from parent/URL
     // eslint-disable-next-line no-unused-vars
     onLiquidityChange: (liquidity: bigint) => void;
-    initialMode?: "quote" | "base" | "custom";
+    initialMode?: "quote" | "base" | "matched" | "independent";
     chain?: SupportedChainsType;
     onRefreshPool?: () => Promise<any>;
     label?: string; // Custom label for the header (default: "Position Size:")
 }
 
-type InputMode = "quote" | "base" | "custom";
+type InputMode = "quote" | "base" | "matched" | "independent";
 
 export function PositionSizeConfig({
     pool,
@@ -44,7 +49,7 @@ export function PositionSizeConfig({
     tickUpper,
     liquidity,
     onLiquidityChange,
-    initialMode = "custom",
+    initialMode = "independent",
     chain,
     onRefreshPool,
     label = "Position Size:",
@@ -60,6 +65,7 @@ export function PositionSizeConfig({
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
     const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+    const [lastChangedField, setLastChangedField] = useState<"base" | "quote" | null>(null);
 
     // Use the position size calculation hook
     const positionCalculation = usePositionSizeCalculation({
@@ -126,6 +132,8 @@ export function PositionSizeConfig({
         (value: string, valueBigInt: bigint) => {
             setBaseAmount(value);
             setBaseAmountBigInt(valueBigInt);
+            // Track which field was changed for matched mode
+            setLastChangedField("base");
         },
         []
     );
@@ -135,9 +143,230 @@ export function PositionSizeConfig({
         (value: string, valueBigInt: bigint) => {
             setQuoteAmount(value);
             setQuoteAmountBigInt(valueBigInt);
+            // Track which field was changed for matched mode
+            setLastChangedField("quote");
         },
         []
     );
+
+    // Handle "Match Base" - calculate required quote amount from current base amount
+    // Strategy: Use ALL the base amount entered, calculate liquidity from it, then find matching quote amount
+    const handleMatchBase = useCallback(() => {
+        if (baseAmountBigInt === 0n || pool.currentTick === null || !pool.sqrtPriceX96) {
+            return;
+        }
+
+        try {
+            const sqrtPriceCurrent = BigInt(pool.sqrtPriceX96);
+            const sqrtPriceLower = BigInt(TickMath.getSqrtRatioAtTick(tickLower).toString());
+            const sqrtPriceUpper = BigInt(TickMath.getSqrtRatioAtTick(tickUpper).toString());
+
+            // Determine which token is which in the pool
+            const token0Amount = positionCalculation.isQuoteToken0 ? 0n : baseAmountBigInt;
+            const token1Amount = positionCalculation.isQuoteToken0 ? baseAmountBigInt : 0n;
+
+            // Calculate initial liquidity from the base token amount (floor division)
+            let calculatedLiquidity: bigint;
+
+            if (pool.currentTick < tickLower) {
+                // Below range - only token0 needed
+                calculatedLiquidity = getLiquidityFromAmount0(sqrtPriceLower, sqrtPriceUpper, token0Amount, false);
+            } else if (pool.currentTick >= tickUpper) {
+                // Above range - only token1 needed
+                calculatedLiquidity = getLiquidityFromAmount1(sqrtPriceLower, sqrtPriceUpper, token1Amount, false);
+            } else {
+                // In range - calculate from base token only
+                if (positionCalculation.isQuoteToken0) {
+                    // Base is token1, calculate L from token1
+                    calculatedLiquidity = getLiquidityFromAmount1(sqrtPriceLower, sqrtPriceCurrent, token1Amount, false);
+                } else {
+                    // Base is token0, calculate L from token0
+                    calculatedLiquidity = getLiquidityFromAmount0(sqrtPriceCurrent, sqrtPriceUpper, token0Amount, false);
+                }
+            }
+
+            if (calculatedLiquidity === 0n) return;
+
+            // Iteratively decrease liquidity until the base amount fits within the entered amount
+            let finalLiquidity = calculatedLiquidity;
+            let iterations = 0;
+            const maxIterations = 1000;
+
+            while (iterations < maxIterations) {
+                const amounts = getTokenAmountsFromLiquidity(
+                    finalLiquidity,
+                    pool.currentTick,
+                    tickLower,
+                    tickUpper,
+                    false
+                );
+
+                const calculatedBaseAmount = positionCalculation.isQuoteToken0 ? amounts.token1Amount : amounts.token0Amount;
+
+                // Check if base amount fits within budget
+                if (calculatedBaseAmount <= baseAmountBigInt) {
+                    break; // Found optimal liquidity
+                }
+
+                // Decrease liquidity and try again
+                finalLiquidity = finalLiquidity - 1n;
+                iterations++;
+
+                if (finalLiquidity === 0n) break;
+            }
+
+            // Get final token amounts with adjusted liquidity
+            const { token0Amount: finalToken0, token1Amount: finalToken1 } = getTokenAmountsFromLiquidity(
+                finalLiquidity,
+                pool.currentTick,
+                tickLower,
+                tickUpper,
+                false
+            );
+
+            // Extract quote amount
+            const calculatedQuoteAmount = positionCalculation.isQuoteToken0 ? finalToken0 : finalToken1;
+            const calculatedBaseAmount = positionCalculation.isQuoteToken0 ? finalToken1 : finalToken0;
+
+            // Final verification: ensure base amount still within budget after all calculations
+            if (calculatedBaseAmount > baseAmountBigInt && finalLiquidity > 0n) {
+                // Still over budget, need to reduce further
+                console.warn("Final verification failed, reducing liquidity further");
+                finalLiquidity = finalLiquidity - 1n;
+                const verifiedAmounts = getTokenAmountsFromLiquidity(
+                    finalLiquidity,
+                    pool.currentTick,
+                    tickLower,
+                    tickUpper,
+                    false
+                );
+                const verifiedQuoteAmount = positionCalculation.isQuoteToken0 ? verifiedAmounts.token0Amount : verifiedAmounts.token1Amount;
+                const quoteAmountString = formatCompactValue(verifiedQuoteAmount, quoteToken.decimals);
+                setQuoteAmount(quoteAmountString);
+                setQuoteAmountBigInt(verifiedQuoteAmount);
+            } else {
+                const quoteAmountString = formatCompactValue(calculatedQuoteAmount, quoteToken.decimals);
+                setQuoteAmount(quoteAmountString);
+                setQuoteAmountBigInt(calculatedQuoteAmount);
+            }
+        } catch (error) {
+            console.error("Error calculating matching quote amount:", error);
+        }
+    }, [baseAmountBigInt, pool.currentTick, pool.sqrtPriceX96, tickLower, tickUpper, positionCalculation.isQuoteToken0, baseToken.decimals, quoteToken.decimals]);
+
+    // Handle "Match Quote" - calculate required base amount from current quote amount
+    // Strategy: Use ALL the quote amount entered, calculate liquidity from it, then find matching base amount
+    const handleMatchQuote = useCallback(() => {
+        if (quoteAmountBigInt === 0n || pool.currentTick === null || !pool.sqrtPriceX96) {
+            return;
+        }
+
+        try {
+            const sqrtPriceCurrent = BigInt(pool.sqrtPriceX96);
+            const sqrtPriceLower = BigInt(TickMath.getSqrtRatioAtTick(tickLower).toString());
+            const sqrtPriceUpper = BigInt(TickMath.getSqrtRatioAtTick(tickUpper).toString());
+
+            // Determine which token is which in the pool
+            const token0Amount = positionCalculation.isQuoteToken0 ? quoteAmountBigInt : 0n;
+            const token1Amount = positionCalculation.isQuoteToken0 ? 0n : quoteAmountBigInt;
+
+            // Calculate initial liquidity from the quote token amount (floor division)
+            let calculatedLiquidity: bigint;
+
+            if (pool.currentTick < tickLower) {
+                // Below range - only token0 needed
+                calculatedLiquidity = getLiquidityFromAmount0(sqrtPriceLower, sqrtPriceUpper, token0Amount, false);
+            } else if (pool.currentTick >= tickUpper) {
+                // Above range - only token1 needed
+                calculatedLiquidity = getLiquidityFromAmount1(sqrtPriceLower, sqrtPriceUpper, token1Amount, false);
+            } else {
+                // In range - calculate from quote token only
+                if (positionCalculation.isQuoteToken0) {
+                    // Quote is token0, calculate L from token0
+                    calculatedLiquidity = getLiquidityFromAmount0(sqrtPriceCurrent, sqrtPriceUpper, token0Amount, false);
+                } else {
+                    // Quote is token1, calculate L from token1
+                    calculatedLiquidity = getLiquidityFromAmount1(sqrtPriceLower, sqrtPriceCurrent, token1Amount, false);
+                }
+            }
+
+            if (calculatedLiquidity === 0n) return;
+
+            // Iteratively decrease liquidity until the quote amount fits within the entered amount
+            let finalLiquidity = calculatedLiquidity;
+            let iterations = 0;
+            const maxIterations = 100;
+
+            while (iterations < maxIterations) {
+                const amounts = getTokenAmountsFromLiquidity(
+                    finalLiquidity,
+                    pool.currentTick,
+                    tickLower,
+                    tickUpper,
+                    false
+                );
+
+                const calculatedQuoteAmount = positionCalculation.isQuoteToken0 ? amounts.token0Amount : amounts.token1Amount;
+
+                // Check if quote amount fits within budget
+                if (calculatedQuoteAmount <= quoteAmountBigInt) {
+                    break; // Found optimal liquidity
+                }
+
+                // Decrease liquidity and try again
+                finalLiquidity = finalLiquidity - 1n;
+                iterations++;
+
+                if (finalLiquidity === 0n) break;
+            }
+
+            // Get final token amounts using the adjusted liquidity
+            const { token0Amount: reqToken0, token1Amount: reqToken1 } = getTokenAmountsFromLiquidity(
+                finalLiquidity,
+                pool.currentTick,
+                tickLower,
+                tickUpper,
+                false
+            );
+
+            // Extract base amount
+            const calculatedBaseAmount = positionCalculation.isQuoteToken0 ? reqToken1 : reqToken0;
+            const baseAmountString = formatCompactValue(calculatedBaseAmount, baseToken.decimals);
+            setBaseAmount(baseAmountString);
+            setBaseAmountBigInt(calculatedBaseAmount);
+        } catch (error) {
+            console.error("Error calculating matching base amount:", error);
+        }
+    }, [quoteAmountBigInt, pool.currentTick, pool.sqrtPriceX96, tickLower, tickUpper, positionCalculation.isQuoteToken0, baseToken.decimals, quoteToken.decimals]);
+
+    // Auto-matching in "matched" mode
+    useEffect(() => {
+        if (mode !== "matched" || !isInitialized) return;
+        if (lastChangedField !== "base") return; // Only match when user changed base
+
+        // Use timeout to allow user typing to complete
+        const timeoutId = setTimeout(() => {
+            if (baseAmountBigInt > 0n) {
+                handleMatchBase();
+            }
+        }, 500); // 500ms debounce
+
+        return () => clearTimeout(timeoutId);
+    }, [baseAmountBigInt, mode, isInitialized, lastChangedField]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (mode !== "matched" || !isInitialized) return;
+        if (lastChangedField !== "quote") return; // Only match when user changed quote
+
+        // Use timeout to allow user typing to complete
+        const timeoutId = setTimeout(() => {
+            if (quoteAmountBigInt > 0n) {
+                handleMatchQuote();
+            }
+        }, 500); // 500ms debounce
+
+        return () => clearTimeout(timeoutId);
+    }, [quoteAmountBigInt, mode, isInitialized, lastChangedField]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Calculate liquidity from user input and emit to parent
     useEffect(() => {
@@ -146,6 +375,12 @@ export function PositionSizeConfig({
         if (!isInitialized) return;
 
         const inputLiquidity = positionCalculation.liquidity;
+
+        console.log('[PositionSizeConfig] Input values:', {
+            baseAmountBigInt: baseAmountBigInt.toString(),
+            quoteAmountBigInt: quoteAmountBigInt.toString(),
+            calculatedLiquidity: inputLiquidity.toString(),
+        });
 
         // Only emit change if the calculated liquidity differs from current prop
         // This prevents infinite loops when the component re-renders due to prop updates
@@ -162,17 +397,10 @@ export function PositionSizeConfig({
     // Mode change handler
     const handleModeChange = useCallback((newMode: InputMode) => {
         setMode(newMode);
+        setLastChangedField(null); // Reset on mode change to prevent unwanted matching
 
-        // Clear amounts when switching modes to avoid confusion
-        if (newMode !== "custom") {
-            if (newMode === "quote") {
-                setBaseAmount("0");
-                setBaseAmountBigInt(0n);
-            } else if (newMode === "base") {
-                setQuoteAmount("0");
-                setQuoteAmountBigInt(0n);
-            }
-        }
+        // Don't clear amounts - let the user keep their inputs
+        // The liquidity calculation will handle single-token inputs automatically
     }, []);
 
     // Refresh pool data handler
@@ -296,14 +524,24 @@ export function PositionSizeConfig({
                                 {quoteToken.symbol}
                             </button>
                             <button
-                                onClick={() => handleModeChange("custom")}
+                                onClick={() => handleModeChange("matched")}
                                 className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                                    mode === "custom"
+                                    mode === "matched"
                                         ? "bg-blue-600 text-white"
                                         : "bg-slate-700 text-slate-300 hover:bg-slate-600"
                                 }`}
                             >
-                                {baseToken.symbol}+{quoteToken.symbol}
+                                Matched
+                            </button>
+                            <button
+                                onClick={() => handleModeChange("independent")}
+                                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                                    mode === "independent"
+                                        ? "bg-blue-600 text-white"
+                                        : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                                }`}
+                            >
+                                Independent
                             </button>
                             </div>
                         </div>
@@ -321,8 +559,8 @@ export function PositionSizeConfig({
 
                     {/* Conditional token inputs */}
                     <div className="space-y-3">
-                        {/* Base token input - show in base mode or custom mode */}
-                        {(mode === "base" || mode === "custom") && (
+                        {/* Base token input - show in base, matched, or independent mode */}
+                        {(mode === "base" || mode === "matched" || mode === "independent") && (
                             <TokenAmountInput
                                 token={baseToken}
                                 value={baseAmount}
@@ -333,8 +571,8 @@ export function PositionSizeConfig({
                             />
                         )}
 
-                        {/* Quote token input - show in quote mode or custom mode */}
-                        {(mode === "quote" || mode === "custom") && (
+                        {/* Quote token input - show in quote, matched, or independent mode */}
+                        {(mode === "quote" || mode === "matched" || mode === "independent") && (
                             <TokenAmountInput
                                 token={quoteToken}
                                 value={quoteAmount}
@@ -349,11 +587,13 @@ export function PositionSizeConfig({
                     {/* Help text */}
                     <div className="text-xs text-slate-400">
                         {mode === "quote" &&
-                            `Enter total ${quoteToken.symbol} amount. ${baseToken.symbol} amount will be calculated automatically.`}
+                            `Enter ${quoteToken.symbol} amount. ${baseToken.symbol} will be calculated automatically.`}
                         {mode === "base" &&
-                            `Enter total ${baseToken.symbol} amount. ${quoteToken.symbol} amount will be calculated automatically.`}
-                        {mode === "custom" &&
-                            `Enter both token amounts independently for asymmetric positions.`}
+                            `Enter ${baseToken.symbol} amount. ${quoteToken.symbol} will be calculated automatically.`}
+                        {mode === "matched" &&
+                            `Enter either amount. The other will auto-match for balanced positions.`}
+                        {mode === "independent" &&
+                            `Enter both amounts independently for asymmetric positions.`}
                     </div>
                 </div>
             )}

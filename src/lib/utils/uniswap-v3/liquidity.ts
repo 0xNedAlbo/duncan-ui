@@ -20,7 +20,8 @@ export function getTokenAmountsFromLiquidity(
     liquidity: bigint,
     tickCurrent: number,
     tickLower: number,
-    tickUpper: number
+    tickUpper: number,
+    roundUp: boolean = false
 ): TokenAmounts {
     if (liquidity === 0n) {
         return { token0Amount: 0n, token1Amount: 0n };
@@ -44,7 +45,8 @@ export function getTokenAmountsFromLiquidity(
         token0Amount = getAmount0FromLiquidity(
             sqrtPriceLower,
             sqrtPriceUpper,
-            liquidity
+            liquidity,
+            roundUp
         );
         token1Amount = 0n;
     } else if (tickCurrent >= tickUpper) {
@@ -53,19 +55,22 @@ export function getTokenAmountsFromLiquidity(
         token1Amount = getAmount1FromLiquidity(
             sqrtPriceLower,
             sqrtPriceUpper,
-            liquidity
+            liquidity,
+            roundUp
         );
     } else {
         // Price in range - mixed liquidity
         token0Amount = getAmount0FromLiquidity(
             sqrtPriceCurrent,
             sqrtPriceUpper,
-            liquidity
+            liquidity,
+            roundUp
         );
         token1Amount = getAmount1FromLiquidity(
             sqrtPriceLower,
             sqrtPriceCurrent,
-            liquidity
+            liquidity,
+            roundUp
         );
     }
 
@@ -133,41 +138,78 @@ export function getLiquidityFromTokenAmounts(
 export function getAmount0FromLiquidity(
     sqrtPriceLower: bigint,
     sqrtPriceUpper: bigint,
-    liquidity: bigint
+    liquidity: bigint,
+    roundUp: boolean = false
 ): bigint {
     if (sqrtPriceUpper <= sqrtPriceLower || liquidity === 0n) return 0n;
     const numerator1 = liquidity * (sqrtPriceUpper - sqrtPriceLower); // L * (Δ√P)
-    return mulDiv(numerator1, Q96, sqrtPriceUpper * sqrtPriceLower);
+    const denominator = sqrtPriceUpper * sqrtPriceLower;
+
+    if (roundUp) {
+        // Use ceiling division
+        const product = numerator1 * Q96;
+        return product % denominator === 0n ? product / denominator : product / denominator + 1n;
+    } else {
+        return mulDiv(numerator1, Q96, denominator);
+    }
 }
 
 export function getAmount1FromLiquidity(
     sqrtPriceLower: bigint,
     sqrtPriceUpper: bigint,
-    liquidity: bigint
+    liquidity: bigint,
+    roundUp: boolean = false
 ): bigint {
     if (sqrtPriceUpper <= sqrtPriceLower || liquidity === 0n) return 0n;
-    return mulDiv(liquidity, sqrtPriceUpper - sqrtPriceLower, Q96);
+    const delta = sqrtPriceUpper - sqrtPriceLower;
+
+    if (roundUp) {
+        // Use ceiling division
+        const product = liquidity * delta;
+        return product % Q96 === 0n ? product / Q96 : product / Q96 + 1n;
+    } else {
+        return mulDiv(liquidity, delta, Q96);
+    }
 }
 
-function getLiquidityFromAmount0(
+export function getLiquidityFromAmount0(
     sqrtPriceLower: bigint,
     sqrtPriceUpper: bigint,
-    amount0: bigint
+    amount0: bigint,
+    roundUp: boolean = false
 ): bigint {
     if (sqrtPriceUpper <= sqrtPriceLower || amount0 <= 0n) return 0n;
     const delta = sqrtPriceUpper - sqrtPriceLower;
-    return (amount0 * (sqrtPriceLower * sqrtPriceUpper)) / (Q96 * delta);
+    const numerator = amount0 * (sqrtPriceLower * sqrtPriceUpper);
+    const denominator = Q96 * delta;
+
+    if (roundUp) {
+        // Ceiling division: (a + b - 1) / b
+        return (numerator + denominator - 1n) / denominator;
+    } else {
+        // Floor division (default)
+        return numerator / denominator;
+    }
 }
 
-function getLiquidityFromAmount1(
+export function getLiquidityFromAmount1(
     sqrtPriceLower: bigint,
     sqrtPriceUpper: bigint,
-    amount1: bigint
+    amount1: bigint,
+    roundUp: boolean = false
 ): bigint {
     if (sqrtPriceUpper <= sqrtPriceLower || amount1 <= 0n) return 0n;
     const delta = sqrtPriceUpper - sqrtPriceLower;
-    // floor(amount1 * Q96 / delta)
-    return (amount1 * Q96) / delta;
+    const numerator = amount1 * Q96;
+    const denominator = delta;
+
+    if (roundUp) {
+        // Ceiling division: (a + b - 1) / b
+        return (numerator + denominator - 1n) / denominator;
+    } else {
+        // Floor division (default)
+        return numerator / denominator;
+    }
 }
 
 export const pow10 = (n: number) => 10n ** BigInt(n);
