@@ -10,7 +10,7 @@ import { isValidChainSlug, getChainId, type SupportedChainsType } from "@/config
 import { useCreatePositionOptimistic } from "@/app-shared/hooks/api/useCreatePositionOptimistic";
 import { useSession } from "next-auth/react";
 import { compareAddresses } from "@/lib/utils/evm";
-import { parseIncreaseLiquidityEvent } from "@/lib/utils/uniswap-v3/parse-mint-receipt";
+import { parseIncreaseLiquidityEvent } from "@/lib/utils/uniswap-v3/parse-liquidity-events";
 import { NONFUNGIBLE_POSITION_MANAGER_ADDRESSES } from "@/lib/contracts/nonfungiblePositionManager";
 
 import { IntroStep } from "./IntroStep";
@@ -62,12 +62,12 @@ export function PositionWizard({
             queryClient.setQueriesData(
                 { queryKey: ['positions', 'list'] },
                 (oldData: any) => {
-                    if (!oldData?.data || !response.data) return oldData;
+                    if (!oldData?.data || !response.data?.position) return oldData;
 
                     return {
                         ...oldData,
                         data: {
-                            positions: [response.data, ...oldData.data.positions],
+                            positions: [response.data.position, ...oldData.data.positions],
                             pagination: {
                                 ...oldData.data.pagination,
                                 total: oldData.data.pagination.total + 1
@@ -78,8 +78,8 @@ export function PositionWizard({
             );
 
             // Notify parent immediately
-            if (response.data) {
-                onPositionCreated?.(response.data);
+            if (response.data?.position) {
+                onPositionCreated?.(response.data.position);
             }
 
             // No background refresh needed - PUT endpoint now returns full data
@@ -216,7 +216,7 @@ export function PositionWizard({
                                 ) > 0;
 
                                 // Parse initial event from receipt if available
-                                let initialEvent = undefined;
+                                let events = undefined;
                                 if (receipt) {
                                     const chainId = getChainId(chainForApi as SupportedChainsType);
                                     const nftManagerAddress = NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[chainId];
@@ -228,15 +228,16 @@ export function PositionWizard({
                                         );
 
                                         if (parsed) {
-                                            initialEvent = {
+                                            events = [{
+                                                eventType: 'INCREASE_LIQUIDITY' as const,
                                                 transactionHash: parsed.transactionHash,
-                                                blockNumber: parsed.blockNumber.toString(),
+                                                blockNumber: parsed.blockNumber,
                                                 transactionIndex: parsed.transactionIndex,
                                                 logIndex: parsed.logIndex,
                                                 liquidity: parsed.liquidity,
                                                 amount0: parsed.amount0,
                                                 amount1: parsed.amount1
-                                            };
+                                            }];
                                         }
                                     }
                                 }
@@ -251,7 +252,7 @@ export function PositionWizard({
                                     liquidity: positionData.liquidity,
                                     token0IsQuote,
                                     owner: walletAddress,
-                                    initialEvent
+                                    events
                                 });
                             } else {
                                 setPositionCreated(false);

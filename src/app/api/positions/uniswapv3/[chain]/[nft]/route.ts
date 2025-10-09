@@ -147,21 +147,26 @@ export const GET = withAuthAndLogging<ApiResponse<BasicPosition>>(
  */
 
 interface CreatePositionRequestBody {
-    poolAddress: string;
-    tickLower: number;
-    tickUpper: number;
-    liquidity: string;
-    token0IsQuote: boolean;
+    // For position creation (wizard)
+    poolAddress?: string;
+    tickLower?: number;
+    tickUpper?: number;
+    liquidity?: string;
+    token0IsQuote?: boolean;
     owner?: string;
-    initialEvent?: {
+
+    // For event seeding (action modals + wizard)
+    events?: Array<{
+        eventType: "INCREASE_LIQUIDITY" | "DECREASE_LIQUIDITY" | "COLLECT";
         transactionHash: string;
         blockNumber: string;
         transactionIndex: number;
         logIndex: number;
-        liquidity: string;
-        amount0: string;
-        amount1: string;
-    };
+        liquidity?: string;
+        amount0?: string;
+        amount1?: string;
+        recipient?: string;
+    }>;
 }
 
 export const PUT = withAuthAndLogging<PositionRefreshResponse>(
@@ -354,26 +359,113 @@ export const PUT = withAuthAndLogging<PositionRefreshResponse>(
             const existingPosition = await positionService.getPosition(positionId);
 
             if (existingPosition) {
+                // UPDATE PATH - Position exists, seed events and return full data
                 log.debug(
-                    { chain, nftId, userId: user.userId },
-                    "Position already exists - returning existing position with full data"
+                    { chain, nftId, userId: user.userId, eventsCount: body.events?.length || 0 },
+                    "Position exists - updating with events"
                 );
 
-                // Return full position data structure for existing position
+                // Seed events if provided
+                if (body.events && body.events.length > 0) {
+                    const ledgerService = apiFactory.positionLedgerService;
+
+                    // Position info for seeding
+                    const positionInfo = {
+                        userId: user.userId,
+                        chain,
+                        protocol: "uniswapv3" as const,
+                        nftId,
+                        token0IsQuote: existingPosition.token0IsQuote,
+                        pool: {
+                            poolAddress: existingPosition.pool.poolAddress,
+                            chain,
+                            token0: { decimals: existingPosition.pool.token0.decimals },
+                            token1: { decimals: existingPosition.pool.token1.decimals }
+                        }
+                    };
+
+                    for (const event of body.events) {
+                        try {
+                            await ledgerService.seedEvent(positionInfo, event);
+                            log.debug(
+                                { chain, nftId, eventType: event.eventType },
+                                "Seeded event successfully"
+                            );
+                        } catch (error) {
+                            log.warn(
+                                { chain, nftId, eventType: event.eventType, error },
+                                "Failed to seed event - continuing"
+                            );
+                        }
+                    }
+                }
+
+                // Update position with new liquidity if provided
+                if (liquidity) {
+                    const status = BigInt(liquidity) === 0n ? 'closed' : 'active';
+                    await positionService.updatePosition(positionId, {
+                        liquidity,
+                        status
+                    });
+
+                    log.debug(
+                        { chain, nftId, newLiquidity: liquidity, status },
+                        "Updated position liquidity"
+                    );
+                }
+
+                // Invalidate PnL cache to force recalculation with new events
+                await apiFactory.positionPnLService.invalidateCache(positionId);
+
+                // Calculate fresh data
+                let pnlBreakdown = null;
+                let aprBreakdown: AprBreakdown | undefined = undefined;
+                let curveData: CurveData | undefined = undefined;
+
+                // Calculate PnL breakdown
+                try {
+                    pnlBreakdown = await apiFactory.positionPnLService.getPnlBreakdown(positionId);
+                } catch (error) {
+                    log.debug({ chain, nftId, error }, "PnL calculation failed");
+                }
+
+                // Calculate APR breakdown if PnL succeeded
+                if (pnlBreakdown) {
+                    try {
+                        aprBreakdown = await apiFactory.positionAprService.getAprBreakdown(
+                            positionId,
+                            pnlBreakdown.unclaimedFees
+                        );
+                    } catch (error) {
+                        log.debug({ chain, nftId, error }, "APR calculation failed");
+                    }
+                }
+
+                // Calculate curve data
+                try {
+                    if (apiFactory.curveDataService.validatePosition(existingPosition)) {
+                        curveData = await apiFactory.curveDataService.getCurveData(existingPosition);
+                    }
+                } catch (error) {
+                    log.debug({ chain, nftId, error }, "Curve calculation failed");
+                }
+
+                // Return full position data with updated metrics
                 return NextResponse.json({
                     success: true,
                     data: {
                         position: existingPosition,
-                        pnlBreakdown: null,
-                        aprBreakdown: undefined,
-                        curveData: undefined
+                        pnlBreakdown,
+                        aprBreakdown,
+                        curveData
                     },
                     meta: {
                         requestedAt: new Date().toISOString(),
                         chain,
                         protocol: "uniswapv3",
                         nftId,
-                        refreshedAt: new Date().toISOString()
+                        existed: true,
+                        refreshedAt: pnlBreakdown?.calculatedAt?.toISOString() || new Date().toISOString()
                     }
                 });
             }
@@ -434,42 +526,39 @@ export const PUT = withAuthAndLogging<PositionRefreshResponse>(
                 "Position created successfully"
             );
 
-            // Seed initial event if provided
-            if (body.initialEvent) {
+            // Seed events if provided
+            if (body.events && body.events.length > 0) {
                 const ledgerService = apiFactory.positionLedgerService;
 
-                try {
-                    await ledgerService.seedMintEvent(
-                        {
-                            userId: user.userId,
-                            chain,
-                            protocol: "uniswapv3",
-                            nftId,
-                            token0IsQuote: createdPosition.token0IsQuote,
-                            pool: {
-                                poolAddress: createdPosition.pool.poolAddress,
-                                chain: createdPosition.pool.chain,
-                                token0: { decimals: createdPosition.pool.token0.decimals },
-                                token1: { decimals: createdPosition.pool.token1.decimals }
-                            }
-                        },
-                        body.initialEvent
-                    );
+                // Position info for seeding
+                const positionInfo = {
+                    userId: user.userId,
+                    chain,
+                    protocol: "uniswapv3" as const,
+                    nftId,
+                    token0IsQuote: createdPosition.token0IsQuote,
+                    pool: {
+                        poolAddress: createdPosition.pool.poolAddress,
+                        chain: createdPosition.pool.chain,
+                        token0: { decimals: createdPosition.pool.token0.decimals },
+                        token1: { decimals: createdPosition.pool.token1.decimals }
+                    }
+                };
 
-                    log.debug(
-                        { chain, nftId, txHash: body.initialEvent.transactionHash },
-                        'Seeded initial INCREASE_LIQUIDITY event'
-                    );
-                } catch (error) {
-                    // Non-fatal - scheduled refresh will sync eventually
-                    log.warn(
-                        {
-                            chain,
-                            nftId,
-                            error: error instanceof Error ? error.message : 'Unknown error'
-                        },
-                        'Failed to seed initial event - scheduled refresh will handle'
-                    );
+                for (const event of body.events) {
+                    try {
+                        await ledgerService.seedEvent(positionInfo, event);
+                        log.debug(
+                            { chain, nftId, eventType: event.eventType },
+                            'Seeded event successfully'
+                        );
+                    } catch (error) {
+                        // Non-fatal - scheduled refresh will sync eventually
+                        log.warn(
+                            { chain, nftId, eventType: event.eventType, error },
+                            'Failed to seed event - scheduled refresh will handle'
+                        );
+                    }
                 }
             }
 

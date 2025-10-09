@@ -28,6 +28,7 @@ export interface UseDecreaseLiquidityResult {
   // Overall status
   isSuccess: boolean;
   currentStep: 'idle' | 'withdrawing' | 'complete';
+  receipt: import('viem').TransactionReceipt | undefined;
 
   // Reset state
   reset: () => void;
@@ -75,6 +76,7 @@ export function useDecreaseLiquidity(params: DecreaseLiquidityParams | null): Us
   const {
     isLoading: isWaitingForWithdraw,
     isSuccess: withdrawSuccess,
+    data: receipt,
   } = useWaitForTransactionReceipt({
     hash: withdrawTxHash,
     chainId: params?.chainId,
@@ -159,6 +161,7 @@ export function useDecreaseLiquidity(params: DecreaseLiquidityParams | null): Us
     // Overall status
     isSuccess: withdrawSuccess,
     currentStep,
+    receipt,
 
     // Reset
     reset,

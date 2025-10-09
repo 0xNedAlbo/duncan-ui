@@ -15,6 +15,9 @@ import { NetworkSwitchStep } from "./NetworkSwitchStep";
 import { TransactionStep } from "./TransactionStep";
 import type { BasicPosition } from "@/types/positions";
 import type { UnclaimedFeeAmounts } from "@/app/api/positions/uniswapv3/[chain]/[nft]/details/route";
+import { parseCollectEvent } from "@/lib/utils/uniswap-v3/parse-liquidity-events";
+import { NONFUNGIBLE_POSITION_MANAGER_ADDRESSES } from "@/lib/contracts/nonfungiblePositionManager";
+import { useUpdatePositionWithEvents } from "@/app-shared/hooks/api/useUpdatePositionWithEvents";
 
 interface CollectFeesModalProps {
     isOpen: boolean;
@@ -34,6 +37,7 @@ export function CollectFeesModal({
     const t = useTranslations();
     const [mounted, setMounted] = useState(false);
     const queryClient = useQueryClient();
+    const updateMutation = useUpdatePositionWithEvents();
 
     const {
         address: walletAddress,
@@ -45,6 +49,14 @@ export function CollectFeesModal({
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Reset mutation state when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            updateMutation.reset();
+            collectFees.reset();
+        }
+    }, [isOpen]);
 
     // Normalize addresses
     const normalizedWalletAddress = walletAddress
@@ -130,31 +142,43 @@ export function CollectFeesModal({
         collectFees.collect();
     };
 
-    // Handle successful collection - invalidate position cache
+    // Handle successful collection - seed event and update position
     useEffect(() => {
-        if (collectFees.isSuccess) {
-            // Invalidate position cache to refresh data
-            queryClient.invalidateQueries({
-                queryKey: [
-                    "position",
-                    undefined,
-                    position.pool.chain,
-                    "uniswapv3",
-                    position.nftId,
-                ],
-            });
+        if (collectFees.isSuccess && collectFees.receipt && !updateMutation.isPending && !updateMutation.isSuccess) {
+            const chainId = getChainId(position.pool.chain as SupportedChainsType);
+            const nftManagerAddress = NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[chainId];
 
-            // Also invalidate positions list
-            queryClient.invalidateQueries({
-                queryKey: ["positions", "list"],
-            });
+            if (!nftManagerAddress) {
+                console.error('NFT Manager address not found for chain');
+                // Still close modal even if we can't seed event
+                setTimeout(() => onClose(), 2000);
+                return;
+            }
 
-            // Close modal after short delay
-            setTimeout(() => {
-                onClose();
-            }, 2000);
+            const parsed = parseCollectEvent(
+                collectFees.receipt,
+                nftManagerAddress
+            );
+
+            if (parsed) {
+                // Collect doesn't change liquidity - use current value
+                updateMutation.mutate({
+                    chain: position.pool.chain,
+                    nftId: position.nftId || "",
+                    poolAddress: position.pool.poolAddress,
+                    tickLower: position.tickLower,
+                    tickUpper: position.tickUpper,
+                    liquidity: position.liquidity, // Unchanged
+                    token0IsQuote: position.token0IsQuote,
+                    owner: position.owner,
+                    events: [parsed]
+                });
+            }
+
+            // Close modal after update completes
+            setTimeout(() => onClose(), 2000);
         }
-    }, [collectFees.isSuccess, position.pool.chain, position.nftId, queryClient, onClose]);
+    }, [collectFees.isSuccess, collectFees.receipt, position.pool.chain, position.nftId, position.liquidity, position.tickLower, position.tickUpper, position.token0IsQuote, position.owner, position.pool.poolAddress, onClose, updateMutation]);
 
     // Validation
     const canCollect =

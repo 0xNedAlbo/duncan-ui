@@ -15,7 +15,9 @@ import { formatCompactValue } from "@/lib/utils/fraction-format";
 import { NetworkSwitchStep } from "./NetworkSwitchStep";
 import { TransactionStep } from "./TransactionStep";
 import type { BasicPosition } from "@/types/positions";
-import { usePositionRefresh } from "@/app-shared/hooks/api/usePositionRefresh";
+import { parseDecreaseLiquidityEvent, parseCollectEvent } from "@/lib/utils/uniswap-v3/parse-liquidity-events";
+import { NONFUNGIBLE_POSITION_MANAGER_ADDRESSES } from "@/lib/contracts/nonfungiblePositionManager";
+import { useUpdatePositionWithEvents } from "@/app-shared/hooks/api/useUpdatePositionWithEvents";
 
 interface WithdrawPositionModalProps {
     isOpen: boolean;
@@ -32,10 +34,7 @@ export function WithdrawPositionModal({
     const [withdrawPercent, setWithdrawPercent] = useState<number>(0);
     const [quoteValueInput, setQuoteValueInput] = useState<string>("");
     const [isRefreshing, setIsRefreshing] = useState(false);
-
-    // TODO: Get userId from auth context once available
-    const userId = "temp-user-id"; // Placeholder - matches PositionCard
-    const protocol = "uniswapv3";
+    const updateMutation = useUpdatePositionWithEvents();
 
     const {
         address: walletAddress,
@@ -47,6 +46,14 @@ export function WithdrawPositionModal({
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Reset mutation state when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            updateMutation.reset();
+            decreaseLiquidity.reset();
+        }
+    }, [isOpen]);
 
     // Load pool data to get current price
     const {
@@ -251,9 +258,6 @@ export function WithdrawPositionModal({
     // Decrease liquidity hook
     const decreaseLiquidity = useDecreaseLiquidity(decreaseParams);
 
-    // Position refresh hook
-    const refreshMutation = usePositionRefresh();
-
     // Handle percentage slider change
     const handlePercentChange = useCallback(
         (percent: number) => {
@@ -323,44 +327,56 @@ export function WithdrawPositionModal({
         }
     }, [refetchPool, isRefreshing]);
 
-    // Handle successful withdrawal - trigger refresh to get fresh blockchain data
+    // Handle successful withdrawal - seed TWO events (decrease + collect)
     useEffect(() => {
-        if (decreaseLiquidity.isSuccess) {
-            // Trigger explicit position refresh to fetch fresh blockchain data
-            // This will:
-            // - Read fresh liquidity from NFT contract
-            // - Update status (closed if liquidity === 0)
-            // - Recalculate position value, PnL, APR with current pool state
-            // - Update all caches with fresh data
-            const refreshPosition = async () => {
-                try {
-                    await refreshMutation.mutateAsync({
-                        userId,
-                        chain: position.pool.chain,
-                        protocol,
-                        nftId: position.nftId || "",
-                    });
-                } catch (error) {
-                    console.error("Failed to refresh position after withdrawal:", error);
-                }
+        if (decreaseLiquidity.isSuccess && decreaseLiquidity.receipt && !updateMutation.isPending && !updateMutation.isSuccess) {
+            const chainId = getChainId(position.pool.chain as SupportedChainsType);
+            const nftManagerAddress = NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[chainId];
 
-                // Close modal after refresh completes
-                setTimeout(() => {
-                    onClose();
-                }, 1000);
-            };
+            if (!nftManagerAddress) {
+                console.error('NFT Manager address not found for chain');
+                // Still close modal even if we can't seed events
+                setTimeout(() => onClose(), 2000);
+                return;
+            }
 
-            refreshPosition();
+            // Parse both events from multicall receipt
+            const decreaseEvent = parseDecreaseLiquidityEvent(
+                decreaseLiquidity.receipt,
+                nftManagerAddress
+            );
+            const collectEvent = parseCollectEvent(
+                decreaseLiquidity.receipt,
+                nftManagerAddress
+            );
+
+            const events = [];
+            if (decreaseEvent) events.push(decreaseEvent);
+            if (collectEvent) events.push(collectEvent);
+
+            if (events.length > 0) {
+                // Calculate new total liquidity: current - delta
+                const currentLiquidity = BigInt(position.liquidity);
+                const liquidityDelta = decreaseEvent ? BigInt(decreaseEvent.liquidity || "0") : 0n;
+                const newTotalLiquidity = currentLiquidity - liquidityDelta;
+
+                updateMutation.mutate({
+                    chain: position.pool.chain,
+                    nftId: position.nftId || "",
+                    poolAddress: position.pool.poolAddress,
+                    tickLower: position.tickLower,
+                    tickUpper: position.tickUpper,
+                    liquidity: newTotalLiquidity.toString(),
+                    token0IsQuote: position.token0IsQuote,
+                    owner: position.owner,
+                    events
+                });
+            }
+
+            // Close modal after update completes
+            setTimeout(() => onClose(), 2000);
         }
-    }, [
-        decreaseLiquidity.isSuccess,
-        userId,
-        position.pool.chain,
-        position.nftId,
-        protocol,
-        refreshMutation,
-        onClose,
-    ]);
+    }, [decreaseLiquidity.isSuccess, decreaseLiquidity.receipt, position.pool.chain, position.nftId, position.liquidity, position.tickLower, position.tickUpper, position.token0IsQuote, position.owner, position.pool.poolAddress, onClose, updateMutation]);
 
     // Validation
     const canWithdraw =

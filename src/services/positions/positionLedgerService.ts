@@ -205,6 +205,140 @@ export class PositionLedgerService {
     }
 
     /**
+     * Seed any position event from transaction receipt
+     *
+     * Generalized version that handles all event types (INCREASE_LIQUIDITY, DECREASE_LIQUIDITY, COLLECT).
+     * Idempotent via onchainInputHash - safe even if blockscanner runs first.
+     *
+     * @param positionInfo - Position sync info
+     * @param eventData - Parsed event data from transaction receipt
+     */
+    async seedEvent(
+        positionInfo: PositionSyncInfo,
+        eventData: {
+            eventType: "INCREASE_LIQUIDITY" | "DECREASE_LIQUIDITY" | "COLLECT";
+            transactionHash: string;
+            blockNumber: string;
+            transactionIndex: number;
+            logIndex: number;
+            liquidity?: string;
+            amount0?: string;
+            amount1?: string;
+            recipient?: string;
+        }
+    ): Promise<void> {
+        const chain = positionInfo.pool.chain as SupportedChainsType;
+
+        // Check if event already exists (idempotent via onchainInputHash)
+        const inputHash = this.generateOnchainInputHash(
+            BigInt(eventData.blockNumber),
+            eventData.transactionIndex,
+            eventData.logIndex
+        );
+
+        const existingEvent = await this.prisma.positionEvent.findFirst({
+            where: {
+                positionUserId: positionInfo.userId,
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
+                inputHash,
+            },
+        });
+
+        if (existingEvent) {
+            this.logger.debug(
+                {
+                    nftId: positionInfo.nftId,
+                    chain,
+                    inputHash,
+                },
+                "Event already exists - skipping seed (blockscanner was faster)"
+            );
+            return;
+        }
+
+        // Get block timestamp for event
+        const blockInfo = await this.evmBlockInfoService.getBlockByNumber(
+            BigInt(eventData.blockNumber),
+            chain
+        );
+
+        // Construct RawPositionEvent
+        const rawEvent: RawPositionEvent = {
+            eventType: eventData.eventType,
+            tokenId: positionInfo.nftId,
+            transactionHash: eventData.transactionHash,
+            blockNumber: BigInt(eventData.blockNumber),
+            transactionIndex: eventData.transactionIndex,
+            logIndex: eventData.logIndex,
+            blockTimestamp: new Date(Number(blockInfo.timestamp) * 1000),
+            liquidity: eventData.liquidity,
+            amount0: eventData.amount0,
+            amount1: eventData.amount1,
+            recipient: eventData.recipient,
+            chain,
+        };
+
+        // Get previous state (last event for this position)
+        const lastEvent = await this.prisma.positionEvent.findFirst({
+            where: {
+                positionUserId: positionInfo.userId,
+                positionChain: positionInfo.chain,
+                positionProtocol: positionInfo.protocol,
+                positionNftId: positionInfo.nftId,
+            },
+            orderBy: [
+                { blockNumber: "desc" },
+                { transactionIndex: "desc" },
+                { logIndex: "desc" },
+            ],
+        });
+
+        const previousState = lastEvent
+            ? {
+                  liquidityAfter: lastEvent.liquidityAfter,
+                  costBasisAfter: lastEvent.costBasisAfter,
+                  realizedPnLAfter: lastEvent.realizedPnLAfter,
+                  uncollectedPrincipal0: lastEvent.uncollectedPrincipal0,
+                  uncollectedPrincipal1: lastEvent.uncollectedPrincipal1,
+              }
+            : {
+                  liquidityAfter: "0",
+                  costBasisAfter: "0",
+                  realizedPnLAfter: "0",
+                  uncollectedPrincipal0: "0",
+                  uncollectedPrincipal1: "0",
+              };
+
+        // Reuse existing event processing logic
+        const { eventId, newState } = await this.processAndCreateEvent(
+            rawEvent,
+            positionInfo,
+            previousState
+        );
+
+        // Create or update APR record
+        await this.positionAprService.createEventAprRecord(
+            eventId,
+            new Date(Number(blockInfo.timestamp) * 1000),
+            null, // Open-ended period until next event
+            newState.costBasisAfter
+        );
+
+        this.logger.debug(
+            {
+                nftId: positionInfo.nftId,
+                chain,
+                eventId,
+                eventType: eventData.eventType,
+                costBasis: newState.costBasisAfter,
+            },
+            `Successfully seeded ${eventData.eventType} event`
+        );
+    }
+
+    /**
      * Calculate position status based on liquidity events
      */
     calculatePositionStatus(events: RawPositionEvent[]): {

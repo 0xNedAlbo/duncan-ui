@@ -19,6 +19,9 @@ import { InsufficientFundsAlert } from "./wizard/InsufficientFundsAlert";
 import { NetworkSwitchStep } from "./NetworkSwitchStep";
 import { TransactionStep } from "./TransactionStep";
 import type { BasicPosition } from "@/types/positions";
+import { parseIncreaseLiquidityEvent } from "@/lib/utils/uniswap-v3/parse-liquidity-events";
+import { NONFUNGIBLE_POSITION_MANAGER_ADDRESSES } from "@/lib/contracts/nonfungiblePositionManager";
+import { useUpdatePositionWithEvents } from "@/app-shared/hooks/api/useUpdatePositionWithEvents";
 
 interface IncreasePositionModalProps {
     isOpen: boolean;
@@ -34,6 +37,7 @@ export function IncreasePositionModal({
     const [mounted, setMounted] = useState(false);
     const [liquidity, setLiquidity] = useState<bigint>(0n);
     const queryClient = useQueryClient();
+    const updateMutation = useUpdatePositionWithEvents();
 
     const {
         address: walletAddress,
@@ -45,6 +49,14 @@ export function IncreasePositionModal({
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Reset mutation state when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            updateMutation.reset();
+            increaseLiquidity.reset();
+        }
+    }, [isOpen]);
 
     // Load pool data to get current price
     const {
@@ -272,31 +284,47 @@ export function IncreasePositionModal({
         increaseLiquidity.increase();
     };
 
-    // Handle successful increase - invalidate position cache
+    // Handle successful increase - seed event and update position
     useEffect(() => {
-        if (increaseLiquidity.isSuccess) {
-            // Invalidate position cache to refresh data
-            queryClient.invalidateQueries({
-                queryKey: [
-                    "position",
-                    undefined,
-                    position.pool.chain,
-                    "uniswapv3",
-                    position.nftId,
-                ],
-            });
+        if (increaseLiquidity.isSuccess && increaseLiquidity.receipt && !updateMutation.isPending && !updateMutation.isSuccess) {
+            const chainId = getChainId(position.pool.chain as SupportedChainsType);
+            const nftManagerAddress = NONFUNGIBLE_POSITION_MANAGER_ADDRESSES[chainId];
 
-            // Also invalidate positions list
-            queryClient.invalidateQueries({
-                queryKey: ["positions", "list"],
-            });
+            if (!nftManagerAddress) {
+                console.error('NFT Manager address not found for chain');
+                // Still close modal even if we can't seed event
+                setTimeout(() => onClose(), 2000);
+                return;
+            }
 
-            // Close modal after short delay
-            setTimeout(() => {
-                onClose();
-            }, 2000);
+            const parsed = parseIncreaseLiquidityEvent(
+                increaseLiquidity.receipt,
+                nftManagerAddress
+            );
+
+            if (parsed) {
+                // Calculate new total liquidity: current + delta
+                const currentLiquidity = BigInt(position.liquidity);
+                const liquidityDelta = BigInt(parsed.liquidity || "0");
+                const newTotalLiquidity = currentLiquidity + liquidityDelta;
+
+                updateMutation.mutate({
+                    chain: position.pool.chain,
+                    nftId: position.nftId || "",
+                    poolAddress: position.pool.poolAddress,
+                    tickLower: position.tickLower,
+                    tickUpper: position.tickUpper,
+                    liquidity: newTotalLiquidity.toString(),
+                    token0IsQuote: position.token0IsQuote,
+                    owner: position.owner,
+                    events: [parsed]
+                });
+            }
+
+            // Close modal after update completes
+            setTimeout(() => onClose(), 2000);
         }
-    }, [increaseLiquidity.isSuccess, position.pool.chain, position.nftId, queryClient, onClose]);
+    }, [increaseLiquidity.isSuccess, increaseLiquidity.receipt, position.pool.chain, position.nftId, position.liquidity, position.tickLower, position.tickUpper, position.token0IsQuote, position.owner, position.pool.poolAddress, onClose, updateMutation]);
 
     // Determine transaction steps
     const needsBaseApproval = requiredBaseAmount > 0n && !baseApproval.isApproved;

@@ -26,6 +26,7 @@ export interface UseCollectFeesResult {
   collectedAmount0: bigint | undefined;
   collectedAmount1: bigint | undefined;
   isSuccess: boolean;
+  receipt: import('viem').TransactionReceipt | undefined;
 
   // Reset state
   reset: () => void;
@@ -151,6 +152,7 @@ export function useCollectFees(params: CollectFeesParams | null): UseCollectFees
     collectedAmount0,
     collectedAmount1,
     isSuccess,
+    receipt,
 
     // Reset
     reset,

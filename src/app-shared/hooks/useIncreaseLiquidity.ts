@@ -25,6 +25,7 @@ export interface UseIncreaseLiquidityResult {
   // Result
   addedLiquidity: bigint | undefined;
   isSuccess: boolean;
+  receipt: import('viem').TransactionReceipt | undefined;
 
   // Reset state
   reset: () => void;
@@ -145,6 +146,7 @@ export function useIncreaseLiquidity(params: IncreaseLiquidityParams | null): Us
     // Result
     addedLiquidity,
     isSuccess,
+    receipt,
 
     // Reset
     reset,
