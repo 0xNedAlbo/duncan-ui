@@ -189,8 +189,9 @@ export function TokenAmountInput({
     const handleMaxClick = useCallback(() => {
         if (!balanceData || !isConnected) return;
 
-        const maxValue = formatFromBigInt(balanceData, token.decimals);
-        const bigIntValue = balanceData;
+        // Subtract 1 wei to prevent edge cases with gas estimation and rounding errors
+        const bigIntValue = balanceData > 0n ? balanceData - 1n : 0n;
+        const maxValue = formatFromBigInt(bigIntValue, token.decimals);
         onChange(maxValue, bigIntValue);
 
         onMaxClick?.();

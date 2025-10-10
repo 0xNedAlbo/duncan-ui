@@ -36,6 +36,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
         isLoading: isPoolLoading,
         isError: isPoolError,
         error: poolError,
+        refetch: refetchPool,
     } = usePool({
         chain,
         poolAddress,
@@ -370,6 +371,7 @@ export function PositionConfigStep(props: PositionConfigStepProps) {
                                     liquidity={liquidity || 0n}
                                     onLiquidityChange={onLiquidityChange}
                                     chain={chain}
+                                    onRefreshPool={refetchPool}
                                 />
                             </div>
                         )}
