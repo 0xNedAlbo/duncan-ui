@@ -55,7 +55,7 @@ export function calculatePnL(
  * @param liquidity Position liquidity
  * @param tickLower Lower bound tick
  * @param tickUpper Upper bound tick
- * @param initialValue Initial position value
+ * @param costBasis Cost basis for PnL calculation (baseline value). For new positions, this is the initial investment value. For existing positions, this is the current cost basis after operations.
  * @param baseTokenAddress Base token address
  * @param quoteTokenAddress Quote token address
  * @param baseTokenDecimals Base token decimals
@@ -68,7 +68,7 @@ export function generatePnLCurve(
     liquidity: bigint,
     tickLower: number,
     tickUpper: number,
-    initialValue: bigint,
+    costBasis: bigint,
     baseTokenAddress: string,
     quoteTokenAddress: string,
     baseTokenDecimals: number,
@@ -104,7 +104,7 @@ export function generatePnLCurve(
             baseTokenDecimals
         );
 
-        const { pnl, pnlPercent } = calculatePnL(positionValue, initialValue);
+        const { pnl, pnlPercent } = calculatePnL(positionValue, costBasis);
         const phase = determinePhase(tick, tickLower, tickUpper);
 
         points.push({

@@ -1,16 +1,20 @@
 "use client";
 
-import { useState, memo } from "react";
+import { useState, memo, useMemo } from "react";
 import type { BasicPosition } from "@/types/positions";
+import type { PnlBreakdown } from "@/types/pnl";
 import { useTranslations } from "@/app-shared/i18n/client";
+import { generatePnLCurve } from "@/lib/utils/uniswap-v3/position";
+import { tickToPrice } from "@/lib/utils/uniswap-v3/price";
 
 interface MiniPnLCurveProps {
     position: BasicPosition;
-    curveData: CurveData | null;
+    pnlBreakdown: PnlBreakdown | null;
     width?: number;
     height?: number;
     className?: string;
     showTooltip?: boolean;
+    markerPrice?: number; // Optional price to position the marker at (for "what if" scenarios)
 }
 
 export interface CurvePoint {
@@ -32,68 +36,138 @@ export interface CurveData {
 
 function MiniPnLCurveComponent({
     position,
-    curveData,
+    pnlBreakdown,
     width = 120,
     height = 60,
     className = "",
     showTooltip = false,
+    markerPrice,
 }: MiniPnLCurveProps) {
     const t = useTranslations();
     const [hoveredPoint, setHoveredPoint] = useState<CurvePoint | null>(null);
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
-    // Client-side validation to match server-side logic
-    const isValidForCurve = Boolean(
-        position.liquidity &&
-        position.liquidity !== "0" &&
-        position.tickLower < position.tickUpper &&
-        position.pool &&
-        position.pool.token0 &&
-        position.pool.token1
-    );
-
-    // Show loading state when curve data is not available but position should have one
-    if (!curveData && isValidForCurve) {
-        return (
-            <div
-                className={`flex items-center justify-center bg-slate-800/30 rounded ${className}`}
-                style={{ width, height }}
-                title="Loading curve data..."
-            >
-                <span className="text-xs text-slate-500">Loading...</span>
-            </div>
+    // Generate curve data locally using cost basis from PnL breakdown
+    const curveData = useMemo(() => {
+        // Client-side validation
+        const isValidForCurve = Boolean(
+            position.liquidity &&
+            position.liquidity !== "0" &&
+            position.tickLower < position.tickUpper &&
+            position.pool &&
+            position.pool.token0 &&
+            position.pool.token1
         );
-    }
 
-    // Show N/A state for positions that can't have curves (closed, invalid data, etc.)
-    if (!isValidForCurve) {
-        return (
-            <div
-                className={`flex items-center justify-center bg-slate-800/30 rounded ${className}`}
-                style={{ width, height }}
-                title="Curve not available for this position"
-            >
-                <span className="text-xs text-slate-500">N/A</span>
-            </div>
-        );
-    }
+        if (!isValidForCurve || !pnlBreakdown) {
+            return null;
+        }
 
-    // Show no data state when curve data is explicitly null or missing
-    // This handles both API errors and positions not eligible for curves
+        try {
+            // Extract cost basis from PnL breakdown
+            const costBasis = BigInt(pnlBreakdown.currentCostBasis);
+
+            // Determine base/quote tokens
+            const baseIsToken0 = !position.token0IsQuote;
+            const baseToken = baseIsToken0 ? position.pool.token0 : position.pool.token1;
+            const quoteToken = baseIsToken0 ? position.pool.token1 : position.pool.token0;
+
+            // Calculate price range (±50% buffer around position range)
+            const currentPrice = BigInt(position.pool.currentPrice);
+            const lowerPrice = tickToPrice(position.tickLower, baseToken.address, quoteToken.address, baseToken.decimals);
+            const upperPrice = tickToPrice(position.tickUpper, baseToken.address, quoteToken.address, baseToken.decimals);
+            const rangeWidth = upperPrice - lowerPrice;
+            const buffer = rangeWidth / 2n;
+            const minPrice = lowerPrice > buffer ? lowerPrice - buffer : lowerPrice / 2n;
+            const maxPrice = upperPrice + buffer;
+
+            // Generate curve with cost basis as baseline
+            const pnlPoints = generatePnLCurve(
+                BigInt(position.liquidity),
+                position.tickLower,
+                position.tickUpper,
+                costBasis, // Use current cost basis from accounting
+                baseToken.address,
+                quoteToken.address,
+                baseToken.decimals,
+                position.pool.tickSpacing,
+                { min: minPrice, max: maxPrice },
+                100
+            );
+
+            // Transform to display format
+            const points: CurvePoint[] = pnlPoints.map(point => ({
+                price: Number(point.price) / Number(10n ** BigInt(quoteToken.decimals)),
+                pnl: Number(point.pnl) / Number(10n ** BigInt(quoteToken.decimals)),
+                phase: point.phase
+            }));
+
+            // Find indices for metadata
+            const currentPriceNumber = Number(currentPrice) / Number(10n ** BigInt(quoteToken.decimals));
+
+            // Use markerPrice if provided, otherwise use current pool price
+            const priceForMarker = markerPrice !== undefined ? markerPrice : currentPriceNumber;
+
+            // Find the closest point to the marker price
+            let currentPriceIndex = 0;
+            let minDistance = Infinity;
+            points.forEach((point, i) => {
+                const distance = Math.abs(point.price - priceForMarker);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    currentPriceIndex = i;
+                }
+            });
+
+            const lowerPriceNumber = Number(lowerPrice) / Number(10n ** BigInt(quoteToken.decimals));
+            const lowerIndex = points.findIndex((_, i) => points[i].price >= lowerPriceNumber);
+
+            const upperPriceNumber = Number(upperPrice) / Number(10n ** BigInt(quoteToken.decimals));
+            const upperIndex = points.findIndex((_, i) => points[i].price >= upperPriceNumber);
+
+            const allPrices = points.map(p => p.price);
+            const allPnls = points.map(p => p.pnl);
+
+            return {
+                points,
+                priceRange: {
+                    min: Math.min(...allPrices),
+                    max: Math.max(...allPrices)
+                },
+                pnlRange: {
+                    min: Math.min(...allPnls),
+                    max: Math.max(...allPnls)
+                },
+                currentPriceIndex,
+                rangeIndices: {
+                    lower: Math.max(0, lowerIndex),
+                    upper: Math.min(points.length - 1, upperIndex)
+                },
+                lowerPrice: lowerPriceNumber,
+                upperPrice: upperPriceNumber,
+                currentPrice: currentPriceNumber
+            };
+
+        } catch (error) {
+            console.error("Error generating PnL curve:", error);
+            return null;
+        }
+    }, [position, pnlBreakdown]);
+
+    // Show loading/N/A state when no curve data available
     if (!curveData) {
         return (
             <div
                 className={`flex items-center justify-center bg-slate-800/30 rounded ${className}`}
                 style={{ width, height }}
-                title="Curve data not available for this position"
+                title={!pnlBreakdown ? "Loading PnL data..." : "Curve not available for this position"}
             >
-                <span className="text-xs text-slate-500">N/A</span>
+                <span className="text-xs text-slate-500">{!pnlBreakdown ? "Loading..." : "N/A"}</span>
             </div>
         );
     }
 
-    const { points, priceRange, pnlRange, currentPriceIndex } =
-        curveData;
+    const { points, priceRange, pnlRange, currentPriceIndex } = curveData;
 
     // Validate curve data
     if (!points || points.length === 0) {
@@ -327,26 +401,35 @@ function arePropsEqual(
     prevProps: MiniPnLCurveProps,
     nextProps: MiniPnLCurveProps
 ): boolean {
-    // Primary optimization: compare position ID and current price
+    // Primary optimization: compare position ID
     if (prevProps.position.chain !== nextProps.position.chain ||
         prevProps.position.protocol !== nextProps.position.protocol ||
         prevProps.position.nftId !== nextProps.position.nftId) return false;
-    if (
-        prevProps.position.pool.currentPrice !==
-        nextProps.position.pool.currentPrice
-    )
-        return false;
 
     // Check other props
     if (prevProps.width !== nextProps.width) return false;
     if (prevProps.height !== nextProps.height) return false;
     if (prevProps.className !== nextProps.className) return false;
     if (prevProps.showTooltip !== nextProps.showTooltip) return false;
+    if (prevProps.markerPrice !== nextProps.markerPrice) return false; // Check marker price changes
 
-    // CRITICAL: Check curve data changes
-    if (prevProps.curveData !== nextProps.curveData) return false;
+    // CRITICAL: Check PnL breakdown changes (affects cost basis and curve)
+    if (prevProps.pnlBreakdown !== nextProps.pnlBreakdown) {
+        // If both are null, consider equal
+        if (prevProps.pnlBreakdown === null && nextProps.pnlBreakdown === null) {
+            // Continue checking other fields
+        } else if (prevProps.pnlBreakdown && nextProps.pnlBreakdown) {
+            // Compare cost basis which is key for curve generation
+            if (prevProps.pnlBreakdown.currentCostBasis !== nextProps.pnlBreakdown.currentCostBasis) {
+                return false;
+            }
+        } else {
+            // One is null, one is not - not equal
+            return false;
+        }
+    }
 
-    // For performance, only check key position fields that affect curve shape
+    // Check key position fields that affect curve shape
     if (prevProps.position.liquidity !== nextProps.position.liquidity)
         return false;
     if (prevProps.position.tickLower !== nextProps.position.tickLower)

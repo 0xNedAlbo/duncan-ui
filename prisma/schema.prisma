@@ -204,7 +204,6 @@ model Position {
   // Relations
   events     PositionEvent[]
   pnlCache   PositionPnL? // Optional cached PnL data
-  curveCache PositionCurve? // Optional cached curve data
 
   // Timestamps
   createdAt DateTime @default(now())
@@ -376,37 +375,6 @@ model PositionPnL {
   @@index([positionUserId, positionChain, positionProtocol, positionNftId, isValid]) // Quick cache lookups
   @@index([calculatedAt]) // Cleanup old cache entries
   @@map("position_pnl_cache")
-}
-
-// Position Curve Cache Model - Cached PnL curve visualization data
-model PositionCurve {
-  id String @id @default(cuid())
-
-  // Relations
-  positionUserId   String
-  positionChain    String
-  positionProtocol String
-  positionNftId    String
-  position         Position @relation(fields: [positionUserId, positionChain, positionProtocol, positionNftId], references: [userId, chain, protocol, nftId], onDelete: Cascade)
-
-  // Curve Data (JSON for atomic operations)
-  curveData Json // Complete CurveData object as JSON
-
-  // Cache Metadata
-  calculatedAt DateTime @default(now()) // When this curve was calculated
-  updatedAt    DateTime @updatedAt // Auto-updated on changes
-  isValid      Boolean  @default(true) // Cache validity flag
-
-  // Invalidation triggers (for cache dependency tracking)
-  poolTick         Int? // Pool tick when calculated
-  poolSqrtPriceX96 String? // Pool price when calculated
-  pnlCacheVersion  String? // Link to PositionPnL cache version for invalidation
-
-  // Performance Indexes
-  @@unique([positionUserId, positionChain, positionProtocol, positionNftId]) // One-to-one with Position
-  @@index([positionUserId, positionChain, positionProtocol, positionNftId, isValid]) // Quick cache lookups
-  @@index([calculatedAt]) // Cleanup old cache entries
-  @@map("position_curve_cache")
 }
 
 // Blockscanner Models for Reorg Detection and Event Scanning

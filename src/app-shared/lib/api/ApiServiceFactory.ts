@@ -13,7 +13,6 @@ import { PositionLedgerService } from "@/services/positions/positionLedgerServic
 import { PositionService } from "@/services/positions/positionService";
 import { PositionPnLService } from "@/services/positions/positionPnLService";
 import { PositionAprService } from "@/services/positions/positionAprService";
-import { CurveDataService } from "@/services/positions/curveDataService";
 import { TokenService } from "@/services/tokens/tokenService";
 import { ApiKeyService } from "@/services/auth/apiKeyService";
 import { DefaultClientsFactory, type Clients } from "@/services/ClientsFactory";
@@ -196,17 +195,6 @@ export class ApiServiceFactory {
         return this.serviceInstances.positionAprService;
     }
 
-    public get curveDataService(): CurveDataService {
-        if (!this.serviceInstances.curveDataService) {
-            const { prisma } = this.clients;
-            this.serviceInstances.curveDataService = new CurveDataService(
-                { prisma },
-                { positionPnLService: this.positionPnLService }
-            );
-        }
-        return this.serviceInstances.curveDataService;
-    }
-
     public get apiKeyService(): ApiKeyService {
         if (!this.serviceInstances.apiKeyService) {
             const { prisma } = this.clients;
@@ -232,7 +220,6 @@ export class ApiServiceFactory {
             positionService: this.positionService,
             positionPnLService: this.positionPnLService,
             positionAprService: this.positionAprService,
-            curveDataService: this.curveDataService,
             tokenService: this.tokenService,
             apiKeyService: this.apiKeyService,
         };

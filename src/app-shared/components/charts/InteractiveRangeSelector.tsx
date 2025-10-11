@@ -143,7 +143,9 @@ export function InteractiveRangeSelector({
             const lowerTick = priceToTick(safeLowerPrice, tickSpacing, baseTokenAddress, quoteTokenAddress, baseTokenDecimals);
             const upperTick = priceToTick(safeUpperPrice, tickSpacing, baseTokenAddress, quoteTokenAddress, baseTokenDecimals);
 
-            const initialValue = calculatePositionValueAtPrice(
+            // Calculate cost basis at current price
+            // For position planning, this is the hypothetical initial investment value
+            const costBasis = calculatePositionValueAtPrice(
                 liquidityAmount,
                 lowerTick,
                 upperTick,
@@ -158,7 +160,7 @@ export function InteractiveRangeSelector({
                 liquidityAmount,
                 lowerTick,
                 upperTick,
-                initialValue,
+                costBasis, // Position value at current price = cost basis for new position
                 baseTokenAddress,
                 quoteTokenAddress,
                 baseTokenDecimals,

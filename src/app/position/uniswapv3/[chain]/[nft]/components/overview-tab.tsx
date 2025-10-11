@@ -17,21 +17,19 @@ import {
 } from "lucide-react";
 import type { BasicPosition } from "@/types/positions";
 import type { PnlBreakdown } from "@/types/pnl";
-import type { CurveData } from "@/app-shared/components/charts/mini-pnl-curve";
 import { calculatePositionStates, calculateBreakEvenPrice } from "@/app-shared/lib/utils/position-states";
 import { MiniPnLCurve } from "@/app-shared/components/charts/mini-pnl-curve";
-import { tickToPrice } from "@/lib/utils/uniswap-v3/price";
 import { RangeStatusLine } from "./range-status-line";
+import { tickToPrice } from "@/lib/utils/uniswap-v3/price";
 
 interface OverviewTabProps {
     position: BasicPosition;
     pnlBreakdown?: PnlBreakdown | null;
-    curveData?: CurveData | null;
     chainSlug: string;
     nftId: string;
 }
 
-export function OverviewTab({ position, pnlBreakdown, curveData }: OverviewTabProps) {
+export function OverviewTab({ position, pnlBreakdown }: OverviewTabProps) {
     const t = useTranslations();
     // Get quote token info for formatting (must be before hook calls)
     const quoteToken = position.token0IsQuote
@@ -51,50 +49,25 @@ export function OverviewTab({ position, pnlBreakdown, curveData }: OverviewTabPr
     // Calculate position states for all three scenarios
     const positionStates = calculatePositionStates(position, pnlBreakdown);
 
-    // Helper function to find closest price index in curve data
-    const findPriceIndex = (targetPrice: bigint): number => {
-        if (!curveData) return 0;
-
-        const targetPriceNumber = Number(targetPrice) / (10 ** quoteToken.decimals);
-        let closestIndex = 0;
-        let closestDistance = Infinity;
-
-        curveData.points.forEach((point, index) => {
-            const distance = Math.abs(point.price - targetPriceNumber);
-            if (distance < closestDistance) {
-                closestDistance = distance;
-                closestIndex = index;
-            }
-        });
-
-        return closestIndex;
-    };
-
-    // Create curve data variants for each section
-    const createCurveDataForTick = (tick: number): CurveData | null => {
-        if (!curveData) return null;
-
-        const targetPrice = tickToPrice(
-            tick,
-            baseToken.address,
-            quoteToken.address,
-            baseToken.decimals
-        );
-
-        const targetIndex = findPriceIndex(targetPrice);
-
-        return {
-            ...curveData,
-            currentPriceIndex: targetIndex
-        };
-    };
-
-    const lowerRangeCurveData = createCurveDataForTick(position.tickLower);
-    const currentCurveData = curveData ?? null; // Use existing curve data with current price
-    const upperRangeCurveData = createCurveDataForTick(position.tickUpper);
-
     // Calculate break-even price
     const breakEvenPrice = calculateBreakEvenPrice(position, pnlBreakdown);
+
+    // Calculate human-readable prices for curve markers
+    const lowerRangePrice = Number(tickToPrice(
+        position.tickLower,
+        baseToken.address,
+        quoteToken.address,
+        baseToken.decimals
+    )) / Number(10n ** BigInt(quoteToken.decimals));
+
+    const upperRangePrice = Number(tickToPrice(
+        position.tickUpper,
+        baseToken.address,
+        quoteToken.address,
+        baseToken.decimals
+    )) / Number(10n ** BigInt(quoteToken.decimals));
+
+    const currentPoolPrice = Number(BigInt(position.pool.currentPrice || "0")) / Number(10n ** BigInt(quoteToken.decimals));
 
     return (
         <div className="space-y-6">
@@ -344,10 +317,11 @@ export function OverviewTab({ position, pnlBreakdown, curveData }: OverviewTabPr
                             <div className="flex-1 flex items-center justify-center">
                                 <MiniPnLCurve
                                     position={position}
-                                    curveData={currentCurveData}
+                                    pnlBreakdown={pnlBreakdown || null}
                                     width={240}
                                     height={144}
                                     showTooltip={true}
+                                    markerPrice={currentPoolPrice}
                                 />
                             </div>
                         </div>
@@ -435,10 +409,11 @@ export function OverviewTab({ position, pnlBreakdown, curveData }: OverviewTabPr
                             <div className="flex-1 flex items-center justify-center">
                                 <MiniPnLCurve
                                     position={position}
-                                    curveData={lowerRangeCurveData}
+                                    pnlBreakdown={pnlBreakdown || null}
                                     width={240}
                                     height={144}
                                     showTooltip={true}
+                                    markerPrice={lowerRangePrice}
                                 />
                             </div>
                         </div>
@@ -526,10 +501,11 @@ export function OverviewTab({ position, pnlBreakdown, curveData }: OverviewTabPr
                             <div className="flex-1 flex items-center justify-center">
                                 <MiniPnLCurve
                                     position={position}
-                                    curveData={upperRangeCurveData}
+                                    pnlBreakdown={pnlBreakdown || null}
                                     width={240}
                                     height={144}
                                     showTooltip={true}
+                                    markerPrice={upperRangePrice}
                                 />
                             </div>
                         </div>

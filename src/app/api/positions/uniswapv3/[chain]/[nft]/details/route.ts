@@ -5,7 +5,6 @@ import { ApiServiceFactory } from "@/app-shared/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
 import type { BasicPosition } from "@/services/positions/positionService";
 import type { PnlBreakdown } from "@/types/pnl";
-import type { CurveData } from "@/app-shared/components/charts/mini-pnl-curve";
 import type { AprBreakdown } from "@/types/apr";
 import type { ApiResponse } from "@/types/api";
 
@@ -28,7 +27,6 @@ export interface PositionDetailsData {
     basicData: BasicPosition;
     pnlBreakdown: PnlBreakdown | null;
     aprBreakdown: AprBreakdown | null;
-    curveData: CurveData | null;
     unclaimedFeesAmounts: UnclaimedFeeAmounts | null;
 }
 
@@ -49,10 +47,12 @@ export interface PositionDetailsResponse extends ApiResponse<PositionDetailsData
  * - Basic position information
  * - PnL breakdown data
  * - APR breakdown (realized vs unrealized)
- * - Curve visualization data
+ * - Unclaimed fees amounts
  *
  * This is a unified endpoint that provides all position data in a single response,
- * eliminating the need for separate API calls for PnL, APR, and curve data.
+ * eliminating the need for separate API calls for PnL and APR data.
+ *
+ * Note: PnL curve visualization is now generated client-side using the PnL breakdown data.
  *
  * Path parameters:
  * - chain: Blockchain network (ethereum, arbitrum, base)
@@ -134,7 +134,6 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
             const positionService = apiFactory.positionService;
             const positionPnLService = apiFactory.positionPnLService;
             const positionAprService = apiFactory.positionAprService;
-            const curveDataService = apiFactory.curveDataService;
 
             // Find the position by user ID, chain, and NFT ID
             const position = await positionService.getPositionByUserChainAndNft(
@@ -166,7 +165,7 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
 
             log.debug(
                 { chain: position.chain, protocol: position.protocol, nftId: position.nftId },
-                "Loading complete position data (PnL + APR + curve)"
+                "Loading complete position data (PnL + APR)"
             );
 
             // Position ID for service calls
@@ -232,55 +231,28 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
                 );
             }
 
-            // Load APR breakdown and curve data in parallel
-            const [aprResult, curveResult] = await Promise.allSettled([
-                (async () => {
-                    try {
-                        // Calculate APR breakdown with or without PnL data
-                        const unclaimedFees = pnlBreakdown?.unclaimedFees;
-                        const positionId = {
-                            userId: user.userId,
-                            chain: position.chain,
-                            protocol: position.protocol,
-                            nftId: position.nftId
-                        };
-                        const aprBreakdownResult = await positionAprService.getAprBreakdown(positionId, unclaimedFees);
-                        log.debug(
-                            { chain: position.chain, protocol: position.protocol, nftId: position.nftId, aprBreakdownResult, unclaimedFees: unclaimedFees || "not available" },
-                            "APR breakdown calculation completed"
-                        );
-                        return aprBreakdownResult;
-                    } catch (error) {
-                        log.debug(
-                            { chain: position.chain, protocol: position.protocol, nftId: position.nftId, error: error instanceof Error ? error.message : String(error) },
-                            "APR breakdown calculation failed"
-                        );
-                        return null;
-                    }
-                })(),
-                (async () => {
-                    try {
-                        if (!curveDataService.validatePosition(position)) {
-                            log.debug(
-                                { chain: position.chain, protocol: position.protocol, nftId: position.nftId, status: position.status, liquidity: position.liquidity },
-                                "Position not eligible for curve generation"
-                            );
-                            return null;
-                        }
-                        return await curveDataService.getCurveData(position);
-                    } catch (error) {
-                        log.debug(
-                            { chain: position.chain, protocol: position.protocol, nftId: position.nftId, error: error instanceof Error ? error.message : String(error) },
-                            "Curve data generation failed"
-                        );
-                        return null;
-                    }
-                })()
-            ]);
-
-            // Extract results
-            const aprBreakdown = aprResult.status === 'fulfilled' ? aprResult.value : null;
-            const curveData = curveResult.status === 'fulfilled' ? curveResult.value : null;
+            // Load APR breakdown
+            let aprBreakdown = null;
+            try {
+                // Calculate APR breakdown with or without PnL data
+                const unclaimedFees = pnlBreakdown?.unclaimedFees;
+                const positionId = {
+                    userId: user.userId,
+                    chain: position.chain,
+                    protocol: position.protocol,
+                    nftId: position.nftId
+                };
+                aprBreakdown = await positionAprService.getAprBreakdown(positionId, unclaimedFees);
+                log.debug(
+                    { chain: position.chain, protocol: position.protocol, nftId: position.nftId, aprBreakdown, unclaimedFees: unclaimedFees || "not available" },
+                    "APR breakdown calculation completed"
+                );
+            } catch (error) {
+                log.debug(
+                    { chain: position.chain, protocol: position.protocol, nftId: position.nftId, error: error instanceof Error ? error.message : String(error) },
+                    "APR breakdown calculation failed"
+                );
+            }
 
             log.debug(
                 {
@@ -289,8 +261,6 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
                     nftId: position.nftId,
                     hasPnl: !!pnlBreakdown,
                     hasApr: !!aprBreakdown,
-                    hasCurve: !!curveData,
-                    curvePoints: curveData?.points?.length || 0,
                     aprRealizedApr: aprBreakdown?.realizedApr || 0,
                     aprUnrealizedApr: aprBreakdown?.unrealizedApr || 0
                 },
@@ -301,7 +271,6 @@ export const GET = withAuthAndLogging<PositionDetailsResponse>(
                 basicData: position,
                 pnlBreakdown,
                 aprBreakdown,
-                curveData,
                 unclaimedFeesAmounts
             };
 

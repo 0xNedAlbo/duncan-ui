@@ -127,7 +127,6 @@ export default function UniswapV3PositionPage() {
                     <OverviewTab
                         position={position.basicData}
                         pnlBreakdown={position.pnlBreakdown}
-                        curveData={position.curveData}
                         chainSlug={chainSlug}
                         nftId={nftId}
                     />
@@ -160,7 +159,6 @@ export default function UniswapV3PositionPage() {
                     <OverviewTab
                         position={position.basicData}
                         pnlBreakdown={position.pnlBreakdown}
-                        curveData={position.curveData}
                         chainSlug={chainSlug}
                         nftId={nftId}
                     />

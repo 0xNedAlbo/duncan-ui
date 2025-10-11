@@ -12,11 +12,12 @@ import type { UnclaimedFeeAmounts } from "@/app/api/positions/uniswapv3/[chain]/
  * Refreshes position data by:
  * - Updating pool state with latest blockchain data
  * - Syncing position events from blockchain
- * - Invalidating cached PnL and curve data
+ * - Invalidating cached PnL data
  * - Recalculating PnL breakdown with fresh data
  * - Calculating fresh APR breakdown (realized vs unrealized)
- * - Pre-calculating fresh curve data for visualization
- * - Updating cached position, PnL, APR, and curve data
+ * - Updating cached position, PnL, and APR data
+ *
+ * Note: PnL curve visualization is now generated client-side.
  *
  * Path parameters:
  * - chain: Blockchain network (ethereum, arbitrum, base)
@@ -98,7 +99,6 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
             const positionService = apiFactory.positionService;
             const positionPnLService = apiFactory.positionPnLService;
             const positionAprService = apiFactory.positionAprService;
-            const curveDataService = apiFactory.curveDataService;
 
             // Find the position by user ID, chain, and NFT ID
             const position = await positionService.getPositionByUserChainAndNft(
@@ -136,7 +136,6 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                 nftId: position.nftId,
             };
             await positionPnLService.invalidateCache(positionId);
-            await curveDataService.invalidateCache(positionId);
 
             log.debug(
                 {
@@ -144,7 +143,7 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                     protocol: position.protocol,
                     nftId: position.nftId,
                 },
-                "Invalidated PnL and curve caches, starting fresh calculation"
+                "Invalidated PnL cache, starting fresh calculation"
             );
 
             try {
@@ -281,48 +280,6 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                 positionId
             );
 
-            // Calculate fresh curve data and include in response
-            // This eliminates the need for a separate curve data fetch
-            let curveData = undefined;
-            try {
-                if (
-                    refreshedPosition &&
-                    curveDataService.validatePosition(refreshedPosition)
-                ) {
-                    curveData = await curveDataService.getCurveData(
-                        refreshedPosition
-                    );
-                    log.debug(
-                        {
-                            chain: position.chain,
-                            protocol: position.protocol,
-                            nftId: position.nftId,
-                        },
-                        "Successfully calculated fresh curve data for response"
-                    );
-                } else {
-                    log.debug(
-                        {
-                            chain: position.chain,
-                            protocol: position.protocol,
-                            nftId: position.nftId,
-                        },
-                        "Skipped curve data calculation due to invalid position data"
-                    );
-                }
-            } catch (curveError) {
-                // Log curve calculation error but don't fail the refresh
-                log.debug(
-                    {
-                        chain: position.chain,
-                        protocol: position.protocol,
-                        nftId: position.nftId,
-                        error: curveError,
-                    },
-                    "Failed to calculate curve data, but refresh completed successfully"
-                );
-            }
-
             log.debug(
                 {
                     chain: position.chain,
@@ -336,7 +293,6 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                     includedAprBreakdown: !!aprBreakdown,
                     aprRealizedApr: aprBreakdown?.realizedApr || 0,
                     aprUnrealizedApr: aprBreakdown?.unrealizedApr || 0,
-                    includedCurveData: !!curveData,
                 },
                 "Successfully refreshed position data"
             );
@@ -348,7 +304,6 @@ export const POST = withAuthAndLogging<PositionRefreshResponse>(
                     pnlBreakdown: pnlBreakdown,
                     unclaimedFeesAmounts,
                     ...(aprBreakdown && { aprBreakdown }),
-                    ...(curveData && { curveData }),
                 },
                 meta: {
                     requestedAt: new Date().toISOString(),

@@ -79,8 +79,9 @@ export function PositionPnLCurve({
                 max: BigInt(Math.floor(priceRange.max * Number(10n ** BigInt(quoteTokenDecimals))))
             };
 
-            // Calculate initial position value at current tick (actual liquidity distribution)
-            const initialPositionValue = calculatePositionValue(
+            // Calculate cost basis: value of position at current price (opening point)
+            // For new positions being planned, this is the initial investment value
+            const costBasis = calculatePositionValue(
                 liquidity,
                 BigInt(pool.sqrtPriceX96),
                 tickLower,
@@ -95,7 +96,7 @@ export function PositionPnLCurve({
                 liquidity,
                 tickLower,
                 tickUpper,
-                initialPositionValue, // Use actual initial position value
+                costBasis, // Use position value at current price as baseline
                 baseToken.address,
                 quoteToken.address,
                 baseTokenDecimals,

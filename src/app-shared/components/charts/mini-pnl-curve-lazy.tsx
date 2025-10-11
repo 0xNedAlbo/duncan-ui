@@ -1,34 +1,38 @@
 "use client";
 
-import { MiniPnLCurve, type CurveData } from "./mini-pnl-curve";
+import { MiniPnLCurve } from "./mini-pnl-curve";
 import type { BasicPosition } from "@/types/positions";
+import type { PnlBreakdown } from "@/types/pnl";
 
 interface MiniPnLCurveLazyProps {
     position: BasicPosition;
-    curveData: CurveData | null;
+    pnlBreakdown: PnlBreakdown | null;
     width?: number;
     height?: number;
     className?: string;
     showTooltip?: boolean;
+    markerPrice?: number;
 }
 
 export function MiniPnLCurveLazy({
     position,
-    curveData,
+    pnlBreakdown,
     width = 120,
     height = 60,
     className = "",
     showTooltip = false,
+    markerPrice,
 }: MiniPnLCurveLazyProps) {
 
     return (
         <div className={className}>
             <MiniPnLCurve
                 position={position}
-                curveData={curveData}
+                pnlBreakdown={pnlBreakdown}
                 width={width}
                 height={height}
                 showTooltip={showTooltip}
+                markerPrice={markerPrice}
             />
         </div>
     );

@@ -190,7 +190,6 @@ export function PositionCard({
     // Extract data from unified response
     const pnlData = positionDetails?.pnlBreakdown;
     const aprData = positionDetails?.aprBreakdown;
-    const curveData = positionDetails?.curveData || null;
 
     // Use fresh position data from details query if available, otherwise fall back to prop
     // This ensures status badges update when position is refreshed
@@ -416,7 +415,7 @@ export function PositionCard({
                             <div className="flex justify-end">
                                 <MiniPnLCurveLazy
                                     position={position}
-                                    curveData={curveData}
+                                    pnlBreakdown={pnlData || null}
                                     width={120}
                                     height={60}
                                     showTooltip={true}

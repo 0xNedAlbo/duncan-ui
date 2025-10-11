@@ -13,7 +13,6 @@ import { PositionLedgerService } from "./positions/positionLedgerService";
 import { PositionService } from "./positions/positionService";
 import { PositionPnLService } from "./positions/positionPnLService";
 import { PositionAprService } from "./positions/positionAprService";
-import { CurveDataService } from "./positions/curveDataService";
 import { TokenService } from "./tokens/tokenService";
 import { ApiKeyService } from "./auth/apiKeyService";
 import { DefaultClientsFactory } from "./ClientsFactory";
@@ -34,7 +33,6 @@ export interface Services {
     positionService: PositionService;
     positionPnLService: PositionPnLService;
     positionAprService: PositionAprService;
-    curveDataService: CurveDataService;
     tokenService: TokenService;
     apiKeyService: ApiKeyService;
 }
@@ -101,11 +99,6 @@ export class DefaultServiceFactory implements ServiceFactory {
             { poolService, positionService }
         );
 
-        const curveDataService = new CurveDataService(
-            { prisma },
-            { positionPnLService }
-        );
-
         const apiKeyService = new ApiKeyService(prisma);
 
         this.services = {
@@ -124,7 +117,6 @@ export class DefaultServiceFactory implements ServiceFactory {
             positionService,
             positionPnLService,
             positionAprService,
-            curveDataService,
             tokenService,
             apiKeyService,
         };
