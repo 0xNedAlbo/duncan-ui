@@ -1,5 +1,6 @@
 import { priceToTick } from "./price";
 import { calculatePositionValue } from "./liquidity";
+import { TickMath } from "@uniswap/v3-sdk";
 import type { PnLPoint, PositionPhase } from "./types";
 
 /**
@@ -91,9 +92,11 @@ export function generatePnLCurve(
             baseTokenDecimals
         );
 
+        // Convert tick to sqrtPriceX96 for hypothetical curve point
+        const sqrtPriceX96 = BigInt(TickMath.getSqrtRatioAtTick(tick).toString());
         const positionValue = calculatePositionValue(
             liquidity,
-            tick,
+            sqrtPriceX96,
             tickLower,
             tickUpper,
             price,
@@ -149,9 +152,11 @@ export function calculatePositionValueAtPrice(
 
     const baseIsToken0 = BigInt(baseTokenAddress) < BigInt(quoteTokenAddress);
 
+    // Convert tick to sqrtPriceX96 for hypothetical price point
+    const sqrtPriceX96 = BigInt(TickMath.getSqrtRatioAtTick(targetTick).toString());
     return calculatePositionValue(
         liquidity,
-        targetTick,
+        sqrtPriceX96,
         tickLower,
         tickUpper,
         targetPrice,

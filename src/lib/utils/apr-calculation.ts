@@ -160,15 +160,15 @@ function calculatePositionValueInQuoteToken(
     poolFeeData: PoolFeeData,
     isToken0Quote: boolean
 ): bigint {
-    // Get actual token amounts from liquidity
+    const sqrtPriceX96 = BigInt(poolFeeData.sqrtPriceX96);
+
+    // Get actual token amounts from liquidity using exact pool price
     const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
         userLiquidity,
-        currentTick,
+        sqrtPriceX96,
         tickLower,
         tickUpper
     );
-
-    const sqrtPriceX96 = BigInt(poolFeeData.sqrtPriceX96);
 
     if (isToken0Quote) {
         // Quote token is token0, so convert token1 amount to token0 units

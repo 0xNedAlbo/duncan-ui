@@ -95,12 +95,31 @@ function MiniPnLCurveComponent({
     const { points, priceRange, pnlRange, currentPriceIndex } =
         curveData;
 
-    // SVG coordinate conversion
-    const xScale = (price: number) =>
-        ((price - priceRange.min) / (priceRange.max - priceRange.min)) * width;
-    const yScale = (pnl: number) =>
-        height -
-        ((pnl - pnlRange.min) / (pnlRange.max - pnlRange.min)) * height;
+    // Validate curve data
+    if (!points || points.length === 0) {
+        return (
+            <div
+                className={`flex items-center justify-center bg-slate-800/30 rounded ${className}`}
+                style={{ width, height }}
+                title="No curve points available"
+            >
+                <span className="text-xs text-slate-500">No Data</span>
+            </div>
+        );
+    }
+
+    // SVG coordinate conversion with NaN guards
+    const xScale = (price: number) => {
+        const range = priceRange.max - priceRange.min;
+        if (range === 0) return width / 2; // Center if no price range
+        return ((price - priceRange.min) / range) * width;
+    };
+
+    const yScale = (pnl: number) => {
+        const range = pnlRange.max - pnlRange.min;
+        if (range === 0) return height / 2; // Center if no PnL range
+        return height - ((pnl - pnlRange.min) / range) * height;
+    };
 
     // Generate curve path
     const pathData = points

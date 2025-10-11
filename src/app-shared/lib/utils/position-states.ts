@@ -1,5 +1,6 @@
-import { getTokenAmountsFromLiquidity, calculatePositionValue } from "@/lib/utils/uniswap-v3/liquidity";
+import { getTokenAmountsFromLiquidity_withTick, calculatePositionValue } from "@/lib/utils/uniswap-v3/liquidity";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
+import { TickMath } from "@uniswap/v3-sdk";
 import type { BasicPosition } from "@/services/positions/positionService";
 import type { PnlBreakdown } from "@/types/pnl";
 
@@ -30,8 +31,9 @@ function calculatePositionStateAtTick(
     const baseToken = position.token0IsQuote ? pool.token1 : pool.token0;
     const quoteToken = position.token0IsQuote ? pool.token0 : pool.token1;
 
-    // Calculate token amounts at this tick
-    const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
+    // Calculate token amounts at this tick (hypothetical scenario)
+    // Using _withTick since tick parameter represents "what-if" calculations
+    const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity_withTick(
         BigInt(position.liquidity),
         tick,
         position.tickLower,
@@ -51,9 +53,11 @@ function calculatePositionStateAtTick(
     );
 
     // Calculate position value at this tick
+    // Convert tick to sqrtPriceX96 for hypothetical scenario
+    const sqrtPriceX96 = BigInt(TickMath.getSqrtRatioAtTick(tick).toString());
     const positionValue = calculatePositionValue(
         BigInt(position.liquidity),
-        tick,
+        sqrtPriceX96,
         position.tickLower,
         position.tickUpper,
         poolPrice,
@@ -153,9 +157,11 @@ export function calculateBreakEvenPrice(
         );
 
         // Calculate position value at this price
+        // Convert tick to sqrtPriceX96 for hypothetical break-even calculation
+        const sqrtPriceX96 = BigInt(TickMath.getSqrtRatioAtTick(tick).toString());
         const positionValue = calculatePositionValue(
             BigInt(position.liquidity),
-            tick,
+            sqrtPriceX96,
             position.tickLower,
             position.tickUpper,
             midPrice,

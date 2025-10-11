@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import { generatePnLCurve, calculatePositionValueAtPrice } from "@/lib/utils/uniswap-v3/position";
 import { priceToTick } from "@/lib/utils/uniswap-v3/price";
-import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
+import { getTokenAmountsFromLiquidity_withTick } from "@/lib/utils/uniswap-v3/liquidity";
 import { normalizeAddress } from "@/lib/utils/evm";
 import { formatCompactValue } from "@/lib/utils/fraction-format";
 import type { PoolWithTokens } from "@/types/pools";
@@ -114,7 +114,8 @@ export function InteractiveRangeSelector({
             const lowerTick = priceToTick(safeLowerPrice, tickSpacing, baseTokenAddress, quoteTokenAddress, baseTokenDecimals);
             const upperTick = priceToTick(safeUpperPrice, tickSpacing, baseTokenAddress, quoteTokenAddress, baseTokenDecimals);
 
-            const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
+            // Using _withTick for hypothetical range selector simulation
+            const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity_withTick(
                 100000n,
                 currentTick,
                 lowerTick,

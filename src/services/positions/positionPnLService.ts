@@ -314,7 +314,7 @@ export class PositionPnLService {
     // 3. Calculate actual token amounts from liquidity and position bounds
     const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
       BigInt(position.liquidity),
-      pool.currentTick,
+      BigInt(pool.sqrtPriceX96!),
       position.tickLower,
       position.tickUpper
     );

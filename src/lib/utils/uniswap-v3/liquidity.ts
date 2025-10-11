@@ -4,133 +4,304 @@ import type { TokenAmounts } from "./types";
 import { mulDiv } from "../math";
 
 /**
- * Liquidity calculations for Uniswap V3 positions
- * Pure functions with simple parameters - no custom data structures
+ * Uniswap V3 Liquidity Calculations
+ *
+ * This module provides functions for calculating token amounts from liquidity and vice versa.
+ * Multiple function variants are provided with different input parameters.
+ *
+ * GENERAL RULE OF THUMB - Function Selection Priority:
+ * ════════════════════════════════════════════════════════════════════════════════════
+ *
+ * 1. ✅ PREFERRED: Use `_X96` suffix functions when possible
+ *    - getTokenAmountsFromLiquidity_X96(liquidity, sqrtPriceCurrent, sqrtPriceLower, sqrtPriceUpper)
+ *    - getLiquidityFromTokenAmounts_X96(sqrtPriceCurrent, sqrtPriceLower, sqrtPriceUpper, amount0, amount1)
+ *    - Zero tick conversions - maximum precision preserved
+ *    - Use when you already have all sqrt prices (e.g., from historical data with cached sqrtPriceX96)
+ *
+ * 2. ⚡ RECOMMENDED: Use base functions without suffix
+ *    - getTokenAmountsFromLiquidity(liquidity, sqrtPriceCurrent, tickLower, tickUpper)
+ *    - getLiquidityFromTokenAmounts(sqrtPriceCurrent, tickLower, tickUpper, amount0, amount1)
+ *    - Only 2 tick→sqrt conversions (position bounds)
+ *    - Use with pool.sqrtPriceX96 (always available in PoolData) + position tick bounds
+ *    - BEST CHOICE for most use cases
+ *
+ * 3. ⚠️  LEGACY: Avoid `_withTick` suffix functions
+ *    - getTokenAmountsFromLiquidity_withTick(liquidity, tickCurrent, tickLower, tickUpper)
+ *    - getLiquidityFromTokenAmounts_withTick(tickCurrent, tickLower, tickUpper, amount0, amount1)
+ *    - Performs 3 tick→sqrt conversions (current price + both bounds)
+ *    - Only for compatibility when tick is the only available current price
+ *
+ * WHY THIS MATTERS:
+ * ────────────────
+ * - pool.sqrtPriceX96 from slot0 is the EXACT on-chain price - use it directly
+ * - Each tick→sqrt conversion introduces rounding (TickMath.getSqrtRatioAtTick)
+ * - Minimizing conversions = maximum precision = accurate calculations
+ * - pool.currentTick is derived FROM sqrtPriceX96, never the other way around
+ *
+ * EXAMPLE - Typical usage pattern:
+ * ────────────────────────────────
+ * ```typescript
+ * const pool = await getPool(chain, poolAddress); // has pool.sqrtPriceX96
+ * const position = await getPosition(positionId);  // has tickLower, tickUpper
+ *
+ * // ✅ BEST: Use base function with sqrtPriceX96 + tick bounds
+ * const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
+ *   liquidity,
+ *   BigInt(pool.sqrtPriceX96),  // exact price from slot0
+ *   position.tickLower,          // tick bounds
+ *   position.tickUpper
+ * );
+ * ```
  */
 
 /**
- * Calculate token amounts from liquidity for a given price range
+ * Calculate token amounts from liquidity given current sqrt price and tick bounds.
+ *
+ * RECOMMENDED FUNCTION - Hybrid approach: accepts sqrtPriceCurrent (from pool.sqrtPriceX96)
+ * and tick bounds (from position), minimizing conversions to only position bounds.
+ *
  * @param liquidity The liquidity amount
- * @param tickCurrent Current price tick
- * @param tickLower Lower bound tick
- * @param tickUpper Upper bound tick
+ * @param sqrtPriceCurrentX96 Current sqrt price from pool.sqrtPriceX96 (Q96.96 format)
+ * @param tickLower Lower bound tick from position
+ * @param tickUpper Upper bound tick from position
+ * @param roundUp Whether to round up (default: false = floor)
  * @returns Token amounts for token0 and token1
  */
 export function getTokenAmountsFromLiquidity(
     liquidity: bigint,
-    tickCurrent: number,
+    sqrtPriceCurrentX96: bigint,
     tickLower: number,
     tickUpper: number,
+    roundUp: boolean = false
+): TokenAmounts {
+    const sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(tickLower).toString();
+    const sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(tickUpper).toString();
+    return getTokenAmountsFromLiquidity_X96(
+        liquidity,
+        sqrtPriceCurrentX96,
+        BigInt(sqrtPriceLowerX96),
+        BigInt(sqrtPriceUpperX96),
+        roundUp
+    );
+}
+
+/**
+ * Calculate liquidity from token amounts given current sqrt price and tick bounds.
+ *
+ * RECOMMENDED FUNCTION - Hybrid approach: accepts sqrtPriceCurrent (from pool.sqrtPriceX96)
+ * and tick bounds (from position), minimizing conversions to only position bounds.
+ *
+ * @param sqrtPriceCurrentX96 Current sqrt price from pool.sqrtPriceX96 (Q96.96 format)
+ * @param tickLower Lower bound tick from position
+ * @param tickUpper Upper bound tick from position
+ * @param token0Amount Amount of token0 available
+ * @param token1Amount Amount of token1 available
+ * @returns Maximum liquidity that can be provided
+ */
+export function getLiquidityFromTokenAmounts(
+    sqrtPriceCurrentX96: bigint,
+    tickLower: number,
+    tickUpper: number,
+    token0Amount: bigint,
+    token1Amount: bigint
+): bigint {
+    const sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(tickLower).toString();
+    const sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(tickUpper).toString();
+    return getLiquidityFromTokenAmounts_X96(
+        sqrtPriceCurrentX96,
+        BigInt(sqrtPriceLowerX96),
+        BigInt(sqrtPriceUpperX96),
+        token0Amount,
+        token1Amount
+    );
+}
+
+/**
+ * Calculate token amounts from liquidity for a given sqrt price range.
+ *
+ * ⭐ PREFERRED FUNCTION - Zero tick conversions, maximum precision.
+ * Use when you already have all sqrt prices (e.g., from historical pool state cache).
+ *
+ * @param liquidity The liquidity amount
+ * @param sqrtPriceCurrentX96 Current sqrt price (Q96.96 format)
+ * @param sqrtPriceLowerX96 Lower bound sqrt price (Q96.96 format)
+ * @param sqrtPriceUpperX96 Upper bound sqrt price (Q96.96 format)
+ * @param roundUp Whether to round up (default: false = floor)
+ * @returns Token amounts for token0 and token1
+ */
+export function getTokenAmountsFromLiquidity_X96(
+    liquidity: bigint,
+    sqrtPriceCurrentX96: bigint,
+    sqrtPriceLowerX96: bigint,
+    sqrtPriceUpperX96: bigint,
     roundUp: boolean = false
 ): TokenAmounts {
     if (liquidity === 0n) {
         return { token0Amount: 0n, token1Amount: 0n };
     }
 
-    const sqrtPriceLower = BigInt(
-        TickMath.getSqrtRatioAtTick(tickLower).toString()
-    );
-    const sqrtPriceUpper = BigInt(
-        TickMath.getSqrtRatioAtTick(tickUpper).toString()
-    );
-    const sqrtPriceCurrent = BigInt(
-        TickMath.getSqrtRatioAtTick(tickCurrent).toString()
-    );
-
-    let token0Amount: bigint;
-    let token1Amount: bigint;
-
-    if (tickCurrent < tickLower) {
-        // Price below range - all liquidity in token0
-        token0Amount = getAmount0FromLiquidity(
-            sqrtPriceLower,
-            sqrtPriceUpper,
-            liquidity,
-            roundUp
-        );
-        token1Amount = 0n;
-    } else if (tickCurrent >= tickUpper) {
-        // Price above range - all liquidity in token1
-        token0Amount = 0n;
-        token1Amount = getAmount1FromLiquidity(
-            sqrtPriceLower,
-            sqrtPriceUpper,
-            liquidity,
-            roundUp
-        );
-    } else {
-        // Price in range - mixed liquidity
-        token0Amount = getAmount0FromLiquidity(
-            sqrtPriceCurrent,
-            sqrtPriceUpper,
-            liquidity,
-            roundUp
-        );
-        token1Amount = getAmount1FromLiquidity(
-            sqrtPriceLower,
-            sqrtPriceCurrent,
-            liquidity,
-            roundUp
-        );
+    if (sqrtPriceCurrentX96 <= sqrtPriceLowerX96) {
+        // Price below range – all liquidity in token0
+        return {
+            token0Amount: getAmount0FromLiquidity(
+                sqrtPriceLowerX96,
+                sqrtPriceUpperX96,
+                liquidity,
+                roundUp
+            ),
+            token1Amount: 0n,
+        };
     }
 
-    return { token0Amount, token1Amount };
+    if (sqrtPriceCurrentX96 >= sqrtPriceUpperX96) {
+        // Price above range – all liquidity in token1
+        return {
+            token0Amount: 0n,
+            token1Amount: getAmount1FromLiquidity(
+                sqrtPriceLowerX96,
+                sqrtPriceUpperX96,
+                liquidity,
+                roundUp
+            ),
+        };
+    }
+
+    // Price within range – mixed liquidity
+    return {
+        token0Amount: getAmount0FromLiquidity(
+            sqrtPriceCurrentX96,
+            sqrtPriceUpperX96,
+            liquidity,
+            roundUp
+        ),
+        token1Amount: getAmount1FromLiquidity(
+            sqrtPriceLowerX96,
+            sqrtPriceCurrentX96,
+            liquidity,
+            roundUp
+        ),
+    };
 }
 
 /**
- * Calculate liquidity from token amounts
- * @param tickCurrent Current price tick
+ * Calculate liquidity from token0/token1 amounts for a given sqrt price range.
+ *
+ * ⭐ PREFERRED FUNCTION - Zero tick conversions, maximum precision.
+ * Use when you already have all sqrt prices (e.g., from historical pool state cache).
+ *
+ * @param sqrtPriceCurrentX96 Current sqrt price (Q96.96 format)
+ * @param sqrtPriceLowerX96 Lower bound sqrt price (Q96.96 format)
+ * @param sqrtPriceUpperX96 Upper bound sqrt price (Q96.96 format)
+ * @param token0Amount Amount of token0 available
+ * @param token1Amount Amount of token1 available
+ * @returns Maximum liquidity that can be provided
+ */
+export function getLiquidityFromTokenAmounts_X96(
+    sqrtPriceCurrentX96: bigint,
+    sqrtPriceLowerX96: bigint,
+    sqrtPriceUpperX96: bigint,
+    token0Amount: bigint,
+    token1Amount: bigint
+): bigint {
+    if (sqrtPriceCurrentX96 <= sqrtPriceLowerX96) {
+        // Price below range – only token0 provides liquidity
+        return getLiquidityFromAmount0(
+            sqrtPriceLowerX96,
+            sqrtPriceUpperX96,
+            token0Amount,
+            /* roundUp */ false
+        );
+    }
+
+    if (sqrtPriceCurrentX96 >= sqrtPriceUpperX96) {
+        // Price above range – only token1 provides liquidity
+        return getLiquidityFromAmount1(
+            sqrtPriceLowerX96,
+            sqrtPriceUpperX96,
+            token1Amount,
+            /* roundUp */ false
+        );
+    }
+
+    // Price within range – both tokens contribute, take the minimum
+    const liquidity0 = getLiquidityFromAmount0(
+        sqrtPriceCurrentX96,
+        sqrtPriceUpperX96,
+        token0Amount,
+        false
+    );
+    const liquidity1 = getLiquidityFromAmount1(
+        sqrtPriceLowerX96,
+        sqrtPriceCurrentX96,
+        token1Amount,
+        false
+    );
+
+    return liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+}
+
+/**
+ * Calculate token amounts from liquidity using tick-based current price.
+ *
+ * ⚠️  LEGACY FUNCTION - Avoid if possible. Performs 3 tick→sqrt conversions.
+ * Only use when current price is only available as tick (rare - pool.sqrtPriceX96 is always available).
+ * Consider using getTokenAmountsFromLiquidity() with pool.sqrtPriceX96 instead.
+ *
+ * @param liquidity The liquidity amount
+ * @param tickCurrent Current price as tick (less precise than sqrtPriceX96)
  * @param tickLower Lower bound tick
  * @param tickUpper Upper bound tick
- * @param token0Amount Amount of token0
- * @param token1Amount Amount of token1
- * @returns Liquidity that can be provided
+ * @param roundUp Whether to round up (default: false = floor)
+ * @returns Token amounts for token0 and token1
  */
-export function getLiquidityFromTokenAmounts(
+export function getTokenAmountsFromLiquidity_withTick(
+    liquidity: bigint,
+    tickCurrent: number,
+    tickLower: number,
+    tickUpper: number,
+    roundUp: boolean = false
+): TokenAmounts {
+    const sqrtPriceCurrentX96 = TickMath.getSqrtRatioAtTick(tickCurrent);
+    return getTokenAmountsFromLiquidity(
+        liquidity,
+        BigInt(sqrtPriceCurrentX96.toString()),
+        tickUpper,
+        tickLower,
+        roundUp
+    );
+}
+
+/**
+ * Calculate liquidity from token amounts using tick-based current price.
+ *
+ * ⚠️  LEGACY FUNCTION - Avoid if possible. Performs 3 tick→sqrt conversions.
+ * Only use when current price is only available as tick (rare - pool.sqrtPriceX96 is always available).
+ * Consider using getLiquidityFromTokenAmounts() with pool.sqrtPriceX96 instead.
+ *
+ * @param tickCurrent Current price as tick (less precise than sqrtPriceX96)
+ * @param tickLower Lower bound tick
+ * @param tickUpper Upper bound tick
+ * @param token0Amount Amount of token0 available
+ * @param token1Amount Amount of token1 available
+ * @returns Maximum liquidity that can be provided
+ */
+export function getLiquidityFromTokenAmounts_withTick(
     tickCurrent: number,
     tickLower: number,
     tickUpper: number,
     token0Amount: bigint,
     token1Amount: bigint
 ): bigint {
-    const sqrtPriceLower = BigInt(
-        TickMath.getSqrtRatioAtTick(tickLower).toString()
-    );
-    const sqrtPriceUpper = BigInt(
-        TickMath.getSqrtRatioAtTick(tickUpper).toString()
-    );
-    const sqrtPriceCurrent = BigInt(
+    const sqrtPriceCurrentX96 = BigInt(
         TickMath.getSqrtRatioAtTick(tickCurrent).toString()
     );
-
-    if (tickCurrent < tickLower) {
-        // Price below range - only token0 determines liquidity
-        return getLiquidityFromAmount0(
-            sqrtPriceLower,
-            sqrtPriceUpper,
-            token0Amount
-        );
-    } else if (tickCurrent >= tickUpper) {
-        // Price above range - only token1 determines liquidity
-        return getLiquidityFromAmount1(
-            sqrtPriceLower,
-            sqrtPriceUpper,
-            token1Amount
-        );
-    } else {
-        // Price in range - take minimum liquidity from both tokens
-        const liquidity0 = getLiquidityFromAmount0(
-            sqrtPriceCurrent,
-            sqrtPriceUpper,
-            token0Amount
-        );
-        const liquidity1 = getLiquidityFromAmount1(
-            sqrtPriceLower,
-            sqrtPriceCurrent,
-            token1Amount
-        );
-        return liquidity0 < liquidity1 ? liquidity0 : liquidity1;
-    }
+    return getLiquidityFromTokenAmounts(
+        sqrtPriceCurrentX96,
+        tickLower,
+        tickUpper,
+        token0Amount,
+        token1Amount
+    );
 }
 
 // Helper functions for liquidity math
@@ -148,7 +319,9 @@ export function getAmount0FromLiquidity(
     if (roundUp) {
         // Use ceiling division
         const product = numerator1 * Q96;
-        return product % denominator === 0n ? product / denominator : product / denominator + 1n;
+        return product % denominator === 0n
+            ? product / denominator
+            : product / denominator + 1n;
     } else {
         return mulDiv(numerator1, Q96, denominator);
     }
@@ -418,7 +591,7 @@ function K_Q96_inToken0(B: bigint, A: bigint, S: bigint): bigint {
  */
 export function calculatePositionValue(
     liquidity: bigint,
-    tickCurrent: number,
+    sqrtPriceCurrentX96: bigint,
     tickLower: number,
     tickUpper: number,
     currentPrice: bigint,
@@ -429,7 +602,7 @@ export function calculatePositionValue(
 
     const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
         liquidity,
-        tickCurrent,
+        sqrtPriceCurrentX96,
         tickLower,
         tickUpper
     );

@@ -79,11 +79,11 @@ export function usePositionSizeCalculation({
         // Calculate resulting token amounts from liquidity
         let token0Amount: bigint = 0n;
         let token1Amount: bigint = 0n;
-        if (liquidity > 0n && pool.currentTick !== null) {
+        if (liquidity > 0n && pool.sqrtPriceX96) {
             try {
                 const tokenAmounts = getTokenAmountsFromLiquidity(
                     liquidity,
-                    pool.currentTick,
+                    BigInt(pool.sqrtPriceX96),
                     tickLower,
                     tickUpper
                 );

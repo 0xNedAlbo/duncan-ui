@@ -145,7 +145,7 @@ export function IncreasePositionModal({
         try {
             const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
                 liquidity,
-                pool.currentTick,
+                BigInt(pool.sqrtPriceX96),
                 position.tickLower,
                 position.tickUpper
             );

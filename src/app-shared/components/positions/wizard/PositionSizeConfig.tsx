@@ -75,11 +75,11 @@ export function PositionSizeConfig({
 
     // Initialize input fields from liquidity prop when component first loads
     useEffect(() => {
-        if (!isInitialized && liquidity > 0n && pool.currentTick !== null) {
+        if (!isInitialized && liquidity > 0n && pool.sqrtPriceX96) {
             try {
                 const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
                     liquidity,
-                    pool.currentTick,
+                    BigInt(pool.sqrtPriceX96),
                     tickLower,
                     tickUpper
                 );

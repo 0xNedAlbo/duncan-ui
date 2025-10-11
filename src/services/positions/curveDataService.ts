@@ -6,7 +6,8 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
+import { calculatePositionValue } from "@/lib/utils/uniswap-v3/liquidity";
+import { TickMath } from "@uniswap/v3-sdk";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
 import type { CurvePoint, CurveData } from "@/app-shared/components/charts/mini-pnl-curve";
 import type { Services } from "../ServiceFactory";
@@ -68,7 +69,7 @@ export class CurveDataService {
     /**
      * Calculate position value at a specific price
      * @param liquidity Position liquidity
-     * @param currentTick Current price tick
+     * @param currentTick Current price tick (hypothetical for curve generation)
      * @param tickLower Lower bound tick
      * @param tickUpper Upper bound tick
      * @param currentPrice Current price in quote token units
@@ -76,37 +77,7 @@ export class CurveDataService {
      * @param baseDecimals Base token decimals
      * @returns Position value in quote token units
      */
-    private calculatePositionValue(
-        liquidity: bigint,
-        currentTick: number,
-        tickLower: number,
-        tickUpper: number,
-        currentPrice: bigint,
-        baseIsToken0: boolean,
-        baseDecimals: number
-    ): bigint {
-        // Get token amounts at current price
-        const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
-            liquidity,
-            currentTick,
-            tickLower,
-            tickUpper
-        );
-
-        if (baseIsToken0) {
-            // Base = token0, Quote = token1
-            // Value = token0Amount * currentPrice + token1Amount
-            // currentPrice is already in quote token decimals per base token
-            const baseValueInQuote = (token0Amount * currentPrice) / BigInt(10 ** baseDecimals);
-            return baseValueInQuote + token1Amount;
-        } else {
-            // Base = token1, Quote = token0
-            // Value = token1Amount * currentPrice + token0Amount
-            // currentPrice is already in quote token decimals per base token
-            const baseValueInQuote = (token1Amount * currentPrice) / BigInt(10 ** baseDecimals);
-            return baseValueInQuote + token0Amount;
-        }
-    }
+    // Removed - using utility function from liquidity.ts instead
     /**
      * Extract position parameters for curve calculation with current cost basis
      */
@@ -246,9 +217,10 @@ export class CurveDataService {
         let upperIndex = 0;
         
         for (let i = 0; i <= numPoints; i++) {
-            // Calculate price for this point
-            const progress = i / numPoints;
-            const priceAtPoint = minPrice + BigInt(Math.floor(Number(maxPrice - minPrice) * progress));
+            // Calculate price for this point using pure BigInt arithmetic
+            // Avoid Number conversion which loses precision for large values
+            const priceRange = maxPrice - minPrice;
+            const priceAtPoint = minPrice + (priceRange * BigInt(i)) / BigInt(numPoints);
             
             // Calculate PnL at this price
             const pnl = this.calculatePnLAtPrice(priceAtPoint, params);
@@ -292,7 +264,7 @@ export class CurveDataService {
         // Calculate ranges
         const allPrices = points.map(p => p.price);
         const allPnls = points.map(p => p.pnl);
-        
+
         return {
             points,
             priceRange: {
@@ -387,10 +359,13 @@ export class CurveDataService {
                 params.baseDecimals
             );
 
-            // Calculate position value at this price/tick
-            const positionValue = this.calculatePositionValue(
+            // Convert tick to sqrtPriceX96 for proper position value calculation
+            const sqrtPriceX96 = BigInt(TickMath.getSqrtRatioAtTick(tickAtPrice).toString());
+
+            // Calculate position value at this price using utility function
+            const positionValue = calculatePositionValue(
                 params.liquidity,
-                tickAtPrice,
+                sqrtPriceX96,
                 params.tickLower,
                 params.tickUpper,
                 price,
@@ -399,10 +374,16 @@ export class CurveDataService {
             );
 
             // PnL = current value - current cost basis (proper baseline)
-            return positionValue - params.currentCostBasis;
+            const pnl = positionValue - params.currentCostBasis;
 
-        } catch {
-            return 0n; // Fallback to zero PnL
+            return pnl;
+
+        } catch (error) {
+            // Log errors for debugging
+            if (error instanceof Error) {
+                throw new Error(`PnL calculation failed at price ${price}: ${error.message}`);
+            }
+            throw error;
         }
     }
 

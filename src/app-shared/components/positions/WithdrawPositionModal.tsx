@@ -118,7 +118,7 @@ export function WithdrawPositionModal({
             const currentLiquidity = BigInt(position.liquidity);
             const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
                 currentLiquidity,
-                pool.currentTick,
+                BigInt(pool.sqrtPriceX96),
                 position.tickLower,
                 position.tickUpper
             );
@@ -176,7 +176,7 @@ export function WithdrawPositionModal({
         try {
             const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
                 liquidityToRemove,
-                pool.currentTick,
+                BigInt(pool.sqrtPriceX96),
                 position.tickLower,
                 position.tickUpper
             );

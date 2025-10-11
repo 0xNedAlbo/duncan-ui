@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { PoolData } from "@/app-shared/hooks/api/usePool";
 import { generatePnLCurve } from "@/lib/utils/uniswap-v3/position";
 import { tickToPrice, priceToTick } from "@/lib/utils/uniswap-v3/price";
-import { calculatePositionValue, getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
+import { calculatePositionValue, getTokenAmountsFromLiquidity_withTick } from "@/lib/utils/uniswap-v3/liquidity";
 import { compareAddresses } from "@/lib/utils/evm";
 import { useTranslations } from "@/app-shared/i18n/client";
 
@@ -82,7 +82,7 @@ export function PositionPnLCurve({
             // Calculate initial position value at current tick (actual liquidity distribution)
             const initialPositionValue = calculatePositionValue(
                 liquidity,
-                pool.currentTick,
+                BigInt(pool.sqrtPriceX96),
                 tickLower,
                 tickUpper,
                 BigInt(Math.floor(currentPrice * Number(10n ** BigInt(quoteTokenDecimals)))),
@@ -118,8 +118,8 @@ export function PositionPnLCurve({
                     baseTokenDecimals
                 );
 
-                // Get token amounts at this tick
-                const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
+                // Get token amounts at this tick (hypothetical for curve visualization)
+                const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity_withTick(
                     liquidity,
                     tick,
                     tickLower,

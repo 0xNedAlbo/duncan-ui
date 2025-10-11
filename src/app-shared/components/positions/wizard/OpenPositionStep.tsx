@@ -133,7 +133,7 @@ export function OpenPositionStep(props: OpenPositionStepProps) {
         try {
             const { token0Amount, token1Amount } = getTokenAmountsFromLiquidity(
                 liquidity,
-                pool.currentTick,
+                BigInt(pool.sqrtPriceX96),
                 tickLower && !isNaN(tickLower) ? tickLower : TickMath.MIN_TICK,
                 tickUpper && !isNaN(tickUpper) ? tickUpper : TickMath.MAX_TICK,
                 false // Use floor to match what user entered
