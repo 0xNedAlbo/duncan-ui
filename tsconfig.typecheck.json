@@ -23,6 +23,7 @@
         ".next",
         "dist",
         "build",
-        "coverage"
+        "coverage",
+        "src/workers/**/dist"
     ]
 }
