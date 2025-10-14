@@ -133,7 +133,7 @@ export class CoinGeckoService {
         throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
       }
 
-      const allTokens: CoinGeckoToken[] = await response.json();
+      const allTokens = await response.json() as CoinGeckoToken[];
 
       // Filter to only include tokens that have addresses on our supported chains
       const supportedChainIds = Object.values(this.chainToPlatformId);
@@ -169,7 +169,7 @@ export class CoinGeckoService {
         throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
       }
 
-      const coin: CoinGeckoDetailedCoin = await response.json();
+      const coin = await response.json() as CoinGeckoDetailedCoin;
       return coin;
     } catch (error) {
       throw new Error(`Failed to fetch coin details for ${coinId}: ${error instanceof Error ? error.message : 'Unknown error'}`);

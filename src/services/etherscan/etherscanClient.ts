@@ -109,7 +109,7 @@ export class EtherscanClient {
                 throw error;
             }
 
-            const data = await response.json();
+            const data = await response.json() as any;
 
             // Check for Etherscan-specific rate limit response
             if (this.isEtherscanRateLimited(data)) {

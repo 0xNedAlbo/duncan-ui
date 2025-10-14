@@ -66,7 +66,7 @@ export class AlchemyTokenService {
       throw new Error(`Alchemy API error: ${response.status} ${response.statusText}`);
     }
 
-    const data: AlchemyResponse = await response.json();
+    const data = await response.json() as AlchemyResponse;
 
     if (data.error) {
       throw new Error(`Alchemy API error: ${data.error.message}`);
@@ -121,7 +121,7 @@ export class AlchemyTokenService {
       throw new Error(`Alchemy API error: ${response.status} ${response.statusText}`);
     }
 
-    const data: AlchemyBatchResponse = await response.json();
+    const data = await response.json() as AlchemyBatchResponse;
 
     if (data.error) {
       throw new Error(`Alchemy API error: ${data.error.message}`);

@@ -5,7 +5,7 @@ app = 'midcurve-blockscanner'
 primary_region = 'fra'
 
 [build]
-  dockerfile = 'src/workers/blockscanner/Dockerfile'
+  dockerfile = 'Dockerfile'
 
 [env]
   NODE_ENV = 'production'

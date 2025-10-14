@@ -78,7 +78,7 @@ export class SubgraphService {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        const data: SubgraphResponse<T> = await response.json();
+        const data = await response.json() as SubgraphResponse<T>;
 
         if (data.errors && data.errors.length > 0) {
           console.error(`🔍 The Graph subgraph GraphQL error for ${chain}:`, {
