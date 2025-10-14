@@ -6,6 +6,7 @@
 .pnp.js
 
 src/workers/*/node_modules
+src/workers/*/dist
 src/workers/*/.env
 src/workers/*/.env.production
 src/workers/*/.env.local

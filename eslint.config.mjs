@@ -18,7 +18,10 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "src/workers/**/dist/**",
     ],
+  },
+  {
      rules: {
             "no-unused-vars": [
                 "error",
