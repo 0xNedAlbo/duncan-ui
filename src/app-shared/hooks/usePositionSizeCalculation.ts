@@ -138,7 +138,6 @@ export function usePositionSizeCalculation({
         quoteToken.address,
         quoteToken.decimals,
         pool.sqrtPriceX96,
-        pool.currentTick,
         tickLower,
         tickUpper,
     ]);

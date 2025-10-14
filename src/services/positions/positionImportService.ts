@@ -424,8 +424,7 @@ export class PositionImportService {
 
             // Return the block number of the latest position event
             return allEvents[allEvents.length - 1].blockNumber;
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (error) {
+        } catch {
             // If we can't find events, return null
             return null;
         }
@@ -477,8 +476,7 @@ export class PositionImportService {
                         functionName: "ownerOf",
                         args: [nftId],
                     });
-                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                } catch (currentError) {
+                } catch {
                     // Fallback: find the last block when position was active
                     const historicalBlock = await this.getLastEventBlockNumber(
                         client,

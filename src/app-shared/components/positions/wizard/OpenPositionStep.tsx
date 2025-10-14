@@ -35,10 +35,9 @@ interface CreatedPositionData {
 }
 
 interface OpenPositionStepProps {
-    // eslint-disable-next-line no-unused-vars
     onPositionCreated?: (
-        data: CreatedPositionData | null,
-        receipt?: import('viem').TransactionReceipt
+        _data: CreatedPositionData | null,
+        _receipt?: import('viem').TransactionReceipt
     ) => void;
 }
 

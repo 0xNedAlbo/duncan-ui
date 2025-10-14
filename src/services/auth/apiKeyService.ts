@@ -31,8 +31,11 @@ function base32(bytes: Buffer): string {
 }
 
 export class ApiKeyService {
-  // eslint-disable-next-line no-unused-vars
-  constructor(private prisma: PrismaClient) {}
+  private readonly prisma: PrismaClient;
+
+  constructor(prisma: PrismaClient) {
+    this.prisma = prisma;
+  }
 
   async createApiKey(
     userId: string,

@@ -73,7 +73,7 @@ function MiniPnLCurveComponent({
             const quoteToken = baseIsToken0 ? position.pool.token1 : position.pool.token0;
 
             // Calculate price range (±50% buffer around position range)
-            const currentPrice = BigInt(position.pool.currentPrice);
+            const currentPrice = BigInt(position.pool.currentPrice || '0');
             const lowerPrice = tickToPrice(position.tickLower, baseToken.address, quoteToken.address, baseToken.decimals);
             const upperPrice = tickToPrice(position.tickUpper, baseToken.address, quoteToken.address, baseToken.decimals);
             const rangeWidth = upperPrice - lowerPrice;
@@ -152,7 +152,7 @@ function MiniPnLCurveComponent({
             console.error("Error generating PnL curve:", error);
             return null;
         }
-    }, [position, pnlBreakdown]);
+    }, [position, pnlBreakdown, markerPrice]);
 
     // Show loading/N/A state when no curve data available
     if (!curveData) {

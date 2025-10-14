@@ -112,8 +112,7 @@ export class EvmBlockInfoService {
                 parentHash: block.parentHash,
                 blockTag
             };
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (_error) {
+        } catch {
             // Block tag not supported by chain (e.g., "finalized" on older chains)
             return null;
         }

@@ -8,7 +8,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAccount } from "wagmi";
 import { isValidChainSlug, getChainId, type SupportedChainsType } from "@/config/chains";
 import { useCreatePositionOptimistic } from "@/app-shared/hooks/api/useCreatePositionOptimistic";
-import { useSession } from "next-auth/react";
 import { compareAddresses } from "@/lib/utils/evm";
 import { parseIncreaseLiquidityEvent } from "@/lib/utils/uniswap-v3/parse-liquidity-events";
 import { NONFUNGIBLE_POSITION_MANAGER_ADDRESSES } from "@/lib/contracts/nonfungiblePositionManager";
@@ -50,10 +49,8 @@ export function PositionWizard({
     // Query client for cache updates
     const queryClient = useQueryClient();
 
-    // Get wallet address and user session
+    // Get wallet address
     const { address: walletAddress } = useAccount();
-    const { data: session } = useSession();
-    const user = session?.user;
 
     // Optimistic position creation mutation
     const createOptimisticMutation = useCreatePositionOptimistic({

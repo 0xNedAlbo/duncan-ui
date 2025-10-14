@@ -8,7 +8,6 @@ import { useMutation, useQueryClient, UseMutationOptions } from '@tanstack/react
 import { apiClient } from '@/app-shared/lib/api-client/apiClient';
 import { ApiError } from '@/app-shared/lib/api-client/apiError';
 import type { PositionRefreshResponse } from '@/types/api';
-import { QUERY_KEYS } from '@/types/api';
 
 export interface UpdatePositionWithEventsRequest {
   chain: string;

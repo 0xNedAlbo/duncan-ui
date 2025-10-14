@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { RotateCcw, Plus } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useTranslations } from "@/app-shared/i18n/client";
 import type { BasicPosition } from "@/types/positions";
 import type { PositionListParams } from "@/types/api";
@@ -21,7 +21,7 @@ interface PositionListProps {
   className?: string;
   onWizardModalOpen?: () => void;
   onImportModalOpen?: () => void;
-  onImportSuccess?: (position: any) => void;
+  onImportSuccess?: (_position: any) => void;
 }
 
 export function PositionList({

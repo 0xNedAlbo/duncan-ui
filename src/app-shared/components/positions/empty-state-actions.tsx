@@ -12,7 +12,7 @@ import type { BasicPosition } from "@/types/positions";
 interface EmptyStateActionsProps {
     onWizardClick: () => void;
     onWalletImportClick: () => void;
-    onImportSuccess?: (position: any) => void;
+    onImportSuccess?: (_position: any) => void;
 }
 
 export function EmptyStateActions({

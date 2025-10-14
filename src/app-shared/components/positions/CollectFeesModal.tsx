@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { X, AlertCircle, Check } from "lucide-react";
 import { useAccount } from "wagmi";
 import type { Address } from "viem";
-import { useQueryClient } from "@tanstack/react-query";
 import { getChainId, SupportedChainsType } from "@/config/chains";
 import { normalizeAddress } from "@/lib/utils/evm";
 import { useCollectFees } from "@/app-shared/hooks/useCollectFees";
@@ -36,7 +35,6 @@ export function CollectFeesModal({
 }: CollectFeesModalProps) {
     const t = useTranslations();
     const [mounted, setMounted] = useState(false);
-    const queryClient = useQueryClient();
     const updateMutation = useUpdatePositionWithEvents();
 
     const {
@@ -49,14 +47,6 @@ export function CollectFeesModal({
     useEffect(() => {
         setMounted(true);
     }, []);
-
-    // Reset mutation state when modal opens
-    useEffect(() => {
-        if (isOpen) {
-            updateMutation.reset();
-            collectFees.reset();
-        }
-    }, [isOpen]);
 
     // Normalize addresses
     const normalizedWalletAddress = walletAddress
@@ -136,6 +126,14 @@ export function CollectFeesModal({
 
     // Collect fees hook
     const collectFees = useCollectFees(collectParams);
+
+    // Reset mutation state when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            updateMutation.reset();
+            collectFees.reset();
+        }
+    }, [isOpen, updateMutation, collectFees]);
 
     // Handle collect execution
     const handleCollect = () => {

@@ -5,13 +5,11 @@
  * Ensures process-wide request spacing to prevent rate limit violations.
  */
 
-/* eslint-disable no-unused-vars */
 type ScheduledTask<T> = {
     execute: () => Promise<T>;
-    resolve: (value: T) => void;
-    reject: (error: unknown) => void;
+    resolve: (_value: T) => void;
+    reject: (_error: unknown) => void;
 };
-/* eslint-enable no-unused-vars */
 
 export class RequestScheduler {
     private queue: ScheduledTask<any>[] = [];

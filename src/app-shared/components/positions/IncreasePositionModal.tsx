@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { X, Loader2, AlertCircle, Check } from "lucide-react";
 import { useAccount } from "wagmi";
 import type { Address } from "viem";
-import { useQueryClient } from "@tanstack/react-query";
 import { getChainId, type SupportedChainsType } from "@/config/chains";
 import { normalizeAddress } from "@/lib/utils/evm";
 import { getTokenAmountsFromLiquidity } from "@/lib/utils/uniswap-v3/liquidity";
@@ -36,7 +35,6 @@ export function IncreasePositionModal({
 }: IncreasePositionModalProps) {
     const [mounted, setMounted] = useState(false);
     const [liquidity, setLiquidity] = useState<bigint>(0n);
-    const queryClient = useQueryClient();
     const updateMutation = useUpdatePositionWithEvents();
 
     const {
@@ -49,14 +47,6 @@ export function IncreasePositionModal({
     useEffect(() => {
         setMounted(true);
     }, []);
-
-    // Reset mutation state when modal opens
-    useEffect(() => {
-        if (isOpen) {
-            updateMutation.reset();
-            increaseLiquidity.reset();
-        }
-    }, [isOpen]);
 
     // Load pool data to get current price
     const {
@@ -265,6 +255,14 @@ export function IncreasePositionModal({
 
     // Increase liquidity hook
     const increaseLiquidity = useIncreaseLiquidity(increaseParams);
+
+    // Reset mutation state when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            updateMutation.reset();
+            increaseLiquidity.reset();
+        }
+    }, [isOpen, updateMutation, increaseLiquidity]);
 
     // Handle liquidity changes
     const onLiquidityChange = useCallback((newLiquidity: bigint) => {

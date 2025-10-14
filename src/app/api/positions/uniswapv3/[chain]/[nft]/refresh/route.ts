@@ -4,7 +4,6 @@ import { logError } from "@/app-shared/lib/api/withLogging";
 import { ApiServiceFactory } from "@/app-shared/lib/api/ApiServiceFactory";
 import { SupportedChainsType, SUPPORTED_CHAINS } from "@/config/chains";
 import type { PositionRefreshResponse } from "@/types/api";
-import type { UnclaimedFeeAmounts } from "@/app/api/positions/uniswapv3/[chain]/[nft]/details/route";
 
 /**
  * POST /api/positions/uniswapv3/[chain]/[nft]/refresh - Refresh position data

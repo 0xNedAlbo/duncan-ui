@@ -47,14 +47,6 @@ export function WithdrawPositionModal({
         setMounted(true);
     }, []);
 
-    // Reset mutation state when modal opens
-    useEffect(() => {
-        if (isOpen) {
-            updateMutation.reset();
-            decreaseLiquidity.reset();
-        }
-    }, [isOpen]);
-
     // Load pool data to get current price
     const {
         pool,
@@ -257,6 +249,14 @@ export function WithdrawPositionModal({
 
     // Decrease liquidity hook
     const decreaseLiquidity = useDecreaseLiquidity(decreaseParams);
+
+    // Reset mutation state when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            updateMutation.reset();
+            decreaseLiquidity.reset();
+        }
+    }, [isOpen, updateMutation, decreaseLiquidity]);
 
     // Handle percentage slider change
     const handlePercentChange = useCallback(

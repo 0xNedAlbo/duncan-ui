@@ -113,6 +113,7 @@ export function PositionSizeConfig({
     }, [
         liquidity,
         pool.currentTick,
+        pool.sqrtPriceX96,
         tickLower,
         tickUpper,
         baseToken,

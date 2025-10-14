@@ -7,7 +7,6 @@ import { normalizeAddress, isValidAddress } from "@/lib/utils/evm";
 import type { BasicPosition } from "@/services/positions/positionService";
 import type { ApiResponse, PositionRefreshResponse } from "@/types/api";
 import type { AprBreakdown } from "@/types/apr";
-import type { CurveData } from "@/app-shared/components/charts/mini-pnl-curve";
 
 /**
  * GET /api/positions/uniswapv3/[chain]/[nft] - Get position details
@@ -420,7 +419,6 @@ export const PUT = withAuthAndLogging<PositionRefreshResponse>(
                 // Calculate fresh data
                 let pnlBreakdown = null;
                 let aprBreakdown: AprBreakdown | undefined = undefined;
-                let curveData: CurveData | undefined = undefined;
 
                 // Calculate PnL breakdown
                 try {
@@ -441,23 +439,13 @@ export const PUT = withAuthAndLogging<PositionRefreshResponse>(
                     }
                 }
 
-                // Calculate curve data
-                try {
-                    if (apiFactory.curveDataService.validatePosition(existingPosition)) {
-                        curveData = await apiFactory.curveDataService.getCurveData(existingPosition);
-                    }
-                } catch (error) {
-                    log.debug({ chain, nftId, error }, "Curve calculation failed");
-                }
-
                 // Return full position data with updated metrics
                 return NextResponse.json({
                     success: true,
                     data: {
                         position: existingPosition,
                         pnlBreakdown,
-                        aprBreakdown,
-                        curveData
+                        aprBreakdown
                     },
                     meta: {
                         requestedAt: new Date().toISOString(),
@@ -566,7 +554,6 @@ export const PUT = withAuthAndLogging<PositionRefreshResponse>(
             // Note: positionId already declared at line 345
             let pnlBreakdown = null;
             let aprBreakdown: AprBreakdown | undefined = undefined;
-            let curveData: CurveData | undefined = undefined;
 
             // Calculate PnL breakdown
             try {
@@ -599,27 +586,13 @@ export const PUT = withAuthAndLogging<PositionRefreshResponse>(
                 }
             }
 
-            // Calculate curve data
-            try {
-                if (apiFactory.curveDataService.validatePosition(createdPosition)) {
-                    curveData = await apiFactory.curveDataService.getCurveData(createdPosition);
-                    log.debug({ chain, nftId }, 'Calculated curve data');
-                }
-            } catch (error) {
-                log.debug(
-                    { chain, nftId, error: error instanceof Error ? error.message : 'Unknown' },
-                    'Curve calculation failed'
-                );
-            }
-
             // Return full position data (matching refresh endpoint structure)
             return NextResponse.json({
                 success: true,
                 data: {
                     position: createdPosition,
                     pnlBreakdown,
-                    aprBreakdown,
-                    curveData
+                    aprBreakdown
                 },
                 meta: {
                     requestedAt: new Date().toISOString(),
